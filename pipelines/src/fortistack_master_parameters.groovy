@@ -1,13 +1,6 @@
-// parameters.groovy
-// This file defines all the parameters for the master pipeline.
-// Lessons Learned:
-// 1. Defining all parameters in one place makes them easier to manage and re-use.
-// 2. When using the properties block in a Jenkinsfile, it overrides any UI-configured parameters.
-// 3. Dynamic parameters (CascadeChoiceParameter) can be set up using SecureGroovyScript for better type safety.
-// 4. Using a list for choices improves readability.
-
 import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.SecureGroovyScript
 
+// Return a map with a 'parameters' key containing the list of parameter definitions.
 return [
   parameters: [
     // Static JSON parameter for common settings.
@@ -34,7 +27,7 @@ return [
       defaultValue: 'node1',
       description: 'Enter the node name (e.g., node1, node2, …)'
     ),
-    // Feature selection using a list for readability.
+    // Feature selection defined as a list for improved readability.
     choice(
       name: 'FEATURE_NAME',
       choices: ["avfortisandbox", "webfilter"].join("\n"),

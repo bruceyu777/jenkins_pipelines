@@ -1,12 +1,19 @@
+// parameters.groovy
+// This file defines all the parameters for the master pipeline.
+// Lessons Learned:
+// 1. Defining all parameters in one place makes them easier to manage and re-use.
+// 2. When using the properties block in a Jenkinsfile, it overrides any UI-configured parameters.
+// 3. Dynamic parameters (CascadeChoiceParameter) can be set up using SecureGroovyScript for better type safety.
+// 4. Using a list for choices improves readability.
+
 import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.SecureGroovyScript
 
-properties([
-  parameters([
+return [
+  parameters: [
     // Static JSON parameter for common settings.
     string(
       name: 'PARAMS_JSON',
       defaultValue: '''{
-  "NODE_NAME": "node1",
   "build_name": "fortistack-",
   "send_to": "yzhengfeng@fortinet.com",
   "FGT_TYPE": "ALL",
@@ -21,10 +28,16 @@ properties([
       defaultValue: '3473',
       description: 'Enter the build number'
     ),
-    // Feature selection.
+    // Node name parameter.
+    string(
+      name: 'NODE_NAME',
+      defaultValue: 'node1',
+      description: 'Enter the node name (e.g., node1, node2, …)'
+    ),
+    // Feature selection using a list for readability.
     choice(
       name: 'FEATURE_NAME',
-      choices: 'avfortisandbox\nwebfilter',
+      choices: ["avfortisandbox", "webfilter"].join("\n"),
       description: 'Select the feature'
     ),
     // Dynamic parameter for TEST_CONFIG_CHOICE.
@@ -45,10 +58,6 @@ properties([
              }''',
           true
         )
-      ],
-      fallbackScript: [
-        $class: 'GroovyScript',
-        script: new SecureGroovyScript('return ["error"]', true)
       ]
     ],
     // Dynamic parameter for TEST_GROUP_CHOICE.
@@ -69,59 +78,7 @@ properties([
              }''',
           true
         )
-      ],
-      fallbackScript: [
-        $class: 'GroovyScript',
-        script: new SecureGroovyScript('return ["error"]', true)
       ]
     ]
-  ])
-])
-
-pipeline {
-  agent any
-
-  stages {
-    stage('Trigger Provision Pipeline') {
-      steps {
-        script {
-          // Parse the static JSON parameter.
-          def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
-          def provisionParams = [
-            string(name: 'NODE_NAME', value: paramsMap.NODE_NAME),
-            string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
-            string(name: 'FGT_TYPE', value: paramsMap.FGT_TYPE)
-          ]
-          echo "Triggering bring_up_node_kvm with parameters: ${provisionParams}"
-          build job: 'bring_up_node_kvm', parameters: provisionParams, wait: true
-        }
-      }
-    }
-    
-    stage('Trigger Test Pipeline') {
-      steps {
-        script {
-          def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
-          def testParams = [
-            string(name: 'NODE_NAME', value: paramsMap.NODE_NAME),
-            string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR),
-            string(name: 'SVN_BRANCH', value: paramsMap.SVN_BRANCH),
-            string(name: 'FEATURE_NAME', value: params.FEATURE_NAME),
-            string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE),
-            string(name: 'TEST_GROUP_CHOICE', value: params.TEST_GROUP_CHOICE),
-            string(name: 'build_name', value: paramsMap.build_name),
-            string(name: 'send_to', value: paramsMap.send_to)
-          ]
-          echo "Triggering runtest with parameters: ${testParams}"
-          build job: 'runtest', parameters: testParams, wait: true
-        }
-      }
-    }
-  }
-
-  post {
-    always {
-      echo "Master pipeline completed."
-    }
-  }
-}
+  ]
+]

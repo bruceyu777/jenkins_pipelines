@@ -1,16 +1,12 @@
-// fortistack_master.groovy
-// Master pipeline that triggers downstream jobs 'bring_up_node_kvm' and 'runtest'.
-// Parameter definitions are maintained in an external file (fortistack_master_parameters.groovy)
-// to keep the pipeline code clean and maintainable.
-//
+// Jenkinsfile
+// This master pipeline triggers two downstream jobs: 'bring_up_node_kvm' and 'runtest'.
+// The parameter definitions are loaded from an external file (parameters.groovy) to improve maintainability.
 // Lessons Learned:
-// 1. Centralizing parameter definitions in a separate file makes it easier to manage and update.
-// 2. Converting the JSON from the shared parameters into a plain map prevents serialization issues.
-// 3. Using descriptive comments throughout the code improves readability and maintainability.
+// - Use an external file to manage parameter definitions so the Jenkinsfile remains clean.
+// - Convert the JSON parsed by JsonSlurper into a plain map to avoid serialization issues.
+// - Use descriptive comments to make the code self-explanatory.
 
-// Load the shared parameter definitions from an external file.
-// Make sure fortistack_master_parameters.groovy is in the same folder as this file.
-def parameterDefs = load 'fortistack_master_parameters.groovy'
+def parameterDefs = load 'parameters.groovy'
 properties(parameterDefs)
 
 pipeline {
@@ -20,12 +16,11 @@ pipeline {
     stage('Trigger Provision Pipeline') {
       steps {
         script {
-          // Parse the static JSON parameter (from shared parameters) and convert it into a plain HashMap.
-          def paramsMap = new groovy.json.JsonSlurper()
-                           .parseText(params.PARAMS_JSON)
-                           .collectEntries { k, v -> [k, v] }
+          // Parse the static JSON parameter and convert it to a plain HashMap.
+          def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
+                         .collectEntries { k, v -> [k, v] }
           
-          // Build parameters for the 'bring_up_node_kvm' job.
+          // Build the parameters for the 'bring_up_node_kvm' job.
           def provisionParams = [
             string(name: 'NODE_NAME', value: params.NODE_NAME),
             string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
@@ -40,12 +35,11 @@ pipeline {
     stage('Trigger Test Pipeline') {
       steps {
         script {
-          // Parse the static JSON parameter again for the test pipeline.
-          def paramsMap = new groovy.json.JsonSlurper()
-                           .parseText(params.PARAMS_JSON)
-                           .collectEntries { k, v -> [k, v] }
+          // Parse the static JSON parameter again for test pipeline.
+          def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
+                         .collectEntries { k, v -> [k, v] }
           
-          // Build parameters for the 'runtest' job.
+          // Build the parameters for the 'runtest' job.
           def testParams = [
             string(name: 'NODE_NAME', value: params.NODE_NAME),
             string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR),
