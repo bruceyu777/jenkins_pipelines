@@ -8,6 +8,18 @@ def call() {
     agent any
 
     stages {
+      stage('Debug Parameters') {
+        steps {
+          script {
+            echo "=== Debug: Printing All Parameters ==="
+            // Iterate over each parameter and print its key/value pair.
+            params.each { key, value ->
+              echo "${key} = ${value}"
+            }
+          }
+        }
+      }
+
       stage('Trigger Provision Pipeline') {
         steps {
           script {
