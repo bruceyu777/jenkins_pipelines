@@ -1,7 +1,9 @@
 // fortistackMasterParameters.groovy
+// This file defines the parameter configuration for the master pipeline.
 println "fortistackMasterParameters loaded successfully"
 def call() {
-    def paramsList = [
+    return [
+      parameters: [
         // Static JSON parameter for common settings.
         string(
           name: 'PARAMS_JSON',
@@ -80,7 +82,6 @@ def call() {
             sandbox: true
           ]
         ]
+      ]
     ]
-    // Explicitly cast the list to a List before returning.
-    return [ parameters: paramsList as List ]
 }
