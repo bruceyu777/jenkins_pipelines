@@ -1,0 +1,7 @@
+FROM jenkins/jenkins:lts
+
+USER root
+RUN mkdir -p /var/jenkins_home/.ssh && \
+    ssh-keyscan github.com >> /var/jenkins_home/.ssh/known_hosts && \
+    chown -R jenkins:jenkins /var/jenkins_home/.ssh
+USER jenkins

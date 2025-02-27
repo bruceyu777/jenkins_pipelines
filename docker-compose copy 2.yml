@@ -1,19 +1,16 @@
 services:
   jenkins-master:
-    build:
-      context: /home/fosqa/jenkins-master  # adjust if needed
-      dockerfile: Dockerfile.jenkins
+    image: jenkins/jenkins:lts
     container_name: jenkins-master
     restart: unless-stopped
     ports:
       - "8080:8080"
       - "50000:50000"
-    environment:
+    environment: #let jenkins accept local git repo
       - JAVA_OPTS=-Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true
     volumes:
       - jenkins_data:/var/jenkins_home
       - /home/fosqa/jenkins-master:/home/fosqa/jenkins-master
-      - /home/fosqa/known_hosts:/var/jenkins_home/.ssh/known_hosts:ro
     networks:
       - custom_network
 

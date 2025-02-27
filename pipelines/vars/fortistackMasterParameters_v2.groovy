@@ -1,12 +1,5 @@
-// fortistackMasterParameters.groovy
-// This file defines the parameter configuration for the master pipeline.
-// Lessons Learned:
-// 1. Centralizing parameter definitions in one file makes maintenance easier.
-// 2. Using a JSON string and converting it to a plain map avoids serialization issues.
-// 3. Dynamic parameters (CascadeChoiceParameter) are defined using GroovyScript with sandbox enabled.
-
-import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.SecureGroovyScript
-
+// fortistackMasterParameters.groovy in vars
+println "fortistackMasterParameters loaded successfully"
 def call() {
     return [
       parameters: [
@@ -48,16 +41,19 @@ def call() {
           choiceType: 'PT_SINGLE_SELECT',
           script: [
             $class: 'GroovyScript',
-            script: new SecureGroovyScript(
-              '''if (FEATURE_NAME == "avfortisandbox") {
-                   return ["env.newman.FGT_KVM.avfortisandbox.conf", "env.newman.FGT_KVM.alt.conf"]
-                 } else if (FEATURE_NAME == "webfilter") {
-                   return ["env.FGTVM64.webfilter_demo.conf", "env.FGTVM64.alt.conf"]
-                 } else {
-                   return ["unknown"]
-                 }''',
-              true
-            )
+            script: '''if (FEATURE_NAME == "avfortisandbox") {
+                         return ["env.newman.FGT_KVM.avfortisandbox.conf", "env.newman.FGT_KVM.alt.conf"]
+                       } else if (FEATURE_NAME == "webfilter") {
+                         return ["env.FGTVM64.webfilter_demo.conf", "env.FGTVM64.alt.conf"]
+                       } else {
+                         return ["unknown"]
+                       }''',
+            sandbox: true
+          ],
+          fallbackScript: [
+            $class: 'GroovyScript',
+            script: 'return ["error"]',
+            sandbox: true
           ]
         ],
         // Dynamic parameter for TEST_GROUP_CHOICE.
@@ -68,16 +64,19 @@ def call() {
           choiceType: 'PT_SINGLE_SELECT',
           script: [
             $class: 'GroovyScript',
-            script: new SecureGroovyScript(
-              '''if (FEATURE_NAME == "avfortisandbox") {
-                   return ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_alt.full"]
-                 } else if (FEATURE_NAME == "webfilter") {
-                   return ["grp.webfilter_basic.full", "grp.webfilter_alt.full"]
-                 } else {
-                   return ["unknown"]
-                 }''',
-              true
-            )
+            script: '''if (FEATURE_NAME == "avfortisandbox") {
+                         return ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_alt.full"]
+                       } else if (FEATURE_NAME == "webfilter") {
+                         return ["grp.webfilter_basic.full", "grp.webfilter_alt.full"]
+                       } else {
+                         return ["unknown"]
+                       }''',
+            sandbox: true
+          ],
+          fallbackScript: [
+            $class: 'GroovyScript',
+            script: 'return ["error"]',
+            sandbox: true
           ]
         ]
       ]
