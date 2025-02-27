@@ -71,19 +71,7 @@ def call() {
             true
           )
         ]
-      ],
-      // Toggle parameter to skip Provision Pipeline stage.
-      booleanParam(
-        name: 'SKIP_PROVISION',
-        defaultValue: false,
-        description: 'Set to true to skip the Provision Pipeline stage'
-      ),
-      // Toggle parameter to skip Test Pipeline stage.
-      booleanParam(
-        name: 'SKIP_TEST',
-        defaultValue: false,
-        description: 'Set to true to skip the Test Pipeline stage'
-      )
+      ]
     ])
   ])
 }

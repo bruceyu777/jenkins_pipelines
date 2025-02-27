@@ -1,4 +1,4 @@
-// No need for the @Library annotation here since this file is part of the shared library.
+// Note: No need for the @Library annotation here since this file is part of the shared library.
 def call() {
   // Load and apply parameter definitions from the shared library.
   // This call must occur before the pipeline block so that job properties are set.
@@ -12,22 +12,19 @@ def call() {
         steps {
           script {
             echo "=== Debug: Printing All Parameters ==="
+            // Iterate over each parameter and print its key/value pair.
             params.each { key, value ->
               echo "${key} = ${value}"
             }
           }
         }
       }
-      
+
       stage('Trigger Provision Pipeline') {
-        when {
-          expression { return !params.SKIP_PROVISION }
-        }
         steps {
           script {
-            // Parse the JSON parameter into a Map.
-            def paramsMap = new groovy.json.JsonSlurper()
-                             .parseText(params.PARAMS_JSON)
+            // Parse the JSON parameter into a Map
+            def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
                              .collectEntries { k, v -> [k, v] }
             def provisionParams = [
               string(name: 'NODE_NAME', value: params.NODE_NAME),
@@ -41,13 +38,9 @@ def call() {
       }
       
       stage('Trigger Test Pipeline') {
-        when {
-          expression { return !params.SKIP_TEST }
-        }
         steps {
           script {
-            def paramsMap = new groovy.json.JsonSlurper()
-                             .parseText(params.PARAMS_JSON)
+            def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
                              .collectEntries { k, v -> [k, v] }
             def testParams = [
               string(name: 'NODE_NAME', value: params.NODE_NAME),
