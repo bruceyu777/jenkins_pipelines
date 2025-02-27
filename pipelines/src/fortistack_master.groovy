@@ -10,7 +10,10 @@
 
 // Load the shared parameter definitions from an external file.
 // Make sure fortistack_master_parameters.groovy is in the same folder as this file.
-def parameterDefs = load 'fortistack_master_parameters.groovy'
+@Library('sharedLib') _
+
+// Load parameter definitions from the shared library function.
+def parameterDefs = fortistackMasterParameters()
 properties(parameterDefs)
 
 pipeline {

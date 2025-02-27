@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """
-This script adjusts the ownership and permissions of a given directory (and all its subdirectories)
-so that the jenkins user has the same level of access as the local user fosqa.
-It assumes that the target directory is a Git repository that Jenkins will use locally.
-
-Usage: sudo python3 set_permissions.py
+This script ensures that the parent directory (/home/fosqa) has permissions
+that allow traversal by the Jenkins user.
+It sets the permissions to 755 for /home/fosqa.
+Run this script with sudo.
 """
 
 import subprocess
 import sys
+import os
 
-def update_permissions(target_dir):
+def set_parent_permissions(directory, mode):
     try:
-        # Change ownership recursively: set owner to "jenkins" and group to "fosqa"
-        subprocess.check_call(["sudo", "chown", "-R", "jenkins:fosqa", target_dir])
-        print(f"Ownership set to jenkins:fosqa for {target_dir}")
+        # Get current permissions
+        current_mode = oct(os.stat(directory).st_mode)[-3:]
+        print(f"Current permissions for {directory}: {current_mode}")
         
-        # Set permissions recursively to 775
-        subprocess.check_call(["sudo", "chmod", "-R", "775", target_dir])
-        print(f"Permissions set to 775 for {target_dir}")
-    except subprocess.CalledProcessError as e:
-        print("Error updating permissions:", e)
+        # Change permissions to desired mode (e.g., '755')
+        subprocess.check_call(["sudo", "chmod", mode, directory])
+        print(f"Permissions for {directory} set to {mode}")
+    except Exception as e:
+        print("Error:", e)
         sys.exit(1)
 
 if __name__ == "__main__":
-    # Set the target directory for your Jenkins master repository
-    target_directory = "/home/fosqa/jenkins-master"
-    update_permissions(target_directory)
+    parent_dir = "/home/fosqa"
+    desired_mode = "755"
+    set_parent_permissions(parent_dir, desired_mode)
