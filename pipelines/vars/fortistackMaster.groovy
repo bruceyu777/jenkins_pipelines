@@ -5,8 +5,8 @@ def call() {
   fortistackMasterParameters()
 
   pipeline {
-    // Dynamically select the agent based on the NODE_NAME parameter.
-    agent { label "${params.NODE_NAME}" }
+    // Run the master pipeline on the master node to avoid deadlock.
+    agent { label 'master' }
 
     stages {
       stage('Debug Parameters') {
@@ -21,6 +21,8 @@ def call() {
       }
       
       stage('Trigger Provision Pipeline') {
+        // This stage runs on the agent specified by NODE_NAME.
+        agent { label "${params.NODE_NAME}" }
         when {
           expression { return !params.SKIP_PROVISION }
         }
@@ -42,6 +44,8 @@ def call() {
       }
       
       stage('Trigger Test Pipeline') {
+        // This stage runs on the agent specified by NODE_NAME.
+        agent { label "${params.NODE_NAME}" }
         when {
           expression { return !params.SKIP_TEST }
         }
