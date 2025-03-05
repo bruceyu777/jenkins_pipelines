@@ -72,6 +72,26 @@ def call() {
           )
         ]
       ],
+      // Dynamic parameter for DOCKER_COMPOSE_FILE_CHOICE.
+      [$class: 'CascadeChoiceParameter',
+        name: 'DOCKER_COMPOSE_FILE_CHOICE',
+        description: 'Select docker compose file based on feature',
+        referencedParameters: 'FEATURE_NAME',
+        choiceType: 'PT_SINGLE_SELECT',
+        script: [
+          $class: 'GroovyScript',
+          script: new SecureGroovyScript(
+            '''if (FEATURE_NAME == "avfortisandbox") {
+                 return ["docker.avfortisandbox_avfortisandbox.yml", "other"]
+               } else if (FEATURE_NAME == "webfilter") {
+                 return ["docker.webfilter_basic.yml", "other"]
+               } else {
+                 return ["unknown"]
+               }''',
+            true
+          )
+        ]
+      ],
       // Toggle parameter to skip Provision Pipeline stage.
       booleanParam(
         name: 'SKIP_PROVISION',

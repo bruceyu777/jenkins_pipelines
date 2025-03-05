@@ -61,6 +61,7 @@ def call() {
               string(name: 'FEATURE_NAME', value: params.FEATURE_NAME),
               string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE),
               string(name: 'TEST_GROUP_CHOICE', value: params.TEST_GROUP_CHOICE),
+              string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE),
               string(name: 'build_name', value: paramsMap.build_name),
               string(name: 'send_to', value: paramsMap.send_to)
             ]

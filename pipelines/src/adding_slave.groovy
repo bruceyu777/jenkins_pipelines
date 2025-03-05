@@ -137,7 +137,7 @@ curl -s -u ${params.JENKINS_ADMIN_USER}:${params.JENKINS_API_TOKEN} \\
                     }
 
                     // Step 2: Update hostname
-                    def setHostnameCmd = "sshpass -p '${params.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${params.NODE_USER}@${params.NODE_IP} 'cd /home/fosqa/resources/tools && sudo python3 set_hostname.py --hostname all-in-one-${params.NODE_NAME}'"
+                    def setHostnameCmd = "sshpass -p '${params.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${params.NODE_USER}@${params.NODE_IP} 'cd /home/fosqa/resources/tools && sudo python3 set_hostname.py --hostname all-in-one-${params.NODE_NAME} --floating-ip ${params.NODE_IP}'"
                     echo "Executing update hostname command: ${setHostnameCmd}"
                     try {
                         sh setHostnameCmd
