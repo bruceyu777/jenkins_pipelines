@@ -1,12 +1,11 @@
 pipeline {
-    // Define parameters to be prompted to the user before the job starts
+    // Define parameters to be prompted to the user before job starts
     parameters {
-        // 1. Node Name Parameter (customizable)
-        string(
+        // 1. Node Name Parameter
+        choice(
             name: 'NODE_NAME',
-            defaultValue: 'node1',
-            trim: true,
-            description: 'Enter the Jenkins node label to run the pipeline on (e.g., node1).'
+            choices: ['node1', 'node2', 'node3'], // Update with your actual node labels
+            description: 'Select the Jenkins node to run the pipeline on.'
         )
         
         // 2. Build Number Parameter
@@ -38,19 +37,24 @@ pipeline {
             }
         }
 
-        stage('Run Python Script') {
+        stage('Bring up FGTs') {
             steps {
-                echo "Running iptable script..."
                 sh """
                   cd /home/fosqa/resources/tools
-                  sudo pwd
-                  sudo ls
-                  hostname
-                  cat Makefile
                   sudo make provision_fgt fgt_type=${params.FGT_TYPE} node=${params.NODE_NAME} build=${params.BUILD_NUMBER}
                 """
             }
         }
+
+        stage('Running test cases'){
+            steps {
+                sh """
+                  cd /home/fosqa/autolibv3/testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}
+                  sudo make provision_fgt fgt_type=${params.FGT_TYPE} node=${params.NODE_NAME} build=${params.BUILD_NUMBER}
+                """
+            }
+        }
+
     }
 
     post {

@@ -5,7 +5,8 @@ def call() {
   fortistackMasterParameters()
 
   pipeline {
-    agent any
+    // Dynamically select the agent based on the NODE_NAME parameter.
+    agent { label "${params.NODE_NAME}" }
 
     stages {
       stage('Debug Parameters') {

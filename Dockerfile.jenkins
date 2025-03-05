@@ -1,7 +1,14 @@
 FROM jenkins/jenkins:lts
 
 USER root
+# Install Python3 and pip
+RUN apt-get update && \
+    apt-get install -y python3 python3-pip sshpass && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set up SSH known hosts
 RUN mkdir -p /var/jenkins_home/.ssh && \
     ssh-keyscan github.com >> /var/jenkins_home/.ssh/known_hosts && \
     chown -R jenkins:jenkins /var/jenkins_home/.ssh
+
 USER jenkins
