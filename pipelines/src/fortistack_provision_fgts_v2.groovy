@@ -50,10 +50,10 @@ pipeline {
                 echo "Running iptable script..."
                 sh """
                   cd /home/fosqa/resources/tools
-                  git config --global --add safe.directory /home/fosqa/resources/tools
-                  sudo -u fosqa git pull
                   sudo pwd
+                  sudo ls
                   hostname
+                  cat Makefile
                   sudo make provision_fgt fgt_type=${params.FGT_TYPE} node=${params.NODE_NAME} build=${params.BUILD_NUMBER}
                 """
             }

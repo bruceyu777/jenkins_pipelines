@@ -3,22 +3,18 @@ import java.net.URLEncoder
 
 pipeline {
     agent { label 'master' }
-    
-    // Static values that should not be exposed to users
-    environment {
-        NODE_USER = 'fosqa'
-        NODE_PASSWORD = 'ftnt123!'
-        JENKINS_ADMIN_USER = 'fosqa'
-        JENKINS_API_TOKEN = '110dec5c2d2974a67968074deafccc1414'
-    }
-    
     parameters {
+        booleanParam(name: 'CREATE_NODE', defaultValue: true, description: 'Automatically create a new node via Jenkins API?')
         string(name: 'NODE_NAME', defaultValue: 'node1', description: 'Name of the Jenkins node')
-        string(name: 'NODE_IP', defaultValue: '10.96.225.186', description: 'Floating IP address of the target node')
+        string(name: 'NODE_IP', defaultValue: '192.168.1.10', description: 'Floating IP address of the target node')
+        string(name: 'NODE_USER', defaultValue: 'fosqa', description: 'SSH username for the target node')
+        password(name: 'NODE_PASSWORD', defaultValue: 'ftnt123!', description: 'SSH password for the target node')
         string(name: 'JENKINS_URL', defaultValue: 'http://10.96.227.206:8080', description: 'Jenkins Master URL (floating IP)')
+        string(name: 'JENKINS_SECRET', defaultValue: '', description: 'Jenkins secret for the node (if not provisioning)')
         booleanParam(name: 'CLEANUP', defaultValue: true, description: 'Cleanup previous Jenkins Agent installation?')
+        string(name: 'JENKINS_ADMIN_USER', defaultValue: 'fosqa', description: 'Jenkins admin username for API calls')
+        password(name: 'JENKINS_API_TOKEN', defaultValue: '110dec5c2d2974a67968074deafccc1414', description: 'Jenkins API token for admin user')
     }
-    
     stages {
         stage('Set Build Display Name') {
             steps {
@@ -28,11 +24,12 @@ pipeline {
             }
         }
         stage('Jenkins master to create a new Node') {
+            when { expression { return params.CREATE_NODE } }
             steps {
                 script {
                     def nodeName = params.NODE_NAME
                     
-                    // Check if the node already exists by retrieving its HTTP status code.
+                    // Check if the node already exists by getting its HTTP status code.
                     def httpCode = sh(
                         script: "curl -s -o /dev/null -w '%{http_code}' ${params.JENKINS_URL}/computer/${nodeName}/api/json",
                         returnStdout: true
@@ -70,7 +67,7 @@ pipeline {
                             
                             // Get Jenkins crumb for CSRF protection.
                             def crumbData = sh(
-                                script: "curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} '${params.JENKINS_URL}/crumbIssuer/api/json'",
+                                script: "curl -s -u ${params.JENKINS_ADMIN_USER}:${params.JENKINS_API_TOKEN} '${params.JENKINS_URL}/crumbIssuer/api/json'",
                                 returnStdout: true
                             ).trim()
                             if (!crumbData) {
@@ -82,13 +79,13 @@ pipeline {
                             
                             // Build the curl command as a multi-line string.
                             def cmd = """
-                                curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
-                                -H 'Jenkins-Crumb:${crumb}' -X POST \\
-                                --data-urlencode 'name=${nodeName}' \\
-                                --data-urlencode 'type=hudson.slaves.DumbSlave' \\
-                                --data-urlencode 'json=${jsonBody}' \\
-                                '${params.JENKINS_URL}/computer/doCreateItem'
-                                """
+curl -s -u ${params.JENKINS_ADMIN_USER}:${params.JENKINS_API_TOKEN} \\
+ -H 'Jenkins-Crumb:${crumb}' -X POST \\
+ --data-urlencode 'name=${nodeName}' \\
+ --data-urlencode 'type=hudson.slaves.DumbSlave' \\
+ --data-urlencode 'json=${jsonBody}' \\
+ '${params.JENKINS_URL}/computer/doCreateItem'
+"""
                             echo "Executing command: ${cmd}"
                             
                             def createResponse = sh(
@@ -104,6 +101,7 @@ pipeline {
             }
         }
         stage('Provision Node') {
+            when { expression { return params.CREATE_NODE || params.JENKINS_SECRET == '' } }
             steps {
                 script {
                     def nodeName = params.NODE_NAME
@@ -112,7 +110,7 @@ pipeline {
                     
                     // Fetch the JNLP file with authentication.
                     def jnlp = sh(
-                        script: "curl -fsSL -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} ${params.JENKINS_URL}/computer/${nodeName}/slave-agent.jnlp",
+                        script: "curl -fsSL -u ${params.JENKINS_ADMIN_USER}:${params.JENKINS_API_TOKEN} ${params.JENKINS_URL}/computer/${nodeName}/slave-agent.jnlp",
                         returnStdout: true
                     ).trim()
                     echo "JNLP content: ${jnlp}"
@@ -123,21 +121,21 @@ pipeline {
                         error "Failed to extract secret from JNLP file. Verify if node ${nodeName} exists and is configured."
                     }
                     def secret = matcher[0][1]
+                    env.NODE_NAME = nodeName
                     env.JENKINS_SECRET = secret
-                    echo "Provisioned node ${nodeName} with secret: ${env.JENKINS_SECRET}"
+                    echo "Provisioned node ${env.NODE_NAME} with secret: ${env.JENKINS_SECRET}"
                 }
             }
         }
         stage('Install Jenkins Agent on Node') {
             steps {
                 script {
-                    def nodeName = params.NODE_NAME
-                    def jenkinsSecret = env.JENKINS_SECRET
+                    def nodeName = env.NODE_NAME ?: params.NODE_NAME
+                    def jenkinsSecret = env.JENKINS_SECRET ?: params.JENKINS_SECRET
                     def cleanupFlag = params.CLEANUP ? "--cleanup" : ""
                     
                     // Step 1: Remote Git pull to update tools
-                    def innerGitCmd = 'cd /home/fosqa/resources/tools && if [ -n "$(git status --porcelain)" ]; then git stash push -m "temporary stash"; fi; git pull; if git stash list | grep -q "temporary stash"; then git stash pop; fi'
-                    def gitPullCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} '${innerGitCmd}'"
+                    def gitPullCmd = "sshpass -p '${params.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${params.NODE_USER}@${params.NODE_IP} 'cd /home/fosqa/resources/tools &&  git reset --hard && git clean -fd && git pull'"
                     echo "Executing remote git pull command: ${gitPullCmd}"
                     try {
                         sh gitPullCmd
@@ -146,7 +144,7 @@ pipeline {
                     }
 
                     // Step 2: Update hostname, floating IP and useful aliases
-                    def setHostnameCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} 'cd /home/fosqa/resources/tools && sudo python3 set_hostname.py --hostname all-in-one-${nodeName} --floating-ip ${params.NODE_IP}'"
+                    def setHostnameCmd = "sshpass -p '${params.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${params.NODE_USER}@${params.NODE_IP} 'cd /home/fosqa/resources/tools && sudo python3 set_hostname.py --hostname all-in-one-${params.NODE_NAME} --floating-ip ${params.NODE_IP}'"
                     echo "Executing update hostname command: ${setHostnameCmd}"
                     try {
                         sh setHostnameCmd
@@ -154,26 +152,28 @@ pipeline {
                         echo "Hostname update failed: ${e.getMessage()}. Continuing..."
                     }
                     
+                    
                     // Step 3: Execute remote installation command
                     def remoteInstallCmd = """sudo python3 /home/fosqa/resources/tools/install_jenkins_agent.py \\
-                                                ${cleanupFlag} \\
-                                                --jenkins-url ${params.JENKINS_URL} \\
-                                                --jenkins-secret ${jenkinsSecret} \\
-                                                --jenkins-agent-name ${nodeName} \\
-                                                --remote-root /home/jenkins/agent \\
-                                                --password jenkins
-                                            """
+            ${cleanupFlag} \\
+            --jenkins-url ${params.JENKINS_URL} \\
+            --jenkins-secret ${jenkinsSecret} \\
+            --jenkins-agent-name ${nodeName} \\
+            --remote-root /home/jenkins/agent \\
+            --password jenkins
+        """
                     echo "Executing remote install command on node ${params.NODE_IP}..."
-                    def sshCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} '${remoteInstallCmd}'"
+                    def sshCmd = "sshpass -p '${params.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${params.NODE_USER}@${params.NODE_IP} '${remoteInstallCmd}'"
                     echo "SSH Command: ${sshCmd}"
                     sh sshCmd
                 }
             }
         }
+
         stage('Verify Node Connection') {
             steps {
                 script {
-                    def nodeName = params.NODE_NAME
+                    def nodeName = env.NODE_NAME ?: params.NODE_NAME
                     def nodeOnline = false
                     for (int i = 0; i < 10; i++) {
                         def json = sh(

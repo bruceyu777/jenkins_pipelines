@@ -28,6 +28,7 @@ pipeline {
     // Use agent none so we don't hold an executor globally.
     agent none
     stages {
+        
         stage('Gather Node Information') {
             steps {
                 script {

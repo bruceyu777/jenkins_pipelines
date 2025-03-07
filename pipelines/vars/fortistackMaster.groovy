@@ -9,6 +9,14 @@ def call() {
     agent { label 'master' }
 
     stages {
+      stage('Set Build Display Name') {
+            steps {
+                script {
+                    currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.NODE_IP}-${params.FEATURE_NAME}"
+                }
+            }
+        }
+      
       stage('Debug Parameters') {
         steps {
           script {
