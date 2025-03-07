@@ -45,8 +45,8 @@ def call() {
               string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
               string(name: 'FGT_TYPE', value: paramsMap.FGT_TYPE)
             ]
-            echo "Triggering bring_up_node_kvm with parameters: ${provisionParams}"
-            build job: 'bring_up_node_kvm', parameters: provisionParams, wait: true
+            echo "Triggering fortistack_provision_fgts pipeline with parameters: ${provisionParams}"
+            build job: 'fortistack_provision_fgts', parameters: provisionParams, wait: true
           }
         }
       }
@@ -74,8 +74,8 @@ def call() {
               string(name: 'build_name', value: paramsMap.build_name),
               string(name: 'send_to', value: paramsMap.send_to)
             ]
-            echo "Triggering runtest with parameters: ${testParams}"
-            build job: 'runtest', parameters: testParams, wait: true
+            echo "Triggering fortistack_runtest pipeline with parameters: ${testParams}"
+            build job: 'fortistack_runtest', parameters: testParams, wait: true
           }
         }
       }
