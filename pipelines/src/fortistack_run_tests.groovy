@@ -1,6 +1,12 @@
 pipeline {
     parameters {
         string(
+            name: 'BUILD_NUMBER',
+            defaultValue: '3473',
+            trim: true,
+            description: 'FGT build number'
+        )
+        string(
             name: 'NODE_NAME',
             defaultValue: 'node1',
             trim: true,
@@ -60,6 +66,14 @@ pipeline {
     agent { label "${params.NODE_NAME}" }
     
     stages {
+        stage('Set Build Display Name') {
+            steps {
+                script {
+                    currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.BUILD_NUMBER}-${params.FEATURE_NAME}-${params.TEST_GROUP_CHOICE}"
+                }
+            }
+        }
+
         stage('Check Docker') {
             steps {
                 echo "Checking Docker environment..."

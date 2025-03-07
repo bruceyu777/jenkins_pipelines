@@ -4,7 +4,7 @@ import java.net.URLEncoder
 pipeline {
     agent { label 'master' }
     
-    // Static values (hidden from users)
+    // Static values that should not be exposed to users
     environment {
         NODE_USER = 'fosqa'
         NODE_PASSWORD = 'ftnt123!'
@@ -32,7 +32,7 @@ pipeline {
                 script {
                     def nodeName = params.NODE_NAME
                     
-                    // Check if the node exists via its HTTP status code.
+                    // Check if the node already exists by retrieving its HTTP status code.
                     def httpCode = sh(
                         script: "curl -s -o /dev/null -w '%{http_code}' ${params.JENKINS_URL}/computer/${nodeName}/api/json",
                         returnStdout: true
@@ -77,20 +77,19 @@ pipeline {
                                 error "Crumb data not received. Check your Jenkins admin credentials and API token."
                             }
                             echo "Crumb data received: ${crumbData}"
-                            
                             def crumbJson = readJSON text: crumbData
                             def crumb = crumbJson.crumb
                             
-                            // Build the curl command for node creation.
+                            // Build the curl command as a multi-line string.
                             def cmd = """
-curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
--H 'Jenkins-Crumb:${crumb}' -X POST \\
---data-urlencode 'name=${nodeName}' \\
---data-urlencode 'type=hudson.slaves.DumbSlave' \\
---data-urlencode 'json=${jsonBody}' \\
-'${params.JENKINS_URL}/computer/doCreateItem'
-"""
-                            echo "Executing node creation command: ${cmd}"
+                                curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
+                                -H 'Jenkins-Crumb:${crumb}' -X POST \\
+                                --data-urlencode 'name=${nodeName}' \\
+                                --data-urlencode 'type=hudson.slaves.DumbSlave' \\
+                                --data-urlencode 'json=${jsonBody}' \\
+                                '${params.JENKINS_URL}/computer/doCreateItem'
+                                """
+                            echo "Executing command: ${cmd}"
                             
                             def createResponse = sh(
                                 script: cmd,
@@ -136,11 +135,8 @@ curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
                     def jenkinsSecret = env.JENKINS_SECRET
                     def cleanupFlag = params.CLEANUP ? "--cleanup" : ""
                     
-                    echo "=== Step 1: Remote Git update ==="
-                    def innerGitCmd = 'cd /home/fosqa/resources/tools && ' +
-                                      'if [ -n "$(git status --porcelain)" ]; then git stash push -m "temporary stash"; fi; ' +
-                                      'git pull; ' +
-                                      'if git stash list | grep -q "temporary stash"; then git stash pop; fi'
+                    // Step 1: Remote Git pull to update tools
+                    def innerGitCmd = 'cd /home/fosqa/resources/tools && if [ -n "$(git status --porcelain)" ]; then git stash push -m "temporary stash"; fi; git pull; if git stash list | grep -q "temporary stash"; then git stash pop; fi'
                     def gitPullCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} '${innerGitCmd}'"
                     echo "Executing remote git pull command: ${gitPullCmd}"
                     try {
@@ -148,8 +144,8 @@ curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
                     } catch (Exception e) {
                         echo "Remote git pull failed: ${e.getMessage()}. Continuing without updating."
                     }
-                    
-                    echo "=== Step 2: Update hostname, floating IP and aliases ==="
+
+                    // Step 2: Update hostname, floating IP and useful aliases
                     def setHostnameCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} 'cd /home/fosqa/resources/tools && sudo python3 set_hostname.py --hostname all-in-one-${nodeName} --floating-ip ${params.NODE_IP}'"
                     echo "Executing update hostname command: ${setHostnameCmd}"
                     try {
@@ -158,34 +154,19 @@ curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
                         echo "Hostname update failed: ${e.getMessage()}. Continuing..."
                     }
                     
-                    echo "=== Step 3: Install Jenkins Agent ==="
+                    // Step 3: Execute remote installation command
                     def remoteInstallCmd = """sudo python3 /home/fosqa/resources/tools/install_jenkins_agent.py \\
-${cleanupFlag} \\
---jenkins-url ${params.JENKINS_URL} \\
---jenkins-secret ${jenkinsSecret} \\
---jenkins-agent-name ${nodeName} \\
---remote-root /home/jenkins/agent \\
---password jenkins
-"""
+                                                ${cleanupFlag} \\
+                                                --jenkins-url ${params.JENKINS_URL} \\
+                                                --jenkins-secret ${jenkinsSecret} \\
+                                                --jenkins-agent-name ${nodeName} \\
+                                                --remote-root /home/jenkins/agent \\
+                                                --password jenkins
+                                            """
                     echo "Executing remote install command on node ${params.NODE_IP}..."
                     def sshCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} '${remoteInstallCmd}'"
                     echo "SSH Command: ${sshCmd}"
                     sh sshCmd
-                    
-                    
-                    // === Alternative: Consolidate all remote commands in one SSH session ===
-                    // def consolidatedCmd = """
-                    //     cd /home/fosqa/resources/tools &&
-                    //     if [ -n "\$(git status --porcelain)" ]; then git stash push -m "temporary stash"; fi;
-                    //     git pull;
-                    //     if git stash list | grep -q "temporary stash"; then git stash pop; fi;
-                    //     sudo python3 set_hostname.py --hostname all-in-one-${nodeName} --floating-ip ${params.NODE_IP};
-                    //     sudo python3 /home/fosqa/resources/tools/install_jenkins_agent.py ${cleanupFlag} --jenkins-url ${params.JENKINS_URL} --jenkins-secret ${jenkinsSecret} --jenkins-agent-name ${nodeName} --remote-root /home/jenkins/agent --password jenkins
-                    //     """
-                    // def consolidatedSSHCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} '${consolidatedCmd}'"
-                    // echo "Executing consolidated remote command: ${consolidatedSSHCmd}"
-                    // sh consolidatedSSHCmd
-                    
                 }
             }
         }
@@ -194,7 +175,6 @@ ${cleanupFlag} \\
                 script {
                     def nodeName = params.NODE_NAME
                     def nodeOnline = false
-                    // Check up to 10 times (with a 10-second interval) for the node to come online.
                     for (int i = 0; i < 10; i++) {
                         def json = sh(
                             script: "curl -fsSL ${params.JENKINS_URL}/computer/${nodeName}/api/json",

@@ -63,6 +63,7 @@ def call() {
                              .parseText(params.PARAMS_JSON)
                              .collectEntries { k, v -> [k, v] }
             def testParams = [
+              string(name: 'BIULD_NUMBER', value: params.BUILD_NUMBER),
               string(name: 'NODE_NAME', value: params.NODE_NAME),
               string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR),
               string(name: 'SVN_BRANCH', value: paramsMap.SVN_BRANCH),
