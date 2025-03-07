@@ -12,7 +12,7 @@ def call() {
       stage('Set Build Display Name') {
             steps {
                 script {
-                    currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.NODE_IP}-${params.FEATURE_NAME}"
+                    currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.FEATURE_NAME}-${params.TEST_GROUP_CHOICE}"
                 }
             }
         }
