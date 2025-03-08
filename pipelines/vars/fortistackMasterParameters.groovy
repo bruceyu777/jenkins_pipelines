@@ -26,6 +26,11 @@ def call() {
         defaultValue: 'node1',
         description: 'Enter the node name: node1, node2 ...'
       ),
+      booleanParam(
+          name: 'FORCE_UPDATE_DOCKER_FILE',
+          defaultValue: true,
+          description: 'If true, update docker file with --force option'
+      ),
       // Feature selection.
       choice(
         name: 'FEATURE_NAME',
