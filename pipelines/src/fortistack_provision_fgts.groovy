@@ -27,6 +27,9 @@ pipeline {
     
     // Dynamically select the agent based on user input
     agent { label "${params.NODE_NAME}" }
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '100'))
+    }
 
     stages {
         stage('Set Build Display Name') {

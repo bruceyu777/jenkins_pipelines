@@ -25,30 +25,28 @@ def parseJson(String json) {
 }
 
 pipeline {
-    // Use agent none so we don't hold an executor globally.
     agent none
     stages {
-        
         stage('Gather Node Information') {
             steps {
                 script {
                     def results = [:]
                     def nodeNames = []
                     
-                    // Include master and all agent nodes.
-                    // nodeNames.add("master")
+                    // Include all agent nodes.
                     for (node in Jenkins.instance.getNodes()) {
                         nodeNames.add(node.getNodeName())
                     }
                     
-                    // Sequentially run on each node to avoid deadlock on single-executor nodes.
+                    // Sequentially run on each node.
                     for (def nodeName : nodeNames) {
                         results[nodeName] = [:]
                         node(nodeName) {
                             // Get the system hostname.
                             def host = sh(script: 'hostname', returnStdout: true).trim()
-                            // Get the internal IP address.
-                            def ip = sh(script: 'hostname -I || hostname -i', returnStdout: true).trim()
+                            
+                            // Retrieve only the ens3 interface IP address using a triple-single-quoted string.
+                            def ip = sh(script: '''ip addr show ens3 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1''', returnStdout: true).trim()
                             
                             // Try reading the floating IP from /etc/jenkins_node_info.txt.
                             def floatingIP = "N/A"
@@ -62,7 +60,35 @@ pipeline {
                                 echo "File /etc/jenkins_node_info.txt not found on ${nodeName}"
                             }
                             
-                            // Store the gathered info.
+                            // Get KVM domain information using the system connection.
+                            def kvmOutput = sh(script: 'virsh --connect qemu:///system list --all', returnStdout: true).trim()
+                            def kvmDomains = []
+                            kvmOutput.split("\n").eachWithIndex { line, idx ->
+                                // Skip header lines.
+                                if (idx > 1 && line.trim()) {
+                                    def columns = line.trim().split(/\s+/)
+                                    if (columns.size() >= 3) {
+                                        kvmDomains << "${columns[1]}:${columns[2]}"
+                                    }
+                                }
+                            }
+                            results[nodeName].KVM_DOMAINS = kvmDomains ? kvmDomains.join(',') : "none"
+                            
+                            // Get Docker container information.
+                            def dockerOutput = sh(script: 'docker ps', returnStdout: true).trim()
+                            def dockerContainers = []
+                            def dockerLines = dockerOutput.split("\n")
+                            if (dockerLines.size() > 1) {
+                                dockerLines.drop(1).each { line ->
+                                    if (line.trim()) {
+                                        def cols = line.trim().split(/\s+/)
+                                        dockerContainers << cols[-1]
+                                    }
+                                }
+                            }
+                            results[nodeName].DOCKERs = dockerContainers ? dockerContainers.join(',') : "none"
+                            
+                            // Store gathered info.
                             results[nodeName].hostname = host
                             results[nodeName].ip = ip
                             results[nodeName].floatingIP = floatingIP
@@ -75,24 +101,58 @@ pipeline {
             }
         }
         stage('Generate HTML Report') {
-            // Run on a dedicated node (e.g., master) so that file I/O works properly.
             agent { label 'master' }
             steps {
                 script {
-                    // Parse the JSON and force a deep conversion to a plain map.
                     def nodeResults = parseJson(env.NODE_INFO)
                     def tableRows = ""
                     nodeResults.each { nodeName, info ->
-                        tableRows += "<tr><td>${nodeName}</td><td>${info.hostname}</td><td>${info.floatingIP}</td><td>${info.ip}</td></tr>\n"
+                        tableRows += "<tr>"
+                        tableRows += "<td>${nodeName}</td>"
+                        tableRows += "<td>${info.hostname}</td>"
+                        tableRows += "<td>${info.floatingIP}</td>"
+                        tableRows += "<td>${info.ip}</td>"
+                        tableRows += "<td>${info.KVM_DOMAINS}</td>"
+                        tableRows += "<td>${info.DOCKERs}</td>"
+                        tableRows += "</tr>\n"
                     }
                     
                     def htmlContent = """
                     <html>
                         <head>
+                            <meta charset="utf-8">
+                            <title>Jenkins Node Information</title>
                             <style>
-                                table { border-collapse: collapse; width: 100%; }
-                                th, td { border: 1px solid #ddd; padding: 8px; }
-                                th { background-color: #4CAF50; color: white; }
+                                body {
+                                    font-family: Arial, sans-serif;
+                                    margin: 20px;
+                                    background-color: #f9f9f9;
+                                }
+                                h2 {
+                                    text-align: center;
+                                    color: #333;
+                                }
+                                table {
+                                    border-collapse: collapse;
+                                    width: 90%;
+                                    margin: 20px auto;
+                                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                                }
+                                th, td {
+                                    padding: 12px 15px;
+                                    border: 1px solid #ddd;
+                                    text-align: left;
+                                }
+                                th {
+                                    background-color: #4CAF50;
+                                    color: white;
+                                }
+                                tr:nth-child(even) {
+                                    background-color: #f2f2f2;
+                                }
+                                tr:hover {
+                                    background-color: #e9e9e9;
+                                }
                             </style>
                         </head>
                         <body>
@@ -102,7 +162,9 @@ pipeline {
                                     <th>Node Name</th>
                                     <th>Hostname</th>
                                     <th>Floating IP</th>
-                                    <th>IP Address</th>
+                                    <th>IP Address (ens3)</th>
+                                    <th>KVM Domains</th>
+                                    <th>Docker Containers</th>
                                 </tr>
                                 ${tableRows}
                             </table>
@@ -118,7 +180,6 @@ pipeline {
     }
     post {
         always {
-            // Publish the HTML report from a node context.
             node('master') {
                 publishHTML(target: [
                     allowMissing: false,

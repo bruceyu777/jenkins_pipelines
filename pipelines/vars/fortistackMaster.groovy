@@ -8,6 +8,10 @@ def call() {
     // Run the master pipeline on the master node to avoid deadlock.
     agent { label 'master' }
 
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '100'))
+    }
+
     stages {
       stage('Set Build Display Name') {
             steps {
@@ -68,6 +72,7 @@ def call() {
               string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR),
               string(name: 'SVN_BRANCH', value: paramsMap.SVN_BRANCH),
               string(name: 'FEATURE_NAME', value: params.FEATURE_NAME),
+              string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER),
               string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE),
               string(name: 'TEST_GROUP_CHOICE', value: params.TEST_GROUP_CHOICE),
               string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE),

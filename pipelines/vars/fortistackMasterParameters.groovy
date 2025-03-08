@@ -32,6 +32,26 @@ def call() {
         choices: ["avfortisandbox", "webfilter"].join("\n"),
         description: 'Select the feature'
       ),
+      // Dynamic parameter for svn test case folder, testcase or testcase_v1.
+      [$class: 'CascadeChoiceParameter',
+        name: 'TEST_CASE_FOLDER',
+        description: 'Select test case folder based on feature',
+        referencedParameters: 'FEATURE_NAME',
+        choiceType: 'PT_SINGLE_SELECT',
+        script: [
+          $class: 'GroovyScript',
+          script: new SecureGroovyScript(
+            '''if (FEATURE_NAME == "avfortisandbox") {
+                 return ["testcase", "testcase_v1"]
+               } else if (FEATURE_NAME == "webfilter") {
+                 return ["testcase_v1", "testcase"]
+               } else {
+                 return ["unknown"]
+               }''',
+            true
+          )
+        ]
+      ],
       // Dynamic parameter for TEST_CONFIG_CHOICE.
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_CONFIG_CHOICE',

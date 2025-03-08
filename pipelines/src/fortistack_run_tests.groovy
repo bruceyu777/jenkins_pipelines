@@ -31,6 +31,12 @@ pipeline {
             description: 'SVN test feature'
         )
         string(
+            name: 'TEST_CASE_FOLDER',
+            defaultValue: 'testcase',
+            trim: true,
+            description: 'SVN test case folder name, like testcase or testcase_v1'
+        )
+        string(
             name: 'TEST_CONFIG_CHOICE',
             defaultValue: 'env.newman.FGT_KVM.avfortisandbox.conf',
             trim: true,
@@ -64,6 +70,9 @@ pipeline {
     }
     
     agent { label "${params.NODE_NAME}" }
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '100'))
+    }
     
     stages {
         stage('Set Build Display Name') {
@@ -87,6 +96,7 @@ pipeline {
                 script {
                     // Use the parameters directly passed from the master pipeline.
                     def branch    = params.SVN_BRANCH
+                    def testcase_folder = params.TEST_CASE_FOLDER
                     def feature   = params.FEATURE_NAME
                     def testConfig = params.TEST_CONFIG_CHOICE
                     def testGroup  = params.TEST_GROUP_CHOICE
@@ -103,7 +113,7 @@ pipeline {
                         sudo ln -s /home/fosqa/docker_filesys/${feature} docker_filesys
 
                         cd /home/fosqa/${params.LOCAL_LIB_DIR}/testcase/${branch}
-                        sudo svn checkout https://qa-svn.corp.fortinet.com/svn/qa/FOS/testcase/${branch}/${feature} \\
+                        sudo svn checkout https://qa-svn.corp.fortinet.com/svn/qa/FOS/${testcase_folder}/${branch}/${feature} \\
                             --username \$SVN_USER \\
                             --password \$SVN_PASS \\
                             --non-interactive
