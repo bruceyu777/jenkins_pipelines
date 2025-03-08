@@ -108,8 +108,31 @@ pipeline {
                     def docker_compose_file = params.DOCKER_COMPOSE_FILE_CHOICE
 
                     withCredentials([usernamePassword(credentialsId: 'LDAP', usernameVariable: 'SVN_USER', passwordVariable: 'SVN_PASS')]) {
-                        
-                        // Build the command for updating docker file based on FORCE_UPDATE_DOCKER_FILE parameter.
+                        // update local git
+                        // echo "=== Step 1: Local Git update ==="
+                        // def innerGitCmd = 'cd /home/fosqa/resources/tools && ' +
+                        //                 'if [ -n "$(git status --porcelain)" ]; then git stash push -m "temporary stash"; fi; ' +
+                        //                 'git pull; ' +
+                        //                 'if git stash list | grep -q "temporary stash"; then git stash pop; fi'
+                        // echo "Executing local git pull command: ${innerGitCmd}"
+                        // try {
+                        //     sh innerGitCmd
+                        // } catch (Exception e) {
+                        //     echo "Local git pull failed: ${e.getMessage()}. Continuing without updating."
+                        // }
+                        // update local git
+                        echo "=== Step 1: Local Git update ==="
+                        def innerGitCmd = "sudo -u fosqa bash -c 'cd /home/fosqa/resources/tools && " +
+                                        "if [ -n \"\$(git status --porcelain)\" ]; then git stash push -m \"temporary stash\"; fi; " +
+                                        "git pull; " +
+                                        "if git stash list | grep -q \"temporary stash\"; then git stash pop; fi'"
+                        echo "Executing local git pull command: ${innerGitCmd}"
+                        try {
+                            sh innerGitCmd
+                        } catch (Exception e) {
+                            echo "Local git pull failed: ${e.getMessage()}. Continuing without updating."
+                        }
+                        // update docker file
                         def forceArg = params.FORCE_UPDATE_DOCKER_FILE ? "--force" : ""
                         sh """
                         cd /home/fosqa/resources/tools
@@ -117,7 +140,7 @@ pipeline {
                         sudo /home/fosqa/resources/tools/venv/bin/python get_dockerfile_from_cdn.py --feature ${feature} ${forceArg}
                         """
                         
-                        // Ensure the parent directory exists (if not, create it)
+                        // Update svn code
                         sh "mkdir -p /home/fosqa/${params.LOCAL_LIB_DIR}/testcase/${branch}"
                         
                         def folderPath = "/home/fosqa/${params.LOCAL_LIB_DIR}/testcase/${branch}/${feature}"
@@ -127,7 +150,7 @@ pipeline {
 
                         if (folderExists == "notexists") {
                             // Folder doesn't exist, perform SVN checkout.
-                            def svnStatus = sh(script: "sudo svn checkout https://qa-svn.corp.fortinet.com/svn/qa/FOS/${testcase_folder}/${branch}/${feature} --username \$SVN_USER --password \$SVN_PASS --non-interactive", returnStatus: true)
+                            def svnStatus = sh(script: "cd /home/fosqa/${params.LOCAL_LIB_DIR}/testcase/${branch} && sudo svn checkout https://qa-svn.corp.fortinet.com/svn/qa/FOS/${testcase_folder}/${branch}/${feature} --username \$SVN_USER --password \$SVN_PASS --non-interactive", returnStatus: true)
                             if (svnStatus != 0) {
                                 echo "SVN checkout failed with exit status ${svnStatus}. Continuing pipeline..."
                             }
@@ -136,15 +159,26 @@ pipeline {
                             sh "cd ${folderPath} && sudo svn update --username \$SVN_USER --password \$SVN_PASS --non-interactive"
                         }
 
+                        // add docker file soft link
                         sh """
                         cd /home/fosqa/testcase/${branch}/${feature}
                         sudo rm docker_filesys
                         sudo ln -s /home/fosqa/docker_filesys/${feature} docker_filesys
                         """
 
+                        // Log in to Harbor using SVN_USER and SVN_PASS (harbor login credentials)
+                        sh "docker login harbor-robot.corp.fortinet.com -u \$SVN_USER -p \$SVN_PASS"
+
+                        // Remove all existing dockers firstly
                         sh """
-                        docker compose -f /home/fosqa/testcase/${branch}/${feature}/docker/${docker_compose_file} down
-                        docker compose -f /home/fosqa/testcase/${branch}/${feature}/docker/${docker_compose_file} up -d
+                        docker ps -aq | xargs -r docker rm -f
+                        """
+                        // Run test
+                        sh """
+                        cd /home/fosqa/resources/tools && python3 set_docker_network.py
+                        sudo python3 set_route_for_docker.py 
+
+                        docker compose -f /home/fosqa/testcase/${branch}/${feature}/docker/${docker_compose_file} up --build -d
 
                         cd /home/fosqa/${params.LOCAL_LIB_DIR}
                         sudo chmod -R 777 .
@@ -154,6 +188,7 @@ pipeline {
                         docker compose -f /home/fosqa/testcase/${branch}/${feature}/docker/${docker_compose_file} down
                         """
                     }
+
 
                 }
             }
