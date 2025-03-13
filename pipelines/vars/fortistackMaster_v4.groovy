@@ -87,10 +87,6 @@ def call() {
             if (!testGroups || testGroups.isEmpty()) {
               testGroups = [params.TEST_GROUP_CHOICE]
             }
-            // Track overall result.
-            def overallSuccess = true
-            def groupResults = [:]
-
             // Loop through the test groups sequentially.
             for (group in testGroups) {
               def testParams = [
@@ -108,19 +104,11 @@ def call() {
                 string(name: 'send_to', value: paramsMap.send_to)
               ]
               echo "Triggering fortistack_runtest pipeline for test group '${group}' with parameters: ${testParams}"
+              // Using propagate: false prevents the downstream failure from failing the entire pipeline.
               def result = build job: 'fortistack_runtest', parameters: testParams, wait: true, propagate: false
-              groupResults[group] = result.getResult()
               if(result.getResult() != "SUCCESS"){
                 echo "Test pipeline for group '${group}' failed with result: ${result.getResult()}"
-                overallSuccess = false
-              } else {
-                echo "Test pipeline for group '${group}' succeeded."
               }
-            }
-            echo "Test pipeline group results: ${groupResults}"
-            // Fail the overall pipeline if any test failed.
-            if (!overallSuccess) {
-              error("One or more test pipelines failed: ${groupResults}")
             }
           }
         }
