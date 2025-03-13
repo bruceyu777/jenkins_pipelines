@@ -50,6 +50,7 @@ def call() {
         steps {
           script {
             def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
+                              .collectEntries { k, v -> [k, v] }
             def provisionParams = [
               string(name: 'NODE_NAME', value: params.NODE_NAME),
               string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
@@ -70,6 +71,7 @@ def call() {
         steps {
           script {
             def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
+                             .collectEntries { k, v -> [k, v] }
             // Determine test groups: if TEST_GROUPS is provided, use it; otherwise, use TEST_GROUP_CHOICE.
             def testGroups = []
             if (params.TEST_GROUPS?.trim()) {
