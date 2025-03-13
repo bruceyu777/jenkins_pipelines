@@ -1,5 +1,6 @@
 pipeline {
-    agent any
+    // Run the master pipeline on the master node to avoid deadlock.
+    agent { label 'master' }
 
     parameters {
         // Standalone BUILD_NUMBER parameter.
