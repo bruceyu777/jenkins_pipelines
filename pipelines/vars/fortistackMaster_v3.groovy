@@ -49,8 +49,7 @@ def call() {
         }
         steps {
           script {
-            def paramsMap = new groovy.json.JsonSlurper()
-                              .parseText(params.PARAMS_JSON)
+            def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
                               .collectEntries { k, v -> [k, v] }
             def provisionParams = [
               string(name: 'NODE_NAME', value: params.NODE_NAME),
@@ -71,8 +70,7 @@ def call() {
         }
         steps {
           script {
-            def paramsMap = new groovy.json.JsonSlurper()
-                             .parseText(params.PARAMS_JSON)
+            def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
                              .collectEntries { k, v -> [k, v] }
             // Determine test groups: if TEST_GROUPS is provided, use it; otherwise, use TEST_GROUP_CHOICE.
             def testGroups = []
@@ -104,11 +102,7 @@ def call() {
                 string(name: 'send_to', value: paramsMap.send_to)
               ]
               echo "Triggering fortistack_runtest pipeline for test group '${group}' with parameters: ${testParams}"
-              // Using propagate: false prevents the downstream failure from failing the entire pipeline.
-              def result = build job: 'fortistack_runtest', parameters: testParams, wait: true, propagate: false
-              if(result.getResult() != "SUCCESS"){
-                echo "Test pipeline for group '${group}' failed with result: ${result.getResult()}"
-              }
+              build job: 'fortistack_runtest', parameters: testParams, wait: true
             }
           }
         }

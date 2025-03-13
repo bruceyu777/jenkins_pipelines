@@ -36,22 +36,18 @@ pipeline {
     "TEST_CASE_FOLDER": "testcase",
     "TEST_CONFIG_CHOICE": "env.newman.FGT_KVM.avfortisandbox.conf",
     "TEST_GROUP_CHOICE": "grp.avfortisandbox_fortistack.full",
-    "TEST_GROUPS": "[\"grp.avfortisandbox_fortistack.full\", \"grp.avfortisandbox_alt.full\"]",
     "DOCKER_COMPOSE_FILE_CHOICE": "docker.avfortisandbox_avfortisandbox.yml"
   },
   {
-    "NODE_NAME": "node3",
+    "NODE_NAME": "node2",
     "FEATURE_NAME": "webfilter",
     "TEST_CASE_FOLDER": "testcase_v1",
     "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
     "TEST_GROUP_CHOICE": "grp.webfilter_basic.full",
-    "TEST_GROUPS": "[\"grp.webfilter_basic.full\", \"grp.webfilter_basic2.full\"]",
     "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml"
   }
 ]''',
-            description: '''Individual configuration parameters as a JSON array.
-Both TEST_GROUP_CHOICE (legacy, single test group) and TEST_GROUPS (a JSON array of test suites) are supported.
-Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall back to TEST_GROUP_CHOICE.'''
+            description: 'Individual configuration parameters as a JSON array'
         )
     }
 
@@ -74,6 +70,7 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                         parallelBuilds[branchName] = {
                             echo "Triggering fortistack_master_provision_runtest with merged configuration: ${merged}"
                             build job: 'fortistack_master_provision_runtest', parameters: [
+                                // Convert the JSON object to a string using the fully qualified name.
                                 string(name: 'PARAMS_JSON', value: groovy.json.JsonOutput.toJson(merged.PARAMS_JSON)),
                                 string(name: 'BUILD_NUMBER', value: merged.BUILD_NUMBER),
                                 string(name: 'NODE_NAME', value: merged.NODE_NAME),
@@ -82,7 +79,6 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                                 string(name: 'TEST_CASE_FOLDER', value: merged.TEST_CASE_FOLDER),
                                 string(name: 'TEST_CONFIG_CHOICE', value: merged.TEST_CONFIG_CHOICE),
                                 string(name: 'TEST_GROUP_CHOICE', value: merged.TEST_GROUP_CHOICE),
-                                string(name: 'TEST_GROUPS', value: merged.TEST_GROUPS),
                                 string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: merged.DOCKER_COMPOSE_FILE_CHOICE),
                                 booleanParam(name: 'SKIP_PROVISION', value: merged.SKIP_PROVISION),
                                 booleanParam(name: 'SKIP_TEST', value: merged.SKIP_TEST)
