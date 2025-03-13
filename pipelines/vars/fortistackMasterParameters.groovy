@@ -89,7 +89,7 @@ def call() {
             '''if (FEATURE_NAME == "avfortisandbox") {
                  return ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_alt.full"]
                } else if (FEATURE_NAME == "webfilter") {
-                 return ["grp.webfilter_basic.full", "grp.webfilter_alt.full"]
+                 return ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full","grp.webfilter_flow.full", "grp.webfilter_peruser.full","grp.webfilter_onearm.full", "grp.webfilter_other.full","grp.webfilter_other2.full" ]
                } else {
                  return ["unknown"]
                }''',

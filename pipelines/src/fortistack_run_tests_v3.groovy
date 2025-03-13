@@ -96,93 +96,107 @@ pipeline {
                 sh 'virsh -c qemu:///system list --all'
             }
         }
-
-        stage('Test Preparation') {
+        stage('Running test cases') {
             steps {
                 script {
+                    // Use the parameters directly passed from the master pipeline.
+                    def branch    = params.SVN_BRANCH
+                    def testcase_folder = params.TEST_CASE_FOLDER
+                    def feature   = params.FEATURE_NAME
+                    def testConfig = params.TEST_CONFIG_CHOICE
+                    def testGroup  = params.TEST_GROUP_CHOICE
+                    def docker_compose_file = params.DOCKER_COMPOSE_FILE_CHOICE
+
                     withCredentials([usernamePassword(credentialsId: 'LDAP', usernameVariable: 'SVN_USER', passwordVariable: 'SVN_PASS')]) {
-                        // Local Git update
+                        // update local git
+                        // echo "=== Step 1: Local Git update ==="
+                        // def innerGitCmd = 'cd /home/fosqa/resources/tools && ' +
+                        //                 'if [ -n "$(git status --porcelain)" ]; then git stash push -m "temporary stash"; fi; ' +
+                        //                 'git pull; ' +
+                        //                 'if git stash list | grep -q "temporary stash"; then git stash pop; fi'
+                        // echo "Executing local git pull command: ${innerGitCmd}"
+                        // try {
+                        //     sh innerGitCmd
+                        // } catch (Exception e) {
+                        //     echo "Local git pull failed: ${e.getMessage()}. Continuing without updating."
+                        // }
+                        // update local git
                         echo "=== Step 1: Local Git update ==="
                         def innerGitCmd = "sudo -u fosqa bash -c 'cd /home/fosqa/resources/tools && " +
-                                          "if [ -n \"\$(git status --porcelain)\" ]; then git stash push -m \"temporary stash\"; fi; " +
-                                          "git pull; " +
-                                          "if git stash list | grep -q \"temporary stash\"; then git stash pop; fi'"
+                                        "if [ -n \"\$(git status --porcelain)\" ]; then git stash push -m \"temporary stash\"; fi; " +
+                                        "git pull; " +
+                                        "if git stash list | grep -q \"temporary stash\"; then git stash pop; fi'"
                         echo "Executing local git pull command: ${innerGitCmd}"
                         try {
                             sh innerGitCmd
                         } catch (Exception e) {
                             echo "Local git pull failed: ${e.getMessage()}. Continuing without updating."
                         }
-
-                        // Update Docker file
+                        // update docker file
                         def forceArg = params.FORCE_UPDATE_DOCKER_FILE ? "--force" : ""
                         sh """
-                            cd /home/fosqa/resources/tools
-                            sudo /home/fosqa/resources/tools/venv/bin/python get_dockerfile_from_cdn.py --feature ${params.FEATURE_NAME} ${forceArg}
+                        cd /home/fosqa/resources/tools
+                        python3 set_kvm_docker_network.py
+                        sudo /home/fosqa/resources/tools/venv/bin/python get_dockerfile_from_cdn.py --feature ${feature} ${forceArg}
                         """
-
-                        // Prepare SVN code directory and update SVN repository
-                        def baseTestDir = "/home/fosqa/${params.LOCAL_LIB_DIR}/testcase/${params.SVN_BRANCH}"
-                        sh "mkdir -p ${baseTestDir}"
-                        def folderPath = "${baseTestDir}/${params.FEATURE_NAME}"
+                        
+                        // Update svn code
+                        sh "mkdir -p /home/fosqa/${params.LOCAL_LIB_DIR}/testcase/${branch}"
+                        
+                        def folderPath = "/home/fosqa/${params.LOCAL_LIB_DIR}/testcase/${branch}/${feature}"
                         echo "Checking folder: ${folderPath}"
                         def folderExists = sh(script: "if [ -d '${folderPath}' ]; then echo exists; else echo notexists; fi", returnStdout: true).trim()
                         echo "Folder check result: ${folderExists}"
 
                         if (folderExists == "notexists") {
-                            // SVN checkout if folder doesn't exist
-                            def svnStatus = sh(script: "cd ${baseTestDir} && sudo svn checkout https://qa-svn.corp.fortinet.com/svn/qa/FOS/${params.TEST_CASE_FOLDER}/${params.SVN_BRANCH}/${params.FEATURE_NAME} --username \$SVN_USER --password \$SVN_PASS --non-interactive", returnStatus: true)
+                            // Folder doesn't exist, perform SVN checkout.
+                            def svnStatus = sh(script: "cd /home/fosqa/${params.LOCAL_LIB_DIR}/testcase/${branch} && sudo svn checkout https://qa-svn.corp.fortinet.com/svn/qa/FOS/${testcase_folder}/${branch}/${feature} --username \$SVN_USER --password \$SVN_PASS --non-interactive", returnStatus: true)
                             if (svnStatus != 0) {
                                 echo "SVN checkout failed with exit status ${svnStatus}. Continuing pipeline..."
                             }
                         } else {
-                            // SVN update if folder exists
-                            // --accept theirs-full 
+                            // Folder exists, perform SVN update.
                             sh "cd ${folderPath} && sudo svn update --username \$SVN_USER --password \$SVN_PASS --non-interactive"
                         }
 
-                        // Create Docker file soft link
+                        // add docker file soft link
                         sh """
-                            cd /home/fosqa/testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}
-                            sudo rm -f docker_filesys
-                            sudo ln -s /home/fosqa/docker_filesys/${params.FEATURE_NAME} docker_filesys
+                        cd /home/fosqa/testcase/${branch}/${feature}
+                        sudo rm docker_filesys
+                        sudo ln -s /home/fosqa/docker_filesys/${feature} docker_filesys
                         """
 
-                        // Login to Harbor
+                        // Log in to Harbor using SVN_USER and SVN_PASS (harbor login credentials)
                         sh "docker login harbor-robot.corp.fortinet.com -u \$SVN_USER -p \$SVN_PASS"
 
-                        // Remove all existing Docker containers
-                        sh "docker ps -aq | xargs -r docker rm -f"
-                    }
-                }
-            }
-        }
-
-        stage('Test Running') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: 'LDAP', usernameVariable: 'SVN_USER', passwordVariable: 'SVN_PASS')]) {
-                        // Run test cases using Docker compose and execute tests
+                        // Remove all existing dockers firstly
                         sh """
-                            cd /home/fosqa/resources/tools && python3 set_docker_network.py
-                            sudo python3 set_route_for_docker.py 
-                            docker compose -f /home/fosqa/testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE} up --build -d
-
-                            cd /home/fosqa/${params.LOCAL_LIB_DIR}
-                            sudo chmod -R 777 .
-                            . /home/fosqa/${params.LOCAL_LIB_DIR}/venv/bin/activate
-                            python3 autotest.py -e testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE} -g testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_GROUP_CHOICE} -d
+                        docker ps -aq | xargs -r docker rm -f
                         """
+                        // Run test
+                        sh """
+                        cd /home/fosqa/resources/tools && python3 set_docker_network.py
+                        sudo python3 set_route_for_docker.py 
 
-                        // Enable HTTP service to check test results
-                        sh "cd /home/fosqa/resources/tools && sudo python3 simple_http_server_as_service.py"
+                        docker compose -f /home/fosqa/testcase/${branch}/${feature}/docker/${docker_compose_file} up --build -d
+
+                        cd /home/fosqa/${params.LOCAL_LIB_DIR}
+                        sudo chmod -R 777 .
+                        . /home/fosqa/${params.LOCAL_LIB_DIR}/venv/bin/activate
+                        python3 autotest.py -e testcase/${branch}/${feature}/${testConfig} -g testcase/${branch}/${feature}/${testGroup} -d
+                        """
+                        // Enable http service for check test result
+                        sh """
+                        cd /home/fosqa/resources/tools && sudo python3 simple_http_server_as_service.py
+                        """
                     }
+
+
                 }
             }
         }
 
-
-        stage('Archive Test Results') {
+        stage('Archive Results') {
             steps {
                 script {
                     def outputsDir = "/home/fosqa/${params.LOCAL_LIB_DIR}/outputs"

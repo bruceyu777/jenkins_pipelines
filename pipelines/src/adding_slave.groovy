@@ -138,9 +138,18 @@ curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
                     
                     echo "=== Step 1: Remote Git update ==="
                     def innerGitCmd = 'cd /home/fosqa/resources/tools && ' +
-                                      'if [ -n "$(git status --porcelain)" ]; then git stash push -m "temporary stash"; fi; ' +
-                                      'git pull; ' +
-                                      'if git stash list | grep -q "temporary stash"; then git stash pop; fi'
+                                    // Stash both tracked and untracked changes
+                                    'if [ -n "$(git status --porcelain)" ]; then git stash push -u -m "temporary stash"; fi; ' +
+                                    // Pull using recursive merge with -X theirs to favor remote changes on conflicts
+                                    'git pull -X theirs; ' +
+                                    // Try to reapply the stash; if conflicts occur, reset hard and drop the stash
+                                    'if git stash list | grep -q "temporary stash"; then ' +
+                                    '  if ! git stash pop; then ' +
+                                    '    echo "Stash pop encountered conflicts, discarding local changes in favor of remote changes"; ' +
+                                    '    git reset --hard HEAD; ' +
+                                    '    git stash drop; ' +
+                                    '  fi; ' +
+                                    'fi'
                     def gitPullCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} '${innerGitCmd}'"
                     echo "Executing remote git pull command: ${gitPullCmd}"
                     try {
@@ -148,6 +157,7 @@ curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
                     } catch (Exception e) {
                         echo "Remote git pull failed: ${e.getMessage()}. Continuing without updating."
                     }
+
                     
                     echo "=== Step 2: Update hostname, floating IP and aliases ==="
                     def setHostnameCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} 'cd /home/fosqa/resources/tools && sudo python3 set_hostname.py --hostname all-in-one-${nodeName} --floating-ip ${params.NODE_IP}'"

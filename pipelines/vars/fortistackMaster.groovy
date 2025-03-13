@@ -1,7 +1,4 @@
-// No need for the @Library annotation here since this file is part of the shared library.
 def call() {
-  // Load and apply parameter definitions from the shared library.
-  // This call must occur before the pipeline block so that job properties are set.
   fortistackMasterParameters()
 
   pipeline {

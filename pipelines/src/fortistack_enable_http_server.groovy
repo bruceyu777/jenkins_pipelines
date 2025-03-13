@@ -118,6 +118,7 @@ pipeline {
                         def forceArg = params.FORCE_UPDATE_DOCKER_FILE ? "--force" : ""
                         sh """
                             cd /home/fosqa/resources/tools
+                            python3 set_kvm_docker_network.py
                             sudo /home/fosqa/resources/tools/venv/bin/python get_dockerfile_from_cdn.py --feature ${params.FEATURE_NAME} ${forceArg}
                         """
 
@@ -137,8 +138,7 @@ pipeline {
                             }
                         } else {
                             // SVN update if folder exists
-                            // --accept theirs-full 
-                            sh "cd ${folderPath} && sudo svn update --username \$SVN_USER --password \$SVN_PASS --non-interactive"
+                            sh "cd ${folderPath} && sudo svn update --accept theirs-full --username \$SVN_USER --password \$SVN_PASS --non-interactive"
                         }
 
                         // Create Docker file soft link
