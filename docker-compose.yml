@@ -1,7 +1,7 @@
 services:
   jenkins-master:
     build:
-      context: /home/fosqa/jenkins-master  # adjust if needed
+      context: /home/fosqa/jenkins-master
       dockerfile: Dockerfile.jenkins
     container_name: jenkins-master
     restart: unless-stopped
