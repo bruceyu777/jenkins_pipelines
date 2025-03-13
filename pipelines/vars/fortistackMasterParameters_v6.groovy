@@ -27,9 +27,9 @@ def call() {
         description: 'Enter the node name: node1, node2 ...'
       ),
       booleanParam(
-        name: 'FORCE_UPDATE_DOCKER_FILE',
-        defaultValue: true,
-        description: 'If true, update docker file with --force option'
+          name: 'FORCE_UPDATE_DOCKER_FILE',
+          defaultValue: true,
+          description: 'If true, update docker file with --force option'
       ),
       // Feature selection.
       choice(
@@ -89,7 +89,7 @@ def call() {
             '''if (FEATURE_NAME == "avfortisandbox") {
                  return ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_alt.full"]
                } else if (FEATURE_NAME == "webfilter") {
-                 return ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full", "grp.webfilter_flow.full", "grp.webfilter_peruser.full", "grp.webfilter_onearm.full", "grp.webfilter_other.full", "grp.webfilter_other2.full" ]
+                 return ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full","grp.webfilter_flow.full", "grp.webfilter_peruser.full","grp.webfilter_onearm.full", "grp.webfilter_other.full","grp.webfilter_other2.full" ]
                } else {
                  return ["unknown"]
                }''',
@@ -97,12 +97,6 @@ def call() {
           )
         ]
       ],
-      // New parameter: TEST_GROUPS.
-      text(
-        name: 'TEST_GROUPS',
-        defaultValue: '',
-        description: 'JSON array of test groups; if provided, overrides TEST_GROUP_CHOICE. Leave empty to use TEST_GROUP_CHOICE.'
-      ),
       // Dynamic parameter for DOCKER_COMPOSE_FILE_CHOICE.
       [$class: 'CascadeChoiceParameter',
         name: 'DOCKER_COMPOSE_FILE_CHOICE',
