@@ -52,79 +52,79 @@ def call() {
   fortistackMasterParameters()
 
   pipeline {
-    parameters {
-            string(
-                name: 'BUILD_NUMBER',
-                defaultValue: '3473',
-                trim: true,
-                description: 'FGT build number'
-            )
-            string(
-                name: 'NODE_NAME',
-                defaultValue: 'node1',
-                trim: true,
-                description: 'Jenkins node label'
-            )
-            string(
-                name: 'LOCAL_LIB_DIR',
-                defaultValue: 'autolibv3',
-                trim: true,
-                description: 'Local library directory'
-            )
-            string(
-                name: 'SVN_BRANCH',
-                defaultValue: 'trunk',
-                trim: true,
-                description: 'SVN test branch'
-            )
-            string(
-                name: 'FEATURE_NAME',
-                defaultValue: 'avfortisandbox',
-                trim: true,
-                description: 'SVN test feature'
-            )
-            string(
-                name: 'TEST_CASE_FOLDER',
-                defaultValue: 'testcase',
-                trim: true,
-                description: 'SVN test case folder name, like testcase or testcase_v1'
-            )
-            string(
-                name: 'TEST_CONFIG_CHOICE',
-                defaultValue: 'env.newman.FGT_KVM.avfortisandbox.conf',
-                trim: true,
-                description: 'Env file name'
-            )
-            string(
-                name: 'TEST_GROUP_CHOICE',
-                defaultValue: 'grp.avfortisandbox_fortistack.full',
-                trim: true,
-                description: 'Test group file name'
-            )
-            string(
-                name: 'DOCKER_COMPOSE_FILE_CHOICE',
-                defaultValue: 'docker.avfortisandbox_avfortisandbox.yml',
-                trim: true,
-                description: 'Docker compose file name'
-            )
-            booleanParam(
-                name: 'FORCE_UPDATE_DOCKER_FILE',
-                defaultValue: true,
-                description: 'If true, update docker file with --force option'
-            )
-            string(
-                name: 'build_name',
-                defaultValue: 'fortistack-',
-                trim: true,
-                description: 'Build name'
-            )
-            string(
-                name: 'send_to',
-                defaultValue: 'yzhengfeng@fortinet.com',
-                trim: true,
-                description: 'Email address'
-            )
-        }
+    // parameters {
+    //         string(
+    //             name: 'BUILD_NUMBER',
+    //             defaultValue: '3473',
+    //             trim: true,
+    //             description: 'FGT build number'
+    //         )
+    //         string(
+    //             name: 'NODE_NAME',
+    //             defaultValue: 'node1',
+    //             trim: true,
+    //             description: 'Jenkins node label'
+    //         )
+    //         string(
+    //             name: 'LOCAL_LIB_DIR',
+    //             defaultValue: 'autolibv3',
+    //             trim: true,
+    //             description: 'Local library directory'
+    //         )
+    //         string(
+    //             name: 'SVN_BRANCH',
+    //             defaultValue: 'trunk',
+    //             trim: true,
+    //             description: 'SVN test branch'
+    //         )
+    //         string(
+    //             name: 'FEATURE_NAME',
+    //             defaultValue: 'avfortisandbox',
+    //             trim: true,
+    //             description: 'SVN test feature'
+    //         )
+    //         string(
+    //             name: 'TEST_CASE_FOLDER',
+    //             defaultValue: 'testcase',
+    //             trim: true,
+    //             description: 'SVN test case folder name, like testcase or testcase_v1'
+    //         )
+    //         string(
+    //             name: 'TEST_CONFIG_CHOICE',
+    //             defaultValue: 'env.newman.FGT_KVM.avfortisandbox.conf',
+    //             trim: true,
+    //             description: 'Env file name'
+    //         )
+    //         string(
+    //             name: 'TEST_GROUP_CHOICE',
+    //             defaultValue: 'grp.avfortisandbox_fortistack.full',
+    //             trim: true,
+    //             description: 'Test group file name'
+    //         )
+    //         string(
+    //             name: 'DOCKER_COMPOSE_FILE_CHOICE',
+    //             defaultValue: 'docker.avfortisandbox_avfortisandbox.yml',
+    //             trim: true,
+    //             description: 'Docker compose file name'
+    //         )
+    //         booleanParam(
+    //             name: 'FORCE_UPDATE_DOCKER_FILE',
+    //             defaultValue: true,
+    //             description: 'If true, update docker file with --force option'
+    //         )
+    //         string(
+    //             name: 'build_name',
+    //             defaultValue: 'fortistack-',
+    //             trim: true,
+    //             description: 'Build name'
+    //         )
+    //         string(
+    //             name: 'send_to',
+    //             defaultValue: 'yzhengfeng@fortinet.com',
+    //             trim: true,
+    //             description: 'Email address'
+    //         )
+    //     }
     agent { label "${params.NODE_NAME}" }
     options {
       buildDiscarder(logRotator(numToKeepStr: '100'))
