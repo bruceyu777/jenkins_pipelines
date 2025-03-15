@@ -1,3 +1,42 @@
+// Helper function to compute test groups based on parameters.
+def getTestGroups(params) {
+    def testGroups = []
+    if (params.TEST_GROUPS) {
+        if (params.TEST_GROUPS instanceof String) {
+            def tg = params.TEST_GROUPS.trim()
+            // Remove surrounding quotes if present.
+            if (tg.startsWith("\"") && tg.endsWith("\"")) {
+                tg = tg.substring(1, tg.length()-1).trim()
+            }
+            if (tg.startsWith("[")) {
+                try {
+                    def parsed = readJSON text: tg
+                    if (parsed instanceof List) {
+                        testGroups = parsed
+                    } else {
+                        testGroups = tg.split(",").collect { it.trim() }
+                    }
+                } catch (e) {
+                    echo "Error parsing TEST_GROUPS as JSON: ${e}. Falling back to splitting by comma."
+                    testGroups = tg.split(",").collect { it.trim() }
+                }
+            } else {
+                testGroups = tg.split(",").collect { it.trim() }
+            }
+        } else if (params.TEST_GROUPS instanceof List) {
+            testGroups = params.TEST_GROUPS
+        } else {
+            testGroups = [params.TEST_GROUPS.toString()]
+        }
+    }
+    if (!testGroups || testGroups.isEmpty()) {
+        testGroups = [params.TEST_GROUP_CHOICE]
+    }
+    return testGroups
+}
+
+def computedTestGroups = []  // Global variable to share across stages
+
 def call() {
   fortistackMasterParameters()
 
@@ -6,43 +45,36 @@ def call() {
     options {
       buildDiscarder(logRotator(numToKeepStr: '100'))
     }
-
+    
     stages {
-      stage('Set Build Display Name') {
+      stage('Initialize Test Groups') {
         steps {
           script {
-            // Determine test groups: if TEST_GROUPS is provided, use it;
-            // otherwise, fall back to a single test group from TEST_GROUP_CHOICE.
-            def testGroups = []
-            if (params.TEST_GROUPS?.trim()) {
-              try {
-                testGroups = readJSON text: params.TEST_GROUPS
-              } catch (Exception e) {
-                echo "Error parsing TEST_GROUPS parameter: ${e}"
-                testGroups = []
-              }
-            }
-            if (!testGroups || testGroups.isEmpty()) {
-              testGroups = [params.TEST_GROUP_CHOICE]
-            }
-            currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.FEATURE_NAME}-${testGroups.join(',')}"
+            computedTestGroups = getTestGroups(params)
+            echo "Computed test groups: ${computedTestGroups}"
           }
         }
       }
-
+      
+      stage('Set Build Display Name') {
+        steps {
+          script {
+            currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.FEATURE_NAME}-${computedTestGroups.join(',')}"
+          }
+        }
+      }
+      
       stage('Debug Parameters') {
         steps {
           script {
             echo "=== Debug: Printing All Parameters ==="
-            params.each { key, value ->
-              echo "${key} = ${value}"
-            }
+            params.each { key, value -> echo "${key} = ${value}" }
           }
         }
       }
-
+      
       stage('Trigger Provision Pipeline') {
-        // This stage runs only once on the designated node.
+        // This stage runs on the designated node.
         agent { label "${params.NODE_NAME}" }
         when {
           expression { return !params.SKIP_PROVISION }
@@ -62,9 +94,9 @@ def call() {
           }
         }
       }
-
+      
       stage('Trigger Test Pipeline') {
-        // This stage runs on the same node and will iterate over each test group sequentially.
+        // This stage runs on the designated node and iterates over each test group sequentially.
         agent { label "${params.NODE_NAME}" }
         when {
           expression { return !params.SKIP_TEST }
@@ -74,25 +106,15 @@ def call() {
             def paramsMap = new groovy.json.JsonSlurper()
                              .parseText(params.PARAMS_JSON)
                              .collectEntries { k, v -> [k, v] }
-            // Determine test groups: if TEST_GROUPS is provided, use it; otherwise, use TEST_GROUP_CHOICE.
-            def testGroups = []
-            if (params.TEST_GROUPS?.trim()) {
-              try {
-                testGroups = readJSON text: params.TEST_GROUPS
-              } catch (Exception e) {
-                echo "Error parsing TEST_GROUPS parameter: ${e}"
-                testGroups = []
-              }
-            }
-            if (!testGroups || testGroups.isEmpty()) {
-              testGroups = [params.TEST_GROUP_CHOICE]
-            }
+                             
+            echo "Using computed test groups: ${computedTestGroups}"
+            
             // Track overall result.
             def overallSuccess = true
             def groupResults = [:]
-
-            // Loop through the test groups sequentially.
-            for (group in testGroups) {
+            
+            // Loop through each test group.
+            for (group in computedTestGroups) {
               def testParams = [
                 string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
                 string(name: 'NODE_NAME', value: params.NODE_NAME),
@@ -118,7 +140,6 @@ def call() {
               }
             }
             echo "Test pipeline group results: ${groupResults}"
-            // Fail the overall pipeline if any test failed.
             if (!overallSuccess) {
               error("One or more test pipelines failed: ${groupResults}")
             }
@@ -126,10 +147,42 @@ def call() {
         }
       }
     }
-
+    
     post {
       always {
-        echo "Master pipeline completed."
+        script {
+          // Archive Test Results using computedTestGroups.
+          def outputsDir = "/home/fosqa/${params.LOCAL_LIB_DIR}/outputs"
+          // Clean up previous archiving work.
+          sh "rm -rf ${WORKSPACE}/test_results"
+          sh "rm -f ${WORKSPACE}/summary_*.html"
+          
+          def archivedFolders = []
+          for (group in computedTestGroups) {
+            def folder = sh(
+                returnStdout: true,
+                script: """
+                    find ${outputsDir} -mindepth 2 -maxdepth 2 -type d -name "*--group--${group}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
+                """
+            ).trim()
+            
+            if (!folder) {
+                echo "Warning: No test results folder found for test group '${group}' in ${outputsDir}."
+            } else {
+                echo "Found folder for group '${group}': ${folder}"
+                archivedFolders << folder
+                //Only archive summary.html
+                sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${group}.html"
+            }
+          }
+          
+          if (archivedFolders.isEmpty()) {
+              echo "No test results were found for any test group."
+          } else {
+              archiveArtifacts artifacts: "test_results/**, summary_*.html", fingerprint: false
+          }
+        }
+        echo "Pipeline completed."
       }
     }
   }

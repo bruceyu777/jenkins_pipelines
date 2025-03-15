@@ -180,36 +180,29 @@ pipeline {
                 }
             }
         }
+
+
         stage('Archive Test Results') {
             steps {
                 script {
                     def outputsDir = "/home/fosqa/${params.LOCAL_LIB_DIR}/outputs"
-                    // Search two levels deep for directories matching the test group.
-                    def latestSubFolder = sh(
-                        returnStdout: true,
-                        script: """
-                            find ${outputsDir} -mindepth 2 -maxdepth 2 -type d -name "*--group--${params.TEST_GROUP_CHOICE}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
-                        """
-                    ).trim()
+                    def latestDateFolder = sh(returnStdout: true, script: "ls -td ${outputsDir}/*/ | head -1").trim()
+                    echo "Latest date folder: ${latestDateFolder}"
+                    def latestSubFolder = sh(returnStdout: true, script: "ls -td ${latestDateFolder}*/ | head -1").trim()
+                    echo "Latest results folder: ${latestSubFolder}"
                     
-                    if (!latestSubFolder) {
-                        echo "Warning: No test results folder found for test group '${params.TEST_GROUP_CHOICE}' in ${outputsDir}. Skipping archiving."
-                    } else {
-                        echo "Latest results folder for test group '${params.TEST_GROUP_CHOICE}': ${latestSubFolder}"
-                        sh "cp -r ${latestSubFolder} ${WORKSPACE}/test_results"
-                        sh "cp ${latestSubFolder}/summary/summary.html ${WORKSPACE}/summary.html"
-                        archiveArtifacts artifacts: "test_results/**, summary.html", fingerprint: false
-                        publishHTML(target: [
-                            reportDir: ".",
-                            reportFiles: 'summary.html',
-                            reportName: "Test Results Summary"
-                        ])
-                    }
+                    sh "cp -r ${latestSubFolder} ${WORKSPACE}/test_results"
+                    sh "cp ${latestSubFolder}summary/summary.html ${WORKSPACE}/summary.html"
+                    
+                    archiveArtifacts artifacts: "test_results/**, summary.html", fingerprint: false
+                    publishHTML(target: [
+                        reportDir: ".",
+                        reportFiles: 'summary.html',
+                        reportName: "Test Results Summary"
+                    ])
                 }
             }
         }
-
-
     }
     
     post {

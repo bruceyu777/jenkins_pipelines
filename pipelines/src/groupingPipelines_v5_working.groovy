@@ -36,7 +36,7 @@ pipeline {
     "TEST_CASE_FOLDER": "testcase",
     "TEST_CONFIG_CHOICE": "env.newman.FGT_KVM.avfortisandbox.conf",
     "TEST_GROUP_CHOICE": "grp.avfortisandbox_fortistack.full",
-    "TEST_GROUPS": "[\\"grp.avfortisandbox_fortistack.full\\", \\"grp.avfortisandbox_alt.full\\"]",
+    "TEST_GROUPS": "[\"grp.avfortisandbox_fortistack.full\", \"grp.avfortisandbox_alt.full\"]",
     "DOCKER_COMPOSE_FILE_CHOICE": "docker.avfortisandbox_avfortisandbox.yml"
   },
   {
@@ -45,12 +45,12 @@ pipeline {
     "TEST_CASE_FOLDER": "testcase_v1",
     "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
     "TEST_GROUP_CHOICE": "grp.webfilter_basic.full",
-    "TEST_GROUPS": "grp.webfilter_basic.full, grp.webfilter_basic2.full",
+    "TEST_GROUPS": "[\"grp.webfilter_basic.full\", \"grp.webfilter_basic2.full\"]",
     "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml"
   }
 ]''',
             description: '''Individual configuration parameters as a JSON array.
-Both TEST_GROUP_CHOICE (legacy, single test group) and TEST_GROUPS (a JSON array of test suites or a comma separated list) are supported.
+Both TEST_GROUP_CHOICE (legacy, single test group) and TEST_GROUPS (a JSON array of test suites) are supported.
 Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall back to TEST_GROUP_CHOICE.'''
         )
     }
@@ -70,31 +70,6 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                         def merged = common + individual
                         // Override BUILD_NUMBER with the standalone parameter.
                         merged.BUILD_NUMBER = params.BUILD_NUMBER
-
-                        // Process TEST_GROUPS field:
-                        if (merged.TEST_GROUPS?.trim()) {
-                            def tg = merged.TEST_GROUPS.trim()
-                            def validTestGroups
-                            if (tg.startsWith('[')) {
-                                // If it starts with '[' try to parse it as JSON.
-                                try {
-                                    def parsed = readJSON text: tg
-                                    validTestGroups = groovy.json.JsonOutput.toJson(parsed)
-                                } catch (Exception e) {
-                                    echo "TEST_GROUPS value not valid JSON, splitting by comma: ${e}"
-                                    def arr = tg.split(',').collect { it.trim() }
-                                    validTestGroups = groovy.json.JsonOutput.toJson(arr)
-                                }
-                            } else {
-                                // Otherwise, assume a comma separated list.
-                                def arr = tg.split(',').collect { it.trim() }
-                                validTestGroups = groovy.json.JsonOutput.toJson(arr)
-                            }
-                            merged.TEST_GROUPS = validTestGroups
-                        } else {
-                            merged.TEST_GROUPS = ""
-                        }
-
                         def branchName = "Run_${i}"
                         parallelBuilds[branchName] = {
                             echo "Triggering fortistack_master_provision_runtest with merged configuration: ${merged}"
