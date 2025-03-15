@@ -1,3 +1,13 @@
+// Helper function to get the archive group name (first two portions).
+def getArchiveGroupName(String group) {
+    def parts = group.tokenize('.')
+    if (parts.size() >= 2) {
+        return "${parts[0]}.${parts[1]}"
+    } else {
+        return group
+    }
+}
+
 // Helper function to compute test groups based on parameters.
 def getTestGroups(params) {
     def testGroups = []
@@ -154,25 +164,25 @@ def call() {
           // Archive Test Results using computedTestGroups.
           def outputsDir = "/home/fosqa/${params.LOCAL_LIB_DIR}/outputs"
           // Clean up previous archiving work.
-          sh "rm -rf ${WORKSPACE}/test_results"
           sh "rm -f ${WORKSPACE}/summary_*.html"
           
           def archivedFolders = []
           for (group in computedTestGroups) {
+            def archiveGroup = getArchiveGroupName(group)
             def folder = sh(
                 returnStdout: true,
                 script: """
-                    find ${outputsDir} -mindepth 2 -maxdepth 2 -type d -name "*--group--${group}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
+                    find ${outputsDir} -mindepth 2 -maxdepth 2 -type d -name "*--group--${archiveGroup}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
                 """
             ).trim()
             
             if (!folder) {
-                echo "Warning: No test results folder found for test group '${group}' in ${outputsDir}."
+                echo "Warning: No test results folder found for test group '${archiveGroup}' in ${outputsDir}."
             } else {
-                echo "Found folder for group '${group}': ${folder}"
+                echo "Found folder for group '${archiveGroup}': ${folder}"
                 archivedFolders << folder
                 //Only archive summary.html
-                sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${group}.html"
+                sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
             }
           }
           
