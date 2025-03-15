@@ -46,12 +46,13 @@ def getTestGroups(params) {
     return testGroups
 }
 
-// Helper function to parse PARAMS_JSON and expand its keys as global variables.
+// Helper function to parse PARAMS_JSON and expand its keys as variables.
 def expandParamsJson(String jsonStr) {
     try {
         def jsonMap = new groovy.json.JsonSlurper().parseText(jsonStr) as Map
+        // Iterate through each key–value pair and set them as global variables.
         jsonMap.each { key, value ->
-            // Set each key-value pair as a global variable.
+            // use binding.setVariable() to create a global variable.
             binding.setVariable(key, value)
             echo "Set variable: ${key} = ${value}"
         }
@@ -65,12 +66,9 @@ def computedTestGroups = []  // Global variable to share across stages
 
 def call() {
   fortistackMasterParameters()
-  // Expand the JSON parameters so that keys (e.g. SVN_BRANCH, LOCAL_LIB_DIR, build_name, send_to, FGT_TYPE)
-  // are available as global variables.
   expandParamsJson(params.PARAMS_JSON)
 
   pipeline {
-    // Use NODE_NAME from pipeline parameters.
     agent { label "${params.NODE_NAME}" }
     options {
       buildDiscarder(logRotator(numToKeepStr: '100'))
@@ -89,8 +87,7 @@ def call() {
       stage('Set Build Display Name') {
         steps {
           script {
-            // Use global variables where appropriate.
-            currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.BUILD_NUMBER}-${FEATURE_NAME}-${computedTestGroups.join(',')}"
+            currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.BUILD_NUMBER}-${params.FEATURE_NAME}-${computedTestGroups.join(',')}"
           }
         }
       }
@@ -125,12 +122,11 @@ def call() {
               def forceArg = params.FORCE_UPDATE_DOCKER_FILE ? "--force" : ""
               sh """
                   cd /home/fosqa/resources/tools
-                  sudo /home/fosqa/resources/tools/venv/bin/python get_dockerfile_from_cdn.py --feature ${FEATURE_NAME} ${forceArg}
+                  sudo /home/fosqa/resources/tools/venv/bin/python get_dockerfile_from_cdn.py --feature ${params.FEATURE_NAME} ${forceArg}
               """
 
               // Prepare SVN code directory and update SVN repository.
-              // Note: Now using global variables LOCAL_LIB_DIR and SVN_BRANCH.
-              def baseTestDir = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}"
+              def baseTestDir = "/home/fosqa/${params.LOCAL_LIB_DIR}/testcase/${params.SVN_BRANCH}"
               sh "mkdir -p ${baseTestDir}"
               def folderPath = "${baseTestDir}/${params.FEATURE_NAME}"
               echo "Checking folder: ${folderPath}"
@@ -138,7 +134,7 @@ def call() {
               echo "Folder check result: ${folderExists}"
 
               if (folderExists == "notexists") {
-                  def svnStatus = sh(script: "cd ${baseTestDir} && sudo svn checkout https://qa-svn.corp.fortinet.com/svn/qa/FOS/${params.TEST_CASE_FOLDER}/${SVN_BRANCH}/${params.FEATURE_NAME} --username \$SVN_USER --password \$SVN_PASS --non-interactive", returnStatus: true)
+                  def svnStatus = sh(script: "cd ${baseTestDir} && sudo svn checkout https://qa-svn.corp.fortinet.com/svn/qa/FOS/${params.TEST_CASE_FOLDER}/${params.SVN_BRANCH}/${params.FEATURE_NAME} --username \$SVN_USER --password \$SVN_PASS --non-interactive", returnStatus: true)
                   if (svnStatus != 0) {
                       echo "SVN checkout failed with exit status ${svnStatus}. Continuing pipeline..."
                   }
@@ -148,7 +144,7 @@ def call() {
 
               // Create Docker file soft link.
               sh """
-                  cd /home/fosqa/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}
+                  cd /home/fosqa/testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}
                   sudo rm -f docker_filesys
                   sudo ln -s /home/fosqa/docker_filesys/${params.FEATURE_NAME} docker_filesys
               """
@@ -171,16 +167,16 @@ def call() {
               sh """
                   cd /home/fosqa/resources/tools && python3 set_docker_network.py
                   sudo python3 set_route_for_docker.py 
-                  docker compose -f /home/fosqa/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE} up --build -d
+                  docker compose -f /home/fosqa/testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE} up --build -d
               """
               // Run tests for each computed test group.
               for (group in computedTestGroups) {
                   echo "Running tests for test group: ${group}"
                   sh """
-                      cd /home/fosqa/${LOCAL_LIB_DIR}
+                      cd /home/fosqa/${params.LOCAL_LIB_DIR}
                       sudo chmod -R 777 .
-                      . /home/fosqa/${LOCAL_LIB_DIR}/venv/bin/activate
-                      python3 autotest.py -e testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE} -g testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group} -d
+                      . /home/fosqa/${params.LOCAL_LIB_DIR}/venv/bin/activate
+                      python3 autotest.py -e testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE} -g testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}/${group} -d
                   """
               }
               // Start HTTP service to check test results.
@@ -195,7 +191,7 @@ def call() {
       always {
         script {
           // Archive Test Results in the post block.
-          def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
+          def outputsDir = "/home/fosqa/${params.LOCAL_LIB_DIR}/outputs"
           // Clean up previous archiving work.
           sh "rm -rf ${WORKSPACE}/test_results"
           sh "rm -f ${WORKSPACE}/summary_*.html"
