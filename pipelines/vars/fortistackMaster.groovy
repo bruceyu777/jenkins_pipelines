@@ -203,10 +203,10 @@ def call() {
               for (group in computedTestGroups) {
                 def archiveGroup = getArchiveGroupName(group)
                 def folder = sh(
-                    returnStdout: true,
-                    script: """
-                        find ${outputsDir} -mindepth 2 -maxdepth 2 -type d -name "*--group--${archiveGroup}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
-                    """
+                  returnStdout: true,
+                  script: """
+                    find "${outputsDir}" -mindepth 2 -maxdepth 2 -type d -name "*--group--${archiveGroup}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
+                  """
                 ).trim()
                 
                 if (!folder) {
@@ -233,6 +233,7 @@ def call() {
             }
           }
         }
+
         echo "Pipeline completed."
       }
     }
