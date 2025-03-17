@@ -197,48 +197,59 @@ def call() {
             try {
               def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
               // Clean up previous archiving work.
+              sh "hostname"
+              sh "ip add"
               sh "rm -f ${WORKSPACE}/summary_*.html"
-              
-              // Get a simplified tree listing (full paths, no report, level 2)
-              def treeList = sh(
+
+              // Debug: list all directories under outputsDir
+              def listAll = sh(
                 returnStdout: true,
-                script: "tree -if --noreport -L 2 '${outputsDir}'"
+                script: "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d"
               ).trim()
-              echo "Tree listing under ${outputsDir}:\n${treeList}"
-              
+              echo "All directories under ${outputsDir}:\n${listAll}"
+
               def archivedFolders = []
               for (group in computedTestGroups) {
                 def archiveGroup = getArchiveGroupName(group)
-                // Filter the tree output for directories ending with the group name.
-                def grepCmd = "echo \"${treeList}\" | grep -- \"-group--${archiveGroup}\$\""
-                echo "Grep command for group '${archiveGroup}': ${grepCmd}"
-                def matchingDirs = sh(
+                // Build the base find command.
+                def baseCmd = "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d -name '*--group--${archiveGroup}' -printf '%T@ %p\\n'"
+                echo "Base find command for group '${archiveGroup}': ${baseCmd}"
+
+                // Execute the base find command and capture raw output.
+                def rawOutput = sh(
                   returnStdout: true,
-                  script: grepCmd
+                  script: "bash -c \"${baseCmd}\""
                 ).trim()
-                echo "Matching directories for group '${archiveGroup}':\n${matchingDirs}"
-                
-                // Sort the matching directories lexicographically and choose the last line.
-                def selectedDir = sh(
+                echo "Raw output for group '${archiveGroup}':\n${rawOutput}"
+
+                // Sort the output and pick the most recent entry.
+                def sortedOutput = sh(
                   returnStdout: true,
-                  script: "echo \"${matchingDirs}\" | sort | tail -n 1"
+                  script: "bash -c \"echo '${rawOutput}' | sort -nr\""
                 ).trim()
-                echo "Selected directory for group '${archiveGroup}': '${selectedDir}'"
-                
-                if (!selectedDir) {
+                echo "Sorted output for group '${archiveGroup}':\n${sortedOutput}"
+
+                def folder = sh(
+                  returnStdout: true,
+                  script: "bash -c \"echo '${sortedOutput}' | head -1 | cut -d' ' -f2-\""
+                ).trim()
+                echo "Final folder for group '${archiveGroup}': '${folder}'"
+
+                if (!folder) {
                   echo "Warning: No test results folder found for test group '${archiveGroup}' in ${outputsDir}."
                 } else {
-                  archivedFolders << selectedDir
+                  echo "Found folder for group '${archiveGroup}': ${folder}"
+                  archivedFolders << folder
                   try {
-                    def cpCommand = "cp ${selectedDir}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
+                    def cpCommand = "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
                     echo "Executing copy command: ${cpCommand}"
                     sh cpCommand
                   } catch (err) {
                     echo "Error copying summary for group '${archiveGroup}': ${err}"
                   }
                 }
-                // Sleep 0.5 second before processing the next group.
-                sleep time: 0.5, unit: 'SECONDS'
+                // Sleep for 1 second before next iteration.
+                sleep time: 1, unit: 'SECONDS'
               }
               
               if (archivedFolders.isEmpty()) {
@@ -252,6 +263,7 @@ def call() {
             }
           }
         }
+
 
         echo "Pipeline completed."
       }
