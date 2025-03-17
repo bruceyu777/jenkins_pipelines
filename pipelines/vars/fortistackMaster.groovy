@@ -202,12 +202,17 @@ def call() {
               def archivedFolders = []
               for (group in computedTestGroups) {
                 def archiveGroup = getArchiveGroupName(group)
+                // Build the find command ensuring proper quoting
+                def findCommand = "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d -name '*--group--${archiveGroup}' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-"
+                echo "Executing find command for group '${archiveGroup}': ${findCommand}"
+                
+                // Execute the command and capture its output
                 def folder = sh(
                   returnStdout: true,
-                  script: """
-                    find "${outputsDir}" -mindepth 2 -maxdepth 2 -type d -name "*--group--${archiveGroup}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
-                  """
+                  script: findCommand
                 ).trim()
+                
+                echo "Raw output for group '${archiveGroup}': '${folder}'"
                 
                 if (!folder) {
                   echo "Warning: No test results folder found for test group '${archiveGroup}' in ${outputsDir}."
@@ -215,8 +220,9 @@ def call() {
                   echo "Found folder for group '${archiveGroup}': ${folder}"
                   archivedFolders << folder
                   try {
-                    // Only archive summary.html; if it fails, log the error and continue.
-                    sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
+                    def cpCommand = "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
+                    echo "Executing copy command: ${cpCommand}"
+                    sh cpCommand
                   } catch (err) {
                     echo "Error copying summary for group '${archiveGroup}': ${err}"
                   }
@@ -226,6 +232,7 @@ def call() {
               if (archivedFolders.isEmpty()) {
                 echo "No test results were found for any test group."
               } else {
+                echo "Archiving artifacts from folders: ${archivedFolders}"
                 archiveArtifacts artifacts: "test_results/**, summary_*.html", fingerprint: false
               }
             } catch (err) {
@@ -233,7 +240,6 @@ def call() {
             }
           }
         }
-
         echo "Pipeline completed."
       }
     }
