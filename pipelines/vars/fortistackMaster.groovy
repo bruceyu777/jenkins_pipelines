@@ -202,15 +202,12 @@ def call() {
               def archivedFolders = []
               for (group in computedTestGroups) {
                 def archiveGroup = getArchiveGroupName(group)
-                // Build the find command ensuring proper quoting
-                def findCommand = "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d -name '*--group--${archiveGroup}' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-"
+                // Build the find command using bash -c to preserve quotes
+                def findCommand = """bash -c "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d -name '*--group--${archiveGroup}' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-" """
                 echo "Executing find command for group '${archiveGroup}': ${findCommand}"
                 
                 // Execute the command and capture its output
-                def folder = sh(
-                  returnStdout: true,
-                  script: findCommand
-                ).trim()
+                def folder = sh(returnStdout: true, script: findCommand).trim()
                 
                 echo "Raw output for group '${archiveGroup}': '${folder}'"
                 
@@ -240,6 +237,7 @@ def call() {
             }
           }
         }
+
         echo "Pipeline completed."
       }
     }
