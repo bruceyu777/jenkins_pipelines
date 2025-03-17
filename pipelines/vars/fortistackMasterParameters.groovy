@@ -77,26 +77,47 @@ def call() {
           )
         ]
       ],
-      // Dynamic parameter for TEST_GROUP_CHOICE.
+      // // Dynamic parameter for TEST_GROUP_CHOICE.
+      // [$class: 'CascadeChoiceParameter',
+      //   name: 'TEST_GROUP_CHOICE',
+      //   description: 'Select test group based on feature',
+      //   referencedParameters: 'FEATURE_NAME',
+      //   choiceType: 'PT_SINGLE_SELECT',
+      //   script: [
+      //     $class: 'GroovyScript',
+      //     script: new SecureGroovyScript(
+      //       '''if (FEATURE_NAME == "avfortisandbox") {
+      //            return ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_alt.full"]
+      //          } else if (FEATURE_NAME == "webfilter") {
+      //            return ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full", "grp.webfilter_flow.full", "grp.webfilter_peruser.full", "grp.webfilter_onearm.full", "grp.webfilter_other.full", "grp.webfilter_other2.full" ]
+      //          } else {
+      //            return ["unknown"]
+      //          }''',
+      //       true
+      //     )
+      //   ]
+      // ],
+      // Dynamic parameter for TEST_GROUP_CHOICE (updated to allow multi-select)
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_GROUP_CHOICE',
-        description: 'Select test group based on feature',
+        description: 'Select one or more test groups based on feature',
         referencedParameters: 'FEATURE_NAME',
-        choiceType: 'PT_SINGLE_SELECT',
+        choiceType: 'PT_MULTI_SELECT', // Changed to multi-select
         script: [
           $class: 'GroovyScript',
           script: new SecureGroovyScript(
             '''if (FEATURE_NAME == "avfortisandbox") {
-                 return ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_alt.full"]
-               } else if (FEATURE_NAME == "webfilter") {
-                 return ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full", "grp.webfilter_flow.full", "grp.webfilter_peruser.full", "grp.webfilter_onearm.full", "grp.webfilter_other.full", "grp.webfilter_other2.full" ]
-               } else {
-                 return ["unknown"]
-               }''',
+                return ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_alt.full"]
+              } else if (FEATURE_NAME == "webfilter") {
+                return ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full", "grp.webfilter_flow.full", "grp.webfilter_peruser.full", "grp.webfilter_onearm.full", "grp.webfilter_other.full", "grp.webfilter_other2.full"]
+              } else {
+                return ["unknown"]
+              }''',
             true
           )
         ]
-      ],
+      ]
+
       // New parameter: TEST_GROUPS.
       text(
         name: 'TEST_GROUPS',

@@ -10,42 +10,6 @@ def getArchiveGroupName(String group) {
 }
 
 // Helper function to compute test groups based on parameters.
-// def getTestGroups(params) {
-//     def testGroups = []
-//     if (params.TEST_GROUPS) {
-//         if (params.TEST_GROUPS instanceof String) {
-//             def tg = params.TEST_GROUPS.trim()
-//             // Remove surrounding quotes if present.
-//             if (tg.startsWith("\"") && tg.endsWith("\"")) {
-//                 tg = tg.substring(1, tg.length()-1).trim()
-//             }
-//             if (tg.startsWith("[")) {
-//                 try {
-//                     def parsed = readJSON text: tg
-//                     if (parsed instanceof List) {
-//                         testGroups = parsed
-//                     } else {
-//                         testGroups = tg.split(",").collect { it.trim() }
-//                     }
-//                 } catch (e) {
-//                     echo "Error parsing TEST_GROUPS as JSON: ${e}. Falling back to splitting by comma."
-//                     testGroups = tg.split(",").collect { it.trim() }
-//                 }
-//             } else {
-//                 testGroups = tg.split(",").collect { it.trim() }
-//             }
-//         } else if (params.TEST_GROUPS instanceof List) {
-//             testGroups = params.TEST_GROUPS
-//         } else {
-//             testGroups = [params.TEST_GROUPS.toString()]
-//         }
-//     }
-//     if (!testGroups || testGroups.isEmpty()) {
-//         testGroups = [params.TEST_GROUP_CHOICE]
-//     }
-//     return testGroups
-// }
-// Updated helper function to compute test groups based on parameters.
 def getTestGroups(params) {
     def testGroups = []
     if (params.TEST_GROUPS) {
@@ -76,17 +40,11 @@ def getTestGroups(params) {
             testGroups = [params.TEST_GROUPS.toString()]
         }
     }
-    // If TEST_GROUPS is empty, use TEST_GROUP_CHOICE.
     if (!testGroups || testGroups.isEmpty()) {
-        if (params.TEST_GROUP_CHOICE instanceof List) {
-            testGroups = params.TEST_GROUP_CHOICE
-        } else {
-            testGroups = [params.TEST_GROUP_CHOICE.toString()]
-        }
+        testGroups = [params.TEST_GROUP_CHOICE]
     }
     return testGroups
 }
-
 
 // Helper function to parse PARAMS_JSON and expand its keys as global variables.
 def expandParamsJson(String jsonStr) {
@@ -201,7 +159,7 @@ def call() {
               echo "Triggering fortistack_runtest pipeline for test group '${group}' with parameters: ${testParams}"
               def result = build job: 'fortistack_runtest', parameters: testParams, wait: true, propagate: false
               groupResults[group] = result.getResult()
-              if (result.getResult() != "SUCCESS") {
+              if(result.getResult() != "SUCCESS"){
                 echo "Test pipeline for group '${group}' failed with result: ${result.getResult()}"
                 overallSuccess = false
               } else {
@@ -218,49 +176,42 @@ def call() {
     }
     post {
       always {
-        node("${params.NODE_NAME}") {
-          script {
-            try {
-              def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
-              // Clean up previous archiving work.
-              sh "rm -f ${WORKSPACE}/summary_*.html"
-              
-              def archivedFolders = []
-              for (group in computedTestGroups) {
-                def archiveGroup = getArchiveGroupName(group)
-                def folder = sh(
-                    returnStdout: true,
-                    script: """
-                        find ${outputsDir} -mindepth 2 -maxdepth 2 -type d -name "*--group--${archiveGroup}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
-                    """
-                ).trim()
+            node("${params.NODE_NAME}") {
+                // Archive Test Results using computedTestGroups.
+                def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
+                // Clean up previous archiving work.
+                sh "rm -f ${WORKSPACE}/summary_*.html"
                 
-                if (!folder) {
-                  echo "Warning: No test results folder found for test group '${archiveGroup}' in ${outputsDir}."
-                } else {
-                  echo "Found folder for group '${archiveGroup}': ${folder}"
-                  archivedFolders << folder
-                  try {
-                    // Only archive summary.html; if it fails, log the error and continue.
-                    sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
-                  } catch (err) {
-                    echo "Error copying summary for group '${archiveGroup}': ${err}"
-                  }
+                def archivedFolders = []
+                for (group in computedTestGroups) {
+                    def archiveGroup = getArchiveGroupName(group)
+                    def folder = sh(
+                        returnStdout: true,
+                        script: """
+                            find ${outputsDir} -mindepth 2 -maxdepth 2 -type d -name "*--group--${archiveGroup}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
+                        """
+                    ).trim()
+                    
+                    if (!folder) {
+                        echo "Warning: No test results folder found for test group '${archiveGroup}' in ${outputsDir}."
+                    } else {
+                        echo "Found folder for group '${archiveGroup}': ${folder}"
+                        archivedFolders << folder
+                        // Only archive summary.html
+                        sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
+                    }
                 }
-              }
-              
-              if (archivedFolders.isEmpty()) {
-                echo "No test results were found for any test group."
-              } else {
-                archiveArtifacts artifacts: "test_results/**, summary_*.html", fingerprint: false
-              }
-            } catch (err) {
-              echo "Error in post block: ${err}"
+                
+                if (archivedFolders.isEmpty()) {
+                    echo "No test results were found for any test group."
+                } else {
+                    archiveArtifacts artifacts: "test_results/**, summary_*.html", fingerprint: false
+                }
             }
-          }
+            echo "Pipeline completed."
         }
-        echo "Pipeline completed."
-      }
     }
+    
+    
   }
 }
