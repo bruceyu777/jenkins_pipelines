@@ -198,19 +198,41 @@ def call() {
               def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
               // Clean up previous archiving work.
               sh "rm -f ${WORKSPACE}/summary_*.html"
-              
+
+              // Debug: list all directories under outputsDir
+              def listAll = sh(
+                returnStdout: true,
+                script: "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d"
+              ).trim()
+              echo "All directories under ${outputsDir}:\n${listAll}"
+
               def archivedFolders = []
               for (group in computedTestGroups) {
                 def archiveGroup = getArchiveGroupName(group)
-                // Build the find command using bash -c to preserve quotes
-                def findCommand = """bash -c "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d -name '*--group--${archiveGroup}' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-" """
-                echo "Executing find command for group '${archiveGroup}': ${findCommand}"
-                
-                // Execute the command and capture its output
-                def folder = sh(returnStdout: true, script: findCommand).trim()
-                
-                echo "Raw output for group '${archiveGroup}': '${folder}'"
-                
+                // Build the base find command.
+                def baseCmd = "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d -name '*--group--${archiveGroup}' -printf '%T@ %p\\n'"
+                echo "Base find command for group '${archiveGroup}': ${baseCmd}"
+
+                // Execute the base find command and capture raw output.
+                def rawOutput = sh(
+                  returnStdout: true,
+                  script: "bash -c \"${baseCmd}\""
+                ).trim()
+                echo "Raw output for group '${archiveGroup}':\n${rawOutput}"
+
+                // Sort the output and pick the most recent entry.
+                def sortedOutput = sh(
+                  returnStdout: true,
+                  script: "bash -c \"echo '${rawOutput}' | sort -nr\""
+                ).trim()
+                echo "Sorted output for group '${archiveGroup}':\n${sortedOutput}"
+
+                def folder = sh(
+                  returnStdout: true,
+                  script: "bash -c \"echo '${sortedOutput}' | head -1 | cut -d' ' -f2-\""
+                ).trim()
+                echo "Final folder for group '${archiveGroup}': '${folder}'"
+
                 if (!folder) {
                   echo "Warning: No test results folder found for test group '${archiveGroup}' in ${outputsDir}."
                 } else {
@@ -224,6 +246,8 @@ def call() {
                     echo "Error copying summary for group '${archiveGroup}': ${err}"
                   }
                 }
+                // Sleep for 1 second before next iteration.
+                sleep time: 1, unit: 'SECONDS'
               }
               
               if (archivedFolders.isEmpty()) {
@@ -237,6 +261,7 @@ def call() {
             }
           }
         }
+
 
         echo "Pipeline completed."
       }
