@@ -98,25 +98,42 @@ def call() {
       //   ]
       // ],
       // Dynamic parameter for TEST_GROUP_CHOICE (updated to allow multi-select)
-      [$class: 'CascadeChoiceParameter',
+      // [$class: 'CascadeChoiceParameter',
+      //   name: 'TEST_GROUP_CHOICE',
+      //   description: 'Select one or more test groups based on feature',
+      //   referencedParameters: 'FEATURE_NAME',
+      //   choiceType: 'PT_MULTI_SELECT', // Changed to multi-select
+      //   script: [
+      //     $class: 'GroovyScript',
+      //     script: new SecureGroovyScript(
+      //       '''if (FEATURE_NAME == "avfortisandbox") {
+      //           return ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_alt.full"]
+      //         } else if (FEATURE_NAME == "webfilter") {
+      //           return ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full", "grp.webfilter_flow.full", "grp.webfilter_peruser.full", "grp.webfilter_onearm.full", "grp.webfilter_other.full", "grp.webfilter_other2.full"]
+      //         } else {
+      //           return ["unknown"]
+      //         }''',
+      //       true
+      //     )
+      //   ]
+      // ],
+      // Dynamic parameter for TEST_GROUP_CHOICE (updated to allow multi-select, filtering/searchable UI)
+      [
+        $class: 'ExtendedChoiceParameterDefinition',
         name: 'TEST_GROUP_CHOICE',
-        description: 'Select one or more test groups based on feature',
-        referencedParameters: 'FEATURE_NAME',
-        choiceType: 'PT_MULTI_SELECT', // Changed to multi-select
-        script: [
-          $class: 'GroovyScript',
-          script: new SecureGroovyScript(
-            '''if (FEATURE_NAME == "avfortisandbox") {
-                return ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_alt.full"]
-              } else if (FEATURE_NAME == "webfilter") {
-                return ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full", "grp.webfilter_flow.full", "grp.webfilter_peruser.full", "grp.webfilter_onearm.full", "grp.webfilter_other.full", "grp.webfilter_other2.full"]
-              } else {
-                return ["unknown"]
-              }''',
-            true
-          )
-        ]
+        type: 'PT_MULTI_SELECT',
+        description: 'Select one or more test groups based on feature (filter enabled)',
+        multiSelectDelimiter: ',',
+        // The 'value' field holds the comma-separated options.
+        // Here you can build a Groovy expression that selects options based on FEATURE_NAME.
+        // For example, for webfilter:
+        value: (FEATURE_NAME == "webfilter" ?
+                "grp.webfilter_basic.full,grp.webfilter_basic2.full,grp.webfilter_ha.full,grp.webfilter_flow.full,grp.webfilter_peruser.full,grp.webfilter_onearm.full,grp.webfilter_other.full,grp.webfilter_other2.full"
+                : (FEATURE_NAME == "avfortisandbox" ?
+                    "grp.avfortisandbox_fortistack.full,grp.avfortisandbox_alt.full"
+                    : "unknown"))
       ],
+
 
       // New parameter: TEST_GROUPS.
       text(
