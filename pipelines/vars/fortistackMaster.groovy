@@ -1,3 +1,4 @@
+// Used by http://10.96.227.206:8080/job/fortistack_master_provision_runtest/
 // Helper function to get the archive group name (first two portions).
 def getArchiveGroupName(String group) {
     def parts = group.tokenize('.')
@@ -43,6 +44,21 @@ def getTestGroups(params) {
         testGroups = [params.TEST_GROUP_CHOICE]
     }
     return testGroups
+}
+
+// Helper function to parse PARAMS_JSON and expand its keys as global variables.
+def expandParamsJson(String jsonStr) {
+    try {
+        def jsonMap = new groovy.json.JsonSlurper().parseText(jsonStr) as Map
+        jsonMap.each { key, value ->
+            // Set each key-value pair as a global variable.
+            binding.setVariable(key, value)
+            echo "Set variable: ${key} = ${value}"
+        }
+        return jsonMap
+    } catch (Exception e) {
+        error("Failed to parse PARAMS_JSON: ${e}")
+    }
 }
 
 def computedTestGroups = []  // Global variable to share across stages
@@ -162,7 +178,7 @@ def call() {
       always {
         script {
           // Archive Test Results using computedTestGroups.
-          def outputsDir = "/home/fosqa/${params.LOCAL_LIB_DIR}/outputs"
+          def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
           // Clean up previous archiving work.
           sh "rm -f ${WORKSPACE}/summary_*.html"
           

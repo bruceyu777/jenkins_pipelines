@@ -1,3 +1,4 @@
+// used by http://10.96.227.206:8080/job/fortistack_runtest/
 // Helper function to get the archive group name (first two portions).
 def getArchiveGroupName(String group) {
     def parts = group.tokenize('.')
