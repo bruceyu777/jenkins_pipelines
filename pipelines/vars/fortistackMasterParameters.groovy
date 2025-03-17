@@ -116,7 +116,7 @@ def call() {
             true
           )
         ]
-      ]
+      ],
 
       // New parameter: TEST_GROUPS.
       text(
