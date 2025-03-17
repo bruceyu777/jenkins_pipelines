@@ -9,46 +9,10 @@ def getArchiveGroupName(String group) {
     }
 }
 
-// Helper function to compute test groups based on parameters.
-// def getTestGroups(params) {
-//     def testGroups = []
-//     if (params.TEST_GROUPS) {
-//         if (params.TEST_GROUPS instanceof String) {
-//             def tg = params.TEST_GROUPS.trim()
-//             // Remove surrounding quotes if present.
-//             if (tg.startsWith("\"") && tg.endsWith("\"")) {
-//                 tg = tg.substring(1, tg.length()-1).trim()
-//             }
-//             if (tg.startsWith("[")) {
-//                 try {
-//                     def parsed = readJSON text: tg
-//                     if (parsed instanceof List) {
-//                         testGroups = parsed
-//                     } else {
-//                         testGroups = tg.split(",").collect { it.trim() }
-//                     }
-//                 } catch (e) {
-//                     echo "Error parsing TEST_GROUPS as JSON: ${e}. Falling back to splitting by comma."
-//                     testGroups = tg.split(",").collect { it.trim() }
-//                 }
-//             } else {
-//                 testGroups = tg.split(",").collect { it.trim() }
-//             }
-//         } else if (params.TEST_GROUPS instanceof List) {
-//             testGroups = params.TEST_GROUPS
-//         } else {
-//             testGroups = [params.TEST_GROUPS.toString()]
-//         }
-//     }
-//     if (!testGroups || testGroups.isEmpty()) {
-//         testGroups = [params.TEST_GROUP_CHOICE]
-//     }
-//     return testGroups
-// }
 // Updated helper function to compute test groups based on parameters.
 def getTestGroups(params) {
     def testGroups = []
-    if (params.TEST_GROUPS) {
+    if (params.TEST_GROUPS?.trim()) {
         if (params.TEST_GROUPS instanceof String) {
             def tg = params.TEST_GROUPS.trim()
             // Remove surrounding quotes if present.
@@ -76,16 +40,23 @@ def getTestGroups(params) {
             testGroups = [params.TEST_GROUPS.toString()]
         }
     }
-    // If TEST_GROUPS is empty, use TEST_GROUP_CHOICE.
-    if (!testGroups || testGroups.isEmpty()) {
+    // If TEST_GROUPS is empty, then use TEST_GROUP_CHOICE.
+    if (!testGroups || testGroups.isEmpty() || testGroups.every { it == "" }) {
         if (params.TEST_GROUP_CHOICE instanceof List) {
             testGroups = params.TEST_GROUP_CHOICE
         } else {
-            testGroups = [params.TEST_GROUP_CHOICE.toString()]
+            def choiceValue = params.TEST_GROUP_CHOICE.toString().trim()
+            // If the multi-select returns a comma-separated string, split it.
+            if (choiceValue.contains(",")) {
+                testGroups = choiceValue.split(",").collect { it.trim() }
+            } else {
+                testGroups = [choiceValue]
+            }
         }
     }
     return testGroups
 }
+
 
 
 // Helper function to parse PARAMS_JSON and expand its keys as global variables.
