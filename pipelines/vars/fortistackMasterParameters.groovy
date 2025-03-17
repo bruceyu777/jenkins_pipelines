@@ -84,7 +84,7 @@ def call() {
       ),
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_GROUP_CHOICE',
-        description: 'Select one or more test groups based on feature (with filter and "All" option)',
+        description: 'Select one or more test groups based on feature (with filter)',
         referencedParameters: 'FEATURE_NAME,TEST_GROUP_FILTER',
         choiceType: 'PT_MULTI_SELECT',
         script: [
@@ -99,16 +99,10 @@ def call() {
               } else {
                   groups = ["unknown"]
               }
-              // Always add "All" at the beginning.
-              groups.add(0, "All")
               
               def filter = TEST_GROUP_FILTER?.trim()
               if (filter) {
-                  groups = groups.findAll { it == "All" || it.toLowerCase().contains(filter.toLowerCase()) }
-                  // Ensure "All" is present if it doesn't match the filter.
-                  if (!groups.contains("All")) {
-                      groups.add(0, "All")
-                  }
+                  groups = groups.findAll { it.toLowerCase().contains(filter.toLowerCase()) }
               }
               return groups
             ''',
@@ -116,6 +110,7 @@ def call() {
           )
         ]
       ],
+
 
       // New parameter: TEST_GROUPS.
       text(
