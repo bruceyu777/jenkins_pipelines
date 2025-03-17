@@ -176,6 +176,7 @@ def call() {
     }
     
     post {
+      agent { label "${params.NODE_NAME}" }
       always {
         script {
           // Archive Test Results using computedTestGroups.
