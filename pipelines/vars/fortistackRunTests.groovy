@@ -76,6 +76,9 @@ def call() {
     options {
       buildDiscarder(logRotator(numToKeepStr: '100'))
     }
+    environment {
+        TZ = 'America/Vancouver'
+    }
     
     stages {
       stage('Initialize Test Groups') {
