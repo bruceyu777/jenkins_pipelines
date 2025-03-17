@@ -178,34 +178,42 @@ def call() {
       always {
         node("${params.NODE_NAME}") {
           script {
-            def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
-            // Clean up previous archiving work.
-            sh "rm -f ${WORKSPACE}/summary_*.html"
-            
-            def archivedFolders = []
-            for (group in computedTestGroups) {
-              def archiveGroup = getArchiveGroupName(group)
-              def folder = sh(
-                  returnStdout: true,
-                  script: """
-                      find ${outputsDir} -mindepth 2 -maxdepth 2 -type d -name "*--group--${archiveGroup}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
-                  """
-              ).trim()
+            try {
+              def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
+              // Clean up previous archiving work.
+              sh "rm -f ${WORKSPACE}/summary_*.html"
               
-              if (!folder) {
-                echo "Warning: No test results folder found for test group '${archiveGroup}' in ${outputsDir}."
-              } else {
-                echo "Found folder for group '${archiveGroup}': ${folder}"
-                archivedFolders << folder
-                // Only archive summary.html
-                sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
+              def archivedFolders = []
+              for (group in computedTestGroups) {
+                def archiveGroup = getArchiveGroupName(group)
+                def folder = sh(
+                    returnStdout: true,
+                    script: """
+                        find ${outputsDir} -mindepth 2 -maxdepth 2 -type d -name "*--group--${archiveGroup}" -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-
+                    """
+                ).trim()
+                
+                if (!folder) {
+                  echo "Warning: No test results folder found for test group '${archiveGroup}' in ${outputsDir}."
+                } else {
+                  echo "Found folder for group '${archiveGroup}': ${folder}"
+                  archivedFolders << folder
+                  try {
+                    // Only archive summary.html; if it fails, log the error and continue.
+                    sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
+                  } catch (err) {
+                    echo "Error copying summary for group '${archiveGroup}': ${err}"
+                  }
+                }
               }
-            }
-            
-            if (archivedFolders.isEmpty()) {
-              echo "No test results were found for any test group."
-            } else {
-              archiveArtifacts artifacts: "test_results/**, summary_*.html", fingerprint: false
+              
+              if (archivedFolders.isEmpty()) {
+                echo "No test results were found for any test group."
+              } else {
+                archiveArtifacts artifacts: "test_results/**, summary_*.html", fingerprint: false
+              }
+            } catch (err) {
+              echo "Error in post block: ${err}"
             }
           }
         }
