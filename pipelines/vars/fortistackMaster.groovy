@@ -65,6 +65,7 @@ def computedTestGroups = []  // Global variable to share across stages
 
 def call() {
   fortistackMasterParameters()
+  expandParamsJson(params.PARAMS_JSON)
 
   pipeline {
     agent { label 'master' }
