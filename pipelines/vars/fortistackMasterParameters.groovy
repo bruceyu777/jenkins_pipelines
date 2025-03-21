@@ -34,7 +34,7 @@ def call() {
       // Feature selection.
       choice(
         name: 'FEATURE_NAME',
-        choices: ["avfortisandbox", "webfilter"].join("\n"),
+        choices: ["avfortisandbox", "webfilter", "dnsfilter"].join("\n"),
         description: 'Select the feature'
       ),
       // Dynamic parameter for svn test case folder, testcase or testcase_v1.
@@ -46,7 +46,7 @@ def call() {
         script: [
           $class: 'GroovyScript',
           script: new SecureGroovyScript(
-            '''if (FEATURE_NAME == "avfortisandbox") {
+            '''if (FEATURE_NAME in ["avfortisandbox","dnsfilter"]) {
                  return ["testcase", "testcase_v1"]
                } else if (FEATURE_NAME == "webfilter") {
                  return ["testcase_v1", "testcase"]
@@ -67,9 +67,11 @@ def call() {
           $class: 'GroovyScript',
           script: new SecureGroovyScript(
             '''if (FEATURE_NAME == "avfortisandbox") {
-                 return ["env.newman.FGT_KVM.avfortisandbox.conf", "env.newman.FGT_KVM.alt.conf"]
+                 return ["env.newman.FGT_KVM.avfortisandbox.conf"]
                } else if (FEATURE_NAME == "webfilter") {
-                 return ["env.FGTVM64.webfilter_demo.conf", "env.FGTVM64.alt.conf"]
+                 return ["env.FGTVM64.webfilter_demo.conf"]
+               } else if (FEATURE_NAME == "dnsfilter") {
+                 return ["env.FGTVM64_dnsfilter_fortistack.conf"]
                } else {
                  return ["unknown"]
                }''',
@@ -96,6 +98,8 @@ def call() {
                   groups = ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_alt.full"]
               } else if (FEATURE_NAME == "webfilter") {
                   groups = ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full", "grp.webfilter_flow.full", "grp.webfilter_peruser.full", "grp.webfilter_onearm.full", "grp.webfilter_other.full", "grp.webfilter_other2.full"]
+              } else if (FEATURE_NAME == "dnsfilter") {
+                  groups = ["grp.dnsfilter.crit", "grp.dnsfilter.full"]
               } else {
                   groups = ["unknown"]
               }
@@ -131,6 +135,8 @@ def call() {
                  return ["docker.avfortisandbox_avfortisandbox.yml", "other"]
                } else if (FEATURE_NAME == "webfilter") {
                  return ["docker.webfilter_basic.yml", "other"]
+               } else if (FEATURE_NAME == "dnsfilter") {
+                 return ["docker.dnsfilter_dnsfilter.yml", "other"]
                } else {
                  return ["unknown"]
                }''',

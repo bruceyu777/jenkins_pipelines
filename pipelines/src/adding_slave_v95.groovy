@@ -39,98 +39,67 @@ pipeline {
                     ).trim()
                     
                     if (httpCode == "200") {
-                        echo "Node ${nodeName} already exists. Removing it first..."
-                        
-                        // Get Jenkins crumb for CSRF protection.
-                        def crumbData = sh(
-                            script: "curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} '${params.JENKINS_URL}/crumbIssuer/api/json'",
-                            returnStdout: true
-                        ).trim()
-                        if (!crumbData) {
-                            error "Crumb data not received. Check your Jenkins admin credentials and API token."
-                        }
-                        echo "Crumb data received: ${crumbData}"
-                        
-                        def crumbJson = readJSON text: crumbData
-                        def crumb = crumbJson.crumb
-                        
-                        // Build the curl command for node deletion.
-                        def deleteCmd = """
-curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
--H 'Jenkins-Crumb:${crumb}' -X POST \\
-'${params.JENKINS_URL}/computer/${nodeName}/doDelete'
-"""
-                        echo "Executing node deletion command: ${deleteCmd}"
-                        def deleteResponse = sh(
-                            script: deleteCmd,
-                            returnStdout: true
-                        ).trim()
-                        echo "Node deletion response: ${deleteResponse}"
-                        
-                        // Wait for the deletion to propagate.
-                        sleep time: 10, unit: 'SECONDS'
-                        echo "Proceeding with node creation for ${nodeName}..."
+                        echo "Node ${nodeName} already exists. Skipping creation."
                     } else {
                         echo "Node ${nodeName} does not exist. Proceeding with creation."
-                    }
-                    
-                    try {
-                        def remoteFS = "/home/jenkins"
-                        
-                        // Build payload as a Groovy map.
-                        def payload = [
-                            name             : nodeName,
-                            nodeDescription  : "Automatically created node",
-                            numExecutors     : 1,
-                            remoteFS         : remoteFS,
-                            labelString      : "",
-                            mode             : "NORMAL",
-                            type             : "hudson.slaves.DumbSlave",
-                            retentionStrategy: [
-                                "stapler-class": "hudson.slaves.RetentionStrategy\$Always",
-                                "\$class"      : "hudson.slaves.RetentionStrategy\$Always"
-                            ],
-                            nodeProperties   : [],
-                            launcher         : [
-                                "stapler-class": "hudson.slaves.JNLPLauncher",
-                                "\$class"      : "hudson.slaves.JNLPLauncher"
+                        try {
+                            def remoteFS = "/home/jenkins"
+                            
+                            // Build payload as a Groovy map.
+                            def payload = [
+                                name             : nodeName,
+                                nodeDescription  : "Automatically created node",
+                                numExecutors     : 1,
+                                remoteFS         : remoteFS,
+                                labelString      : "",
+                                mode             : "NORMAL",
+                                type             : "hudson.slaves.DumbSlave",
+                                retentionStrategy: [
+                                    "stapler-class": "hudson.slaves.RetentionStrategy\$Always",
+                                    "\$class"      : "hudson.slaves.RetentionStrategy\$Always"
+                                ],
+                                nodeProperties   : [],
+                                launcher         : [
+                                    "stapler-class": "hudson.slaves.JNLPLauncher",
+                                    "\$class"      : "hudson.slaves.JNLPLauncher"
+                                ]
                             ]
-                        ]
-                        
-                        def jsonBody = JsonOutput.toJson(payload)
-                        echo "JSON payload: ${jsonBody}"
-                        
-                        // Get Jenkins crumb for CSRF protection for creation.
-                        def crumbDataCreate = sh(
-                            script: "curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} '${params.JENKINS_URL}/crumbIssuer/api/json'",
-                            returnStdout: true
-                        ).trim()
-                        if (!crumbDataCreate) {
-                            error "Crumb data not received for creation. Check your Jenkins admin credentials and API token."
-                        }
-                        echo "Crumb data received for creation: ${crumbDataCreate}"
-                        
-                        def crumbJsonCreate = readJSON text: crumbDataCreate
-                        def crumbCreate = crumbJsonCreate.crumb
-                        
-                        // Build the curl command for node creation.
-                        def cmd = """
+                            
+                            def jsonBody = JsonOutput.toJson(payload)
+                            echo "JSON payload: ${jsonBody}"
+                            
+                            // Get Jenkins crumb for CSRF protection.
+                            def crumbData = sh(
+                                script: "curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} '${params.JENKINS_URL}/crumbIssuer/api/json'",
+                                returnStdout: true
+                            ).trim()
+                            if (!crumbData) {
+                                error "Crumb data not received. Check your Jenkins admin credentials and API token."
+                            }
+                            echo "Crumb data received: ${crumbData}"
+                            
+                            def crumbJson = readJSON text: crumbData
+                            def crumb = crumbJson.crumb
+                            
+                            // Build the curl command for node creation.
+                            def cmd = """
 curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
--H 'Jenkins-Crumb:${crumbCreate}' -X POST \\
+-H 'Jenkins-Crumb:${crumb}' -X POST \\
 --data-urlencode 'name=${nodeName}' \\
 --data-urlencode 'type=hudson.slaves.DumbSlave' \\
 --data-urlencode 'json=${jsonBody}' \\
 '${params.JENKINS_URL}/computer/doCreateItem'
 """
-                        echo "Executing node creation command: ${cmd}"
-                        
-                        def createResponse = sh(
-                            script: cmd,
-                            returnStdout: true
-                        ).trim()
-                        echo "Node creation response: ${createResponse}"
-                    } catch (Exception e) {
-                        echo "Node creation failed: ${e.getMessage()}. Proceeding to next stage."
+                            echo "Executing node creation command: ${cmd}"
+                            
+                            def createResponse = sh(
+                                script: cmd,
+                                returnStdout: true
+                            ).trim()
+                            echo "Node creation response: ${createResponse}"
+                        } catch (Exception e) {
+                            echo "Node creation failed: ${e.getMessage()}. Proceeding to next stage."
+                        }
                     }
                 }
             }
@@ -212,6 +181,7 @@ ${cleanupFlag} \\
                     def sshCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} '${remoteInstallCmd}'"
                     echo "SSH Command: ${sshCmd}"
                     sh sshCmd
+                    
                     
                     // === Alternative: Consolidate all remote commands in one SSH session ===
                     // def consolidatedCmd = """
