@@ -99,7 +99,7 @@ def call() {
               } else if (FEATURE_NAME == "webfilter") {
                   groups = ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full", "grp.webfilter_flow.full", "grp.webfilter_peruser.full", "grp.webfilter_onearm.full", "grp.webfilter_other.full", "grp.webfilter_other2.full"]
               } else if (FEATURE_NAME == "dnsfilter") {
-                  groups = ["grp.dnsfilter.crit", "grp.dnsfilter.full"]
+                  groups = ["grp.dnsfilter_fortistack.crit","grp.dnsfilter.crit", "grp.dnsfilter.full"]
               } else {
                   groups = ["unknown"]
               }
