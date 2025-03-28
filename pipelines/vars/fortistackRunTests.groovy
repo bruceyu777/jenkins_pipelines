@@ -188,7 +188,7 @@ def call() {
                   """
               }
               // Start HTTP service to check test results.
-              sh "cd /home/fosqa/resources/tools && sudo python3 simple_http_server_as_service.py"
+              //sh "cd /home/fosqa/resources/tools && sudo python3 simple_http_server_as_service.py"
             }
           }
         }
