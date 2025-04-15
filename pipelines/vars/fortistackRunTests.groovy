@@ -156,12 +156,6 @@ def call() {
                   sudo rm -f docker_filesys
                   sudo ln -s /home/fosqa/docker_filesys/${params.FEATURE_NAME} docker_filesys
               """
-
-              // Login to Harbor.
-              sh "docker login harbor-robot.corp.fortinet.com -u \$SVN_USER -p \$SVN_PASS"
-
-              // Remove all existing Docker containers.
-              sh "docker ps -aq | xargs -r docker rm -f"
             }
           }
         }
@@ -171,14 +165,11 @@ def call() {
         steps {
           script {
             withCredentials([usernamePassword(credentialsId: 'LDAP', usernameVariable: 'SVN_USER', passwordVariable: 'SVN_PASS')]) {
-              // Setup network and route, make sure telnet available and bring up docker containers
+              // Setup docker network and route, make sure telnet available and bring up docker containers
               sh """
-                  cd /home/fosqa/resources/tools && python3 set_docker_network.py
-                  sudo python3 set_route_for_docker.py 
-                  python3 kill_telnet_by_port.py --port 11023
-                  python3 kill_telnet_by_port.py --port 12023
-                  python3 kill_telnet_by_port.py --port 13023
-                  python3 kill_telnet_by_port.py --port 14023
+                  docker login harbor-robot.corp.fortinet.com -u \$SVN_USER -p \$SVN_PASS
+                  docker ps -aq | xargs -r docker rm -f
+                  make setup_docker_network_and_cleanup_telnet_ports
                   docker compose -f /home/fosqa/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE} up --build -d
               """
               // Run tests for each computed test group.
