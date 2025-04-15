@@ -171,10 +171,14 @@ def call() {
         steps {
           script {
             withCredentials([usernamePassword(credentialsId: 'LDAP', usernameVariable: 'SVN_USER', passwordVariable: 'SVN_PASS')]) {
-              // Setup network and route.
+              // Setup network and route, make sure telnet available and bring up docker containers
               sh """
                   cd /home/fosqa/resources/tools && python3 set_docker_network.py
                   sudo python3 set_route_for_docker.py 
+                  python3 kill_telnet_by_port.py --port 11023
+                  python3 kill_telnet_by_port.py --port 12023
+                  python3 kill_telnet_by_port.py --port 13023
+                  python3 kill_telnet_by_port.py --port 14023
                   docker compose -f /home/fosqa/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE} up --build -d
               """
               // Run tests for each computed test group.
