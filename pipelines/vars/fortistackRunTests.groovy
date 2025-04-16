@@ -169,6 +169,7 @@ def call() {
               sh """
                   docker login harbor-robot.corp.fortinet.com -u \$SVN_USER -p \$SVN_PASS
                   docker ps -aq | xargs -r docker rm -f
+                  cd /home/fosqa/resources/tools/
                   make setup_docker_network_and_cleanup_telnet_ports
                   docker compose -f /home/fosqa/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE} up --build -d
               """
