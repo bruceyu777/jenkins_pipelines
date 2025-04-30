@@ -39,7 +39,7 @@ def call() {
         steps {
           script {
             // Use global variables where appropriate.
-            currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.BUILD_NUMBER}-${FEATURE_NAME}-${computedTestGroups.join(',')}"
+            currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.BUILD_NUMBER}-${FEATURE_NAME}"
           }
         }
       }
