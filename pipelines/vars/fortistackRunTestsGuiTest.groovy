@@ -69,11 +69,21 @@ def call() {
               //     docker compose -f /home/fosqa/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE} up --build -d
               // """
               // Run tests for each computed test group.
+              
+              script {
+                        // Generate session id based on current timestamp in the format "yyyyMMddHHmmss_SSS"
+                        println("Generate Session ID ...")
+                        def currentDateTime = new Date()
+                        def sessionIdFormat = new java.text.SimpleDateFormat("yyyyMMddHHmmss_'${currentDateTime.getTime() % 1000}'")
+                        env.SESSION_ID = sessionIdFormat.format(currentDateTime)
+                        println("Generated Session ID: ${env.SESSION_ID}")
+                    }
+              
               sh """
                   cd /home/fosqa/git/guitest/${params.FEATURE_NAME}
                   sudo chmod -R 777 .
                   . /home/fosqa/git/guitest/venv_fosqa/bin/activate
-                  make docker_test stack=${params.STACK_NAME} name=${params.KEY_WORD} submit=true browser_type=firefox
+                  make docker_test stack=${params.STACK_NAME} name=${params.KEY_WORD} session_id=${env.SESSION_ID} submit=true browser_type=firefox
               """
               // for (group in computedTestGroups) {
               //     echo "Running tests for test group: ${group}"
