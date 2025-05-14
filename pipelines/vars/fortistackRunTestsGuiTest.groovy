@@ -26,6 +26,21 @@ def call() {
   pipeline {
     // Use NODE_NAME from pipeline parameters.
     agent { label "${params.NODE_NAME}" }
+    
+    parameters {
+      string(
+        name: 'STACK_NAME',
+        defaultValue: 'fgtA',
+        description: 'Which Docker stack to bring up (e.g. fgtA)'
+      )
+      string(
+        name: 'KEY_WORD',
+        defaultValue: 'test_',
+        description: 'Test-name prefix to filter which tests to run'
+      )
+    }
+
+
     options {
       buildDiscarder(logRotator(numToKeepStr: '100'))
     }
@@ -38,7 +53,6 @@ def call() {
       stage('Set Build Display Name') {
         steps {
           script {
-            // Use global variables where appropriate.
             currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.BUILD_NUMBER}-${FEATURE_NAME}"
           }
         }
@@ -85,15 +99,6 @@ def call() {
                   . /home/fosqa/git/guitest/venv_fosqa/bin/activate
                   make docker_test stack=${params.STACK_NAME} name=${params.KEY_WORD} session_id=${env.SESSION_ID} submit=true browser_type=firefox
               """
-              // for (group in computedTestGroups) {
-              //     echo "Running tests for test group: ${group}"
-              //     sh """
-              //         cd /home/fosqa/${LOCAL_LIB_DIR}
-              //         sudo chmod -R 777 .
-              //         . /home/fosqa/${LOCAL_LIB_DIR}/venv/bin/activate
-              //         python3 autotest.py -e testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE} -g testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group} -d
-              //     """
-              // }
             }
           }
         }
