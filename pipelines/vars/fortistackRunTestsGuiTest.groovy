@@ -133,17 +133,17 @@ def call() {
                       sh """
                             sudo -S chmod -R 777 ${folderPath}/artifacts/screenshots || true
                             sudo -S mkdir -p ${WORKSPACE}/${BUILD_NUMBER}/report
-                            sudo -S mkdir -p ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots
-                            sudo -S cp -r ${folderPath}/artifacts/screenshots/* ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots || echo 'No screenshot files found'
+                            sudo -S mkdir -p ${WORKSPACE}/${BUILD_NUMBER}/report/artifacts/screenshots
+                            sudo -S cp -r ${folderPath}/artifacts/screenshots/* ${WORKSPACE}/${BUILD_NUMBER}/report/artifacts/screenshots || echo 'No screenshot files found'
                             sudo -S cp -r ${folderPath}/report* ${WORKSPACE}/${BUILD_NUMBER}/report || echo 'No report files found'
                             sudo -S chmod -R 777 ${WORKSPACE}/${BUILD_NUMBER}/report
-                            sudo -S chmod -R 777 ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots
+                            sudo -S chmod -R 777 ${WORKSPACE}/${BUILD_NUMBER}/report/artifacts/screenshots
                             """
 
-                        sh "ls -l ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots/*.png || echo 'No screenshot files copied'"
+                        sh "ls -l ${WORKSPACE}/${BUILD_NUMBER}/report/artifacts/screenshots/*.png || echo 'No screenshot files copied'"
                         sh "ls -l ${WORKSPACE}/${BUILD_NUMBER}/report/* || echo 'No report files copied'"
 
-                        archiveArtifacts allowEmptyArchive: true, artifacts: "${BUILD_NUMBER}/artifacts/screenshots/*.png, ${BUILD_NUMBER}/report/*", fingerprint: false
+                        archiveArtifacts allowEmptyArchive: true, artifacts: "${BUILD_NUMBER}/report/artifacts/screenshots/*.png, ${BUILD_NUMBER}/report/*", fingerprint: false
                         echo "archiveArtifacts done"
                     } catch (Exception err) {
                         echo "Error during file copy: ${err.toString()}"
