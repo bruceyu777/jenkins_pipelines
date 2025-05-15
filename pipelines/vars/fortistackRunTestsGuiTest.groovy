@@ -130,17 +130,15 @@ def call() {
                 println "Add Artifacts ..."
                 docker_report_folders_list.each { folderPath ->
                     try {
-                        withCredentials([string(credentialsId: 'sudoPassword', variable: 'SUDO_PASS')]) {
-                            sh """
-                            echo $SUDO_PASS | sudo -S chmod -R 777 ${folderPath}/artifacts/screenshots || true
-                            echo $SUDO_PASS | sudo -S mkdir -p ${WORKSPACE}/${BUILD_NUMBER}/report
-                            echo $SUDO_PASS | sudo -S mkdir -p ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots
-                            echo $SUDO_PASS | sudo -S cp -r ${folderPath}/artifacts/screenshots/* ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots || echo 'No screenshot files found'
-                            echo $SUDO_PASS | sudo -S cp -r ${folderPath}/report* ${WORKSPACE}/${BUILD_NUMBER}/report || echo 'No report files found'
-                            echo $SUDO_PASS | sudo -S chmod -R 777 ${WORKSPACE}/${BUILD_NUMBER}/report
-                            echo $SUDO_PASS | sudo -S chmod -R 777 ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots
+                      sh """
+                            sudo -S chmod -R 777 ${folderPath}/artifacts/screenshots || true
+                            sudo -S mkdir -p ${WORKSPACE}/${BUILD_NUMBER}/report
+                            sudo -S mkdir -p ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots
+                            sudo -S cp -r ${folderPath}/artifacts/screenshots/* ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots || echo 'No screenshot files found'
+                            sudo -S cp -r ${folderPath}/report* ${WORKSPACE}/${BUILD_NUMBER}/report || echo 'No report files found'
+                            sudo -S chmod -R 777 ${WORKSPACE}/${BUILD_NUMBER}/report
+                            sudo -S chmod -R 777 ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots
                             """
-                        }
 
                         sh "ls -l ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots/*.png || echo 'No screenshot files copied'"
                         sh "ls -l ${WORKSPACE}/${BUILD_NUMBER}/report/* || echo 'No report files copied'"
