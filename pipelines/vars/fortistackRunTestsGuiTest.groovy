@@ -1,6 +1,8 @@
 // used by http://10.96.227.206:8080/job/fortistack_runtest_guitest/
 
 // Helper function to parse PARAMS_JSON and expand its keys as global variables.
+
+
 def expandParamsJson(String jsonStr) {
     try {
         def jsonMap = new groovy.json.JsonSlurper().parseText(jsonStr) as Map
@@ -26,7 +28,7 @@ def call() {
   pipeline {
     // Use NODE_NAME from pipeline parameters.
     agent { label "${params.NODE_NAME}" }
-    
+
     parameters {
       string(
         name: 'STACK_NAME',
@@ -46,6 +48,7 @@ def call() {
     }
     environment {
         TZ = 'America/Vancouver'
+        TEST_FOLDER = "/home/fosqa/git/guitest/${params.FEATURE_NAME}"
     }
     
     stages {
@@ -107,8 +110,82 @@ def call() {
     
     post {
       always {
-        echo "Pipeline completed. Check console output for details."
-      }
+            script {
+                println "Run and Parse Python Script ..."
+                try {
+                    def output = sh(script: "cd ${env.TEST_FOLDER} && . ../venv*/bin/activate && python3 docker_test_report_manager.py --method read_docker_combined_report --file_path ${env.TEST_FOLDER}/docker_combined_report_list.txt --session_id=${env.SESSION_ID}", returnStdout: true).trim()
+                    println("Raw Python script output: $output")
+
+                    def jsonOutput = readJSON text: output
+                    println("After JSON Parsing: ${jsonOutput}")
+                    htmlFilePath = jsonOutput.html_file_path
+                    xmlFilePath = jsonOutput.xml_file_path
+                    docker_report_folders_list = jsonOutput.docker_report_folders ?: []
+                } catch (Throwable t) {
+                    echo "Caught Throwable: ${t}"
+                    currentBuild.result = 'UNSTABLE'
+                    echo "Failed to parse Python script output"
+                }
+
+                println "Add Artifacts ..."
+                docker_report_folders_list.each { folderPath ->
+                    try {
+                        withCredentials([string(credentialsId: 'sudoPassword', variable: 'SUDO_PASS')]) {
+                            sh """
+                            echo $SUDO_PASS | sudo -S chmod -R 777 ${folderPath}/artifacts/screenshots || true
+                            echo $SUDO_PASS | sudo -S mkdir -p ${WORKSPACE}/${BUILD_NUMBER}/report
+                            echo $SUDO_PASS | sudo -S mkdir -p ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots
+                            echo $SUDO_PASS | sudo -S cp -r ${folderPath}/artifacts/screenshots/* ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots || echo 'No screenshot files found'
+                            echo $SUDO_PASS | sudo -S cp -r ${folderPath}/report* ${WORKSPACE}/${BUILD_NUMBER}/report || echo 'No report files found'
+                            echo $SUDO_PASS | sudo -S chmod -R 777 ${WORKSPACE}/${BUILD_NUMBER}/report
+                            echo $SUDO_PASS | sudo -S chmod -R 777 ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots
+                            """
+                        }
+
+                        sh "ls -l ${WORKSPACE}/${BUILD_NUMBER}/artifacts/screenshots/*.png || echo 'No screenshot files copied'"
+                        sh "ls -l ${WORKSPACE}/${BUILD_NUMBER}/report/* || echo 'No report files copied'"
+
+                        archiveArtifacts allowEmptyArchive: true, artifacts: "${BUILD_NUMBER}/artifacts/screenshots/*.png, ${BUILD_NUMBER}/report/*", fingerprint: false
+                        echo "archiveArtifacts done"
+                    } catch (Exception err) {
+                        echo "Error during file copy: ${err.toString()}"
+                    }
+                }
+
+                println "Publish Test Results ..."
+                // Check if report.xml exists before publishing the results
+                def reportExists = sh(script: "test -f ${WORKSPACE}/${BUILD_NUMBER}/report/report.xml && echo 'exists' || echo 'not exists'", returnStdout: true).trim()
+                if (reportExists == 'exists') {
+                    try {
+                        junit "**/report.xml"
+                    } catch (err) {
+                        echo "junit report.xml, Caught: ${err}"
+                    }
+                } else {
+                    echo "No report.xml found at ${WORKSPACE}/${BUILD_NUMBER}/report/. Skipping test results publishing."
+                }
+
+                println "Send Notification ..."
+                // def buildStatus = currentBuild.result ?: 'SUCCESS' // Default to 'SUCCESS' if result is null
+                // def subjectLine = "Build $build_name Finished with Status: ${buildStatus}"
+                // def emailBody = """
+                //     <html>
+                //     <body>
+                //         <p>The build <strong>$build_name</strong> has finished with status: <strong>${buildStatus}</strong>.</p>
+                //         <p>View the detailed artifacts, report.html and logs via the following link:</p>
+                //         <p><a href="http://172.18.57.7:8080/job/${env.JOB_NAME}/${BUILD_NUMBER}">View Logs and Reports</a></p>
+                //     </body>
+                //     </html>
+                // """
+
+                // emailext(
+                //     from: 'fosqa@fortinet.com',
+                //     to: "$send_to",
+                //     subject: subjectLine,
+                //     body: emailBody
+                // )
+            }
+        }
     }
   }
 }
