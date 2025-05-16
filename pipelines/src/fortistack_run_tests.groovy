@@ -181,6 +181,7 @@ pipeline {
                             cd /home/fosqa/${params.LOCAL_LIB_DIR}
                             sudo chmod -R 777 .
                             . /home/fosqa/${params.LOCAL_LIB_DIR}/venv/bin/activate
+                            pip install -r /home/fosqa/${params.LOCAL_LIB_DIR}/requirements.txt
                             python3 autotest.py -e testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE} -g testcase/${params.SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_GROUP_CHOICE} -d
                         """
 

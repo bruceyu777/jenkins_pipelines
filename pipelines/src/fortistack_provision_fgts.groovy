@@ -58,6 +58,7 @@ pipeline {
                   sudo pwd
                   hostname
                   sudo make provision_fgt fgt_type=${params.FGT_TYPE} node=${params.NODE_NAME} build=${params.BUILD_NUMBER}
+                  sudo make update_vm_license_valid_until
                 """
             }
         }
