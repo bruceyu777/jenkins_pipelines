@@ -5,6 +5,11 @@ pipeline {
     parameters {
         // Standalone BUILD_NUMBER parameter.
         string(
+            name: 'RELEASE',
+            defaultValue: '7',  // Default release number.
+            description: 'Enter the release number, like 7, or 8'
+        )
+        string(
             name: 'BUILD_NUMBER',
             defaultValue: '3473',
             description: 'Enter the build number'
@@ -31,7 +36,7 @@ pipeline {
             name: 'INDIVIDUAL_CONFIGS',
             defaultValue: '''[
   {
-    "NODE_NAME": "node1",
+    "NODE_NAME": "node10",
     "FEATURE_NAME": "avfortisandbox",
     "TEST_CASE_FOLDER": "testcase",
     "TEST_CONFIG_CHOICE": "env.newman.FGT_KVM.avfortisandbox.conf",
@@ -40,7 +45,7 @@ pipeline {
     "DOCKER_COMPOSE_FILE_CHOICE": "docker.avfortisandbox_avfortisandbox.yml"
   },
   {
-    "NODE_NAME": "node3",
+    "NODE_NAME": "node11",
     "FEATURE_NAME": "webfilter",
     "TEST_CASE_FOLDER": "testcase_v1",
     "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
@@ -70,6 +75,7 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                         def merged = common + individual
                         // Override BUILD_NUMBER with the standalone parameter.
                         merged.BUILD_NUMBER = params.BUILD_NUMBER
+                        merged.RELEASE = params.RELEASE
 
                         // Process TEST_GROUPS field:
                         if (merged.TEST_GROUPS?.trim()) {
@@ -100,6 +106,7 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                             echo "Triggering fortistack_master_provision_runtest with merged configuration: ${merged}"
                             build job: 'fortistack_master_provision_runtest', parameters: [
                                 string(name: 'PARAMS_JSON', value: groovy.json.JsonOutput.toJson(merged.PARAMS_JSON)),
+                                string(name: 'RELEASE', value: merged.RELEASE),
                                 string(name: 'BUILD_NUMBER', value: merged.BUILD_NUMBER),
                                 string(name: 'NODE_NAME', value: merged.NODE_NAME),
                                 booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: merged.FORCE_UPDATE_DOCKER_FILE),
