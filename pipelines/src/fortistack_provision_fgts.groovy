@@ -11,6 +11,13 @@ pipeline {
         
         // 2. Build Number Parameter
         string(
+            name: 'RELEASE',
+            defaultValue: '7',
+            trim: true,
+            description: 'Enter a 1-digit release number (e.g., 7, or 8).'
+        )
+
+        string(
             name: 'BUILD_NUMBER',
             defaultValue: '3473',
             trim: true,
@@ -35,7 +42,7 @@ pipeline {
         stage('Set Build Display Name') {
             steps {
                 script {
-                    currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.BUILD_NUMBER}-${params.FGT_TYPE}"
+                    currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-r${params.RELEASE}-${params.BUILD_NUMBER}-${params.FGT_TYPE}"
                 }
             }
         }
@@ -57,7 +64,7 @@ pipeline {
                   sudo -u fosqa git pull
                   sudo pwd
                   hostname
-                  sudo make provision_fgt fgt_type=${params.FGT_TYPE} node=${params.NODE_NAME} build=${params.BUILD_NUMBER}
+                  sudo make provision_fgt fgt_type=${params.FGT_TYPE} node=${params.NODE_NAME} release=${params.RELEASE} build=${params.BUILD_NUMBER}
                   sudo make update_vm_license_valid_until
                 """
             }

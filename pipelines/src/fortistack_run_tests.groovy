@@ -11,6 +11,13 @@ def getArchiveGroupName(String group) {
 pipeline {
     parameters {
         string(
+            name: 'RELEASE',
+            defaultValue: '7',
+            trim: true,
+            description: 'FGT release number like 7, or 8'
+        )
+        
+        string(
             name: 'BUILD_NUMBER',
             defaultValue: '3473',
             trim: true,
@@ -93,7 +100,7 @@ pipeline {
         stage('Set Build Display Name') {
             steps {
                 script {
-                    currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.BUILD_NUMBER}-${params.FEATURE_NAME}-${params.TEST_GROUP_CHOICE}"
+                    currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.RELEASE}-${params.BUILD_NUMBER}-${params.FEATURE_NAME}-${params.TEST_GROUP_CHOICE}"
                 }
             }
         }

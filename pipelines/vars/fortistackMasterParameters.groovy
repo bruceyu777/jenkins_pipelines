@@ -17,6 +17,11 @@ def call() {
       ),
       // Manually entered build number.
       string(
+        name: 'RELEASE',
+        defaultValue: '7',
+        description: 'Enter the release number, like 7, or 8'
+      ),
+      string(
         name: 'BUILD_NUMBER',
         defaultValue: '3473',
         description: 'Enter the build number'

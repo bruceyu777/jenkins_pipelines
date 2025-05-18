@@ -129,6 +129,7 @@ def call() {
                               .collectEntries { k, v -> [k, v] }
             def provisionParams = [
               string(name: 'NODE_NAME', value: params.NODE_NAME),
+              string(name: 'RELEASE', value: params.RELEASE),
               string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
               string(name: 'FGT_TYPE', value: paramsMap.FGT_TYPE)
             ]
@@ -159,6 +160,7 @@ def call() {
             // Loop through each test group.
             for (group in computedTestGroups) {
               def testParams = [
+                string(name: 'RELEASE', value: params.RELEASE),
                 string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
                 string(name: 'NODE_NAME', value: params.NODE_NAME),
                 string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR),
