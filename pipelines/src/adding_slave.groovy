@@ -4,17 +4,16 @@ import java.net.URLEncoder
 pipeline {
     agent { label 'master' }
     
-    // Static values (hidden from users)
     environment {
-        NODE_USER = 'fosqa'
-        NODE_PASSWORD = 'ftnt123!'
+        NODE_USER          = 'fosqa'
+        NODE_PASSWORD      = 'ftnt123!'
         JENKINS_ADMIN_USER = 'fosqa'
-        JENKINS_API_TOKEN = '110dec5c2d2974a67968074deafccc1414'
+        JENKINS_API_TOKEN  = '110dec5c2d2974a67968074deafccc1414'
     }
     
     parameters {
         string(name: 'NODE_NAME', defaultValue: 'node1', description: 'Name of the Jenkins node')
-        string(name: 'NODE_IP', defaultValue: '10.96.225.186', description: 'Floating IP address of the target node')
+        string(name: 'NODE_IP',   defaultValue: '10.96.225.186', description: 'Floating IP address of the target node')
         string(name: 'JENKINS_URL', defaultValue: 'http://10.96.227.206:8080', description: 'Jenkins Master URL (floating IP)')
         booleanParam(name: 'CLEANUP', defaultValue: true, description: 'Cleanup previous Jenkins Agent installation?')
     }
@@ -23,232 +22,155 @@ pipeline {
         stage('Set Build Display Name') {
             steps {
                 script {
-                    currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.NODE_IP}"
+                    def nodeName = params.NODE_NAME.toString().trim()
+                    def nodeIp   = params.NODE_IP.toString().trim()
+                    if (!nodeName) error "NODE_NAME was empty or whitespace"
+                    if (!nodeIp)   error "NODE_IP was empty or whitespace"
+                    currentBuild.displayName = "#${currentBuild.number} ${nodeName}-${nodeIp}"
                 }
             }
         }
+        
         stage('Jenkins master to create a new Node') {
             steps {
                 script {
-                    def nodeName = params.NODE_NAME
+                    def nodeName   = params.NODE_NAME.toString().trim()
+                    def nodeIp     = params.NODE_IP.toString().trim()
+                    def jenkinsUrl = params.JENKINS_URL.toString().trim()
+                    if (!nodeName)   error "NODE_NAME was empty or whitespace"
+                    if (!nodeIp)     error "NODE_IP was empty or whitespace"
+                    if (!jenkinsUrl) error "JENKINS_URL was empty or whitespace"
                     
-                    // Check if the node exists via its HTTP status code.
                     def httpCode = sh(
-                        script: "curl -s -o /dev/null -w '%{http_code}' ${params.JENKINS_URL}/computer/${nodeName}/api/json",
+                        script: "curl -s -o /dev/null -w '%{http_code}' ${jenkinsUrl}/computer/${nodeName}/api/json",
                         returnStdout: true
                     ).trim()
                     
-                    if (httpCode == "200") {
-                        echo "Node ${nodeName} already exists. Removing it first..."
-                        
-                        // Get Jenkins crumb for CSRF protection.
+                    if (httpCode == '200') {
+                        echo "Node ${nodeName} exists; deleting..."
                         def crumbData = sh(
-                            script: "curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} '${params.JENKINS_URL}/crumbIssuer/api/json'",
+                            script: "curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} '${jenkinsUrl}/crumbIssuer/api/json'",
                             returnStdout: true
                         ).trim()
-                        if (!crumbData) {
-                            error "Crumb data not received. Check your Jenkins admin credentials and API token."
-                        }
-                        echo "Crumb data received: ${crumbData}"
+                        if (!crumbData) error "Could not get Jenkins crumb."
+                        def crumb = readJSON(text: crumbData).crumb
                         
-                        def crumbJson = readJSON text: crumbData
-                        def crumb = crumbJson.crumb
-                        
-                        // Build the curl command for node deletion.
                         def deleteCmd = """
 curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
--H 'Jenkins-Crumb:${crumb}' -X POST \\
-'${params.JENKINS_URL}/computer/${nodeName}/doDelete'
-"""
-                        echo "Executing node deletion command: ${deleteCmd}"
-                        def deleteResponse = sh(
-                            script: deleteCmd,
-                            returnStdout: true
-                        ).trim()
-                        echo "Node deletion response: ${deleteResponse}"
-                        
-                        // Wait for the deletion to propagate.
+  -H 'Jenkins-Crumb:${crumb}' -X POST \\
+  '${jenkinsUrl}/computer/${nodeName}/doDelete'
+""".stripIndent().trim()
+                        sh(script: deleteCmd, returnStdout: true)
                         sleep time: 10, unit: 'SECONDS'
-                        echo "Proceeding with node creation for ${nodeName}..."
                     } else {
-                        echo "Node ${nodeName} does not exist. Proceeding with creation."
+                        echo "Node ${nodeName} not found; creating..."
                     }
                     
                     try {
-                        def remoteFS = "/home/jenkins"
-                        
-                        // Build payload as a Groovy map.
                         def payload = [
-                            name             : nodeName,
-                            nodeDescription  : "Automatically created node",
-                            numExecutors     : 1,
-                            remoteFS         : remoteFS,
-                            labelString      : "",
-                            mode             : "NORMAL",
-                            type             : "hudson.slaves.DumbSlave",
+                            name            : nodeName,
+                            nodeDescription : "Automatically created node",
+                            numExecutors    : 4,
+                            remoteFS        : "/home/jenkins",
+                            labelString     : "",
+                            mode            : "NORMAL",
+                            type            : "hudson.slaves.DumbSlave",
                             retentionStrategy: [
                                 "stapler-class": "hudson.slaves.RetentionStrategy\$Always",
                                 "\$class"      : "hudson.slaves.RetentionStrategy\$Always"
                             ],
-                            nodeProperties   : [],
-                            launcher         : [
+                            nodeProperties  : [],
+                            launcher        : [
                                 "stapler-class": "hudson.slaves.JNLPLauncher",
                                 "\$class"      : "hudson.slaves.JNLPLauncher"
                             ]
                         ]
-                        
                         def jsonBody = JsonOutput.toJson(payload)
-                        echo "JSON payload: ${jsonBody}"
                         
-                        // Get Jenkins crumb for CSRF protection for creation.
-                        def crumbDataCreate = sh(
-                            script: "curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} '${params.JENKINS_URL}/crumbIssuer/api/json'",
+                        def crumbData2 = sh(
+                            script: "curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} '${jenkinsUrl}/crumbIssuer/api/json'",
                             returnStdout: true
                         ).trim()
-                        if (!crumbDataCreate) {
-                            error "Crumb data not received for creation. Check your Jenkins admin credentials and API token."
-                        }
-                        echo "Crumb data received for creation: ${crumbDataCreate}"
+                        if (!crumbData2) error "Could not get Jenkins crumb for creation."
+                        def crumb2 = readJSON(text: crumbData2).crumb
                         
-                        def crumbJsonCreate = readJSON text: crumbDataCreate
-                        def crumbCreate = crumbJsonCreate.crumb
-                        
-                        // Build the curl command for node creation.
-                        def cmd = """
+                        def createCmd = """
 curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
--H 'Jenkins-Crumb:${crumbCreate}' -X POST \\
---data-urlencode 'name=${nodeName}' \\
---data-urlencode 'type=hudson.slaves.DumbSlave' \\
---data-urlencode 'json=${jsonBody}' \\
-'${params.JENKINS_URL}/computer/doCreateItem'
-"""
-                        echo "Executing node creation command: ${cmd}"
-                        
-                        def createResponse = sh(
-                            script: cmd,
-                            returnStdout: true
-                        ).trim()
-                        echo "Node creation response: ${createResponse}"
-                    } catch (Exception e) {
-                        echo "Node creation failed: ${e.getMessage()}. Proceeding to next stage."
+  -H 'Jenkins-Crumb:${crumb2}' -X POST \\
+  --data-urlencode 'name=${nodeName}' \\
+  --data-urlencode 'type=hudson.slaves.DumbSlave' \\
+  --data-urlencode 'json=${jsonBody}' \\
+  '${jenkinsUrl}/computer/doCreateItem'
+""".stripIndent().trim()
+                        sh(script: createCmd, returnStdout: true)
+                    } catch (e) {
+                        echo "Node creation error: ${e.message}"
                     }
                 }
             }
         }
+        
         stage('Provision Node') {
             steps {
                 script {
-                    def nodeName = params.NODE_NAME
-                    echo "Provisioning node ${nodeName}..."
+                    def nodeName   = params.NODE_NAME.toString().trim()
+                    def jenkinsUrl = params.JENKINS_URL.toString().trim()
+                    echo "Provisioning ${nodeName}..."
                     sleep time: 5, unit: 'SECONDS'
                     
-                    // Fetch the JNLP file with authentication.
                     def jnlp = sh(
-                        script: "curl -fsSL -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} ${params.JENKINS_URL}/computer/${nodeName}/slave-agent.jnlp",
+                        script: "curl -fsSL -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} ${jenkinsUrl}/computer/${nodeName}/slave-agent.jnlp",
                         returnStdout: true
                     ).trim()
-                    echo "JNLP content: ${jnlp}"
-                    
-                    // Extract secret from the first <argument> element.
                     def matcher = jnlp =~ /<argument>(.*?)<\/argument>/
-                    if (!matcher || matcher.size() == 0) {
-                        error "Failed to extract secret from JNLP file. Verify if node ${nodeName} exists and is configured."
-                    }
-                    def secret = matcher[0][1]
-                    env.JENKINS_SECRET = secret
-                    echo "Provisioned node ${nodeName} with secret: ${env.JENKINS_SECRET}"
+                    if (!matcher) error "Failed to parse JNLP secret."
+                    env.JENKINS_SECRET = matcher[0][1]
                 }
             }
         }
+        
         stage('Install Jenkins Agent on Node') {
             steps {
                 script {
-                    def nodeName = params.NODE_NAME
+                    def nodeName      = params.NODE_NAME.toString().trim()
+                    def nodeIp        = params.NODE_IP.toString().trim()
+                    def jenkinsUrl    = params.JENKINS_URL.toString().trim()
                     def jenkinsSecret = env.JENKINS_SECRET
-                    def cleanupFlag = params.CLEANUP ? "--cleanup" : ""
+                    def cleanupFlag   = params.CLEANUP ? "--cleanup" : ""
                     
-                    echo "=== Step 1: Remote Git update ==="
-                    def innerGitCmd = 'cd /home/fosqa/resources/tools && ' +
-                                    // Stash both tracked and untracked changes
-                                    'if [ -n "$(git status --porcelain)" ]; then git stash push -u -m "temporary stash"; fi; ' +
-                                    // Pull using recursive merge with -X theirs to favor remote changes on conflicts
-                                    'git pull -X theirs; ' +
-                                    // Try to reapply the stash; if conflicts occur, reset hard and drop the stash
-                                    'if git stash list | grep -q "temporary stash"; then ' +
-                                    '  if ! git stash pop; then ' +
-                                    '    echo "Stash pop encountered conflicts, discarding local changes in favor of remote changes"; ' +
-                                    '    git reset --hard HEAD; ' +
-                                    '    git stash drop; ' +
-                                    '  fi; ' +
-                                    'fi'
-                    def gitPullCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} '${innerGitCmd}'"
-                    echo "Executing remote git pull command: ${gitPullCmd}"
-                    try {
-                        sh gitPullCmd
-                    } catch (Exception e) {
-                        echo "Remote git pull failed: ${e.getMessage()}. Continuing without updating."
-                    }
-
+                    // Step 1: Git pull
+                    def innerGit = 'cd /home/fosqa/resources/tools && ' +
+                                   'if [ -n "$(git status --porcelain)" ]; then git stash -u -m tmp; fi && ' +
+                                   'git pull -X theirs && ' +
+                                   'if git stash list | grep -q tmp; then git stash pop || (git reset --hard HEAD && git stash drop); fi'
+                    sh "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${env.NODE_USER}@${nodeIp} '${innerGit}' || echo 'Git pull failed, continuing.'"
                     
-                    echo "=== Step 2: Update hostname, floating IP and aliases ==="
-                    def setHostnameCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} 'cd /home/fosqa/resources/tools && sudo python3 set_hostname.py --hostname all-in-one-${nodeName} --floating-ip ${params.NODE_IP}'"
-                    echo "Executing update hostname command: ${setHostnameCmd}"
-                    try {
-                        sh setHostnameCmd
-                    } catch (Exception e) {
-                        echo "Hostname update failed: ${e.getMessage()}. Continuing..."
-                    }
+                    // Step 2: set hostname
+                    def hostCmd = "cd /home/fosqa/resources/tools && sudo python3 set_hostname.py --hostname all-in-one-${nodeName} --floating-ip ${nodeIp}"
+                    sh "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${env.NODE_USER}@${nodeIp} '${hostCmd}' || echo 'Hostname update failed.'"
                     
-                    echo "=== Step 3: Install Jenkins Agent ==="
-                    def remoteInstallCmd = """sudo python3 /home/fosqa/resources/tools/install_jenkins_agent.py \\
-${cleanupFlag} \\
---jenkins-url ${params.JENKINS_URL} \\
---jenkins-secret ${jenkinsSecret} \\
---jenkins-agent-name ${nodeName} \\
---remote-root /home/jenkins/agent \\
---password jenkins
-"""
-                    echo "Executing remote install command on node ${params.NODE_IP}..."
-                    def sshCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} '${remoteInstallCmd}'"
-                    echo "SSH Command: ${sshCmd}"
-                    sh sshCmd
-                    
-                    // === Alternative: Consolidate all remote commands in one SSH session ===
-                    // def consolidatedCmd = """
-                    //     cd /home/fosqa/resources/tools &&
-                    //     if [ -n "\$(git status --porcelain)" ]; then git stash push -m "temporary stash"; fi;
-                    //     git pull;
-                    //     if git stash list | grep -q "temporary stash"; then git stash pop; fi;
-                    //     sudo python3 set_hostname.py --hostname all-in-one-${nodeName} --floating-ip ${params.NODE_IP};
-                    //     sudo python3 /home/fosqa/resources/tools/install_jenkins_agent.py ${cleanupFlag} --jenkins-url ${params.JENKINS_URL} --jenkins-secret ${jenkinsSecret} --jenkins-agent-name ${nodeName} --remote-root /home/jenkins/agent --password jenkins
-                    //     """
-                    // def consolidatedSSHCmd = "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no ${env.NODE_USER}@${params.NODE_IP} '${consolidatedCmd}'"
-                    // echo "Executing consolidated remote command: ${consolidatedSSHCmd}"
-                    // sh consolidatedSSHCmd
-                    
+                    // Step 3: install agent (single line)
+                    def remoteInstallCmd = "sudo python3 /home/fosqa/resources/tools/install_jenkins_agent.py ${cleanupFlag} --jenkins-url ${jenkinsUrl} --jenkins-secret ${jenkinsSecret} --jenkins-agent-name ${nodeName} --remote-root /home/jenkins/agent --password jenkins"
+                    sh "sshpass -p '${env.NODE_PASSWORD}' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${env.NODE_USER}@${nodeIp} '${remoteInstallCmd}'"
                 }
             }
         }
+        
         stage('Verify Node Connection') {
             steps {
                 script {
-                    def nodeName = params.NODE_NAME
-                    def nodeOnline = false
-                    // Check up to 10 times (with a 10-second interval) for the node to come online.
+                    def nodeName   = params.NODE_NAME.toString().trim()
+                    def jenkinsUrl = params.JENKINS_URL.toString().trim()
+                    def ok = false
                     for (int i = 0; i < 10; i++) {
-                        def json = sh(
-                            script: "curl -fsSL ${params.JENKINS_URL}/computer/${nodeName}/api/json",
+                        def out = sh(
+                            script: "curl -fsSL ${jenkinsUrl}/computer/${nodeName}/api/json",
                             returnStdout: true
                         ).trim()
-                        if (json.contains('"offline":false')) {
-                            nodeOnline = true
-                            break
-                        }
+                        if (out.contains('"offline":false')) { ok = true; break }
                         sleep time: 10, unit: 'SECONDS'
                     }
-                    if (!nodeOnline) {
-                        error "Node ${nodeName} did not come online in time."
-                    }
+                    if (!ok) error "Node ${nodeName} did not come online."
                     echo "Node ${nodeName} is online."
                 }
             }
