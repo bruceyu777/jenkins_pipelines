@@ -1,15 +1,24 @@
 /**
- * sendFosqaEmail step: 
- *  1) On master: get the Vault password
- *  2) Back on slave: call test_email.py via bash -c + here-string
- *     so that neither the CLI nor the log ever show the secret.
+ * sendFosqaEmail step
+ *
+ * 1) On master: run get_fosqa_credential.py to retrieve the SMTP password  
+ * 2) Back on the original agent: call test_email.py with that password
+ *
+ * @param to         – recipient email address (required)
+ * @param subject    – email subject (default: “Jenkins Notification”)
+ * @param body       – HTML body (default: empty)
+ * @param smtpServer – SMTP host (default: mail.fortinet.com)
+ * @param port       – SMTP port (default: 465)
+ * @param useSsl     – true to use SSL (default: true)
+ * @param useTls     – true to use STARTTLS (default: false)
+ * @param username   – SMTP username (default: “fosqa”)
  */
 def call(Map args = [:]) {
     if (!args.to) {
         error "sendFosqaEmail: missing required parameter 'to'"
     }
 
-    // defaults
+    // set defaults
     def subject    = args.subject    ?: "Jenkins Notification"
     def body       = args.body       ?: ""
     def smtpServer = args.smtpServer ?: "mail.fortinet.com"
@@ -18,29 +27,43 @@ def call(Map args = [:]) {
     def useTls     = args.useTls     ?: false
     def username   = args.username   ?: "fosqa"
 
-    // 1) Fetch on master
+    // 1) Fetch the password on master
     def pw = ''
     node('master') {
-      pw = sh(
-        script: "/usr/bin/python3 /home/fosqa/resources/tools/get_fosqa_credential.py",
-        returnStdout: true
-      ).trim()
-      echo "🔑 Retrieved SMTP password on master (length=${pw.length()})"
+        pw = sh(
+            script: "/usr/bin/python3 /home/fosqa/resources/tools/get_fosqa_credential.py",
+            returnStdout: true
+        ).trim()
+        echo "🔑 Retrieved SMTP password (length=${pw.length()}) on master"
     }
 
-    // 2) Back on the original agent: mask it via here-string in bash
+    // 2) Back on the original agent, send the email
     withEnv(["SMTP_PW=${pw}"]) {
-      sh """
-        bash -c 'python3 /home/fosqa/resources/tools/test_email.py \
-          --to-addr ${args.to} \
-          --subject "${subject.replace('"','\\"')}" \
-          --body "${body.replace('"','\\"')}" \
-          --smtp-server ${smtpServer} \
-          --port ${port} \
-          ${useSsl ? '--use-ssl' : ''} \
-          ${useTls ? '--use-tls' : ''} \
-          --username ${username} \
-          --password-stdin <<<"\$SMTP_PW"'
-      """
+        sh '''
+            bash -c '
+            python3 /home/fosqa/resources/tools/test_email.py \
+                --to-addr ${args.to} \
+                --subject "${subject.replace('"','\\"')}" \
+                --body "${body.replace('"','\\"')}" \
+                --smtp-server ${smtpServer} \
+                --port ${port} \
+                ${useSsl? "--use-ssl" : ""} \
+                ${useTls? "--use-tls" : ""} \
+                --username ${username} \
+                --password-stdin <<<"$SMTP_PW"
+            '
+        '''
     }
+    
+    sh """
+        printf '%s' "${pw}" | /usr/bin/python3 /home/fosqa/resources/tools/test_email.py \
+        --to-addr ${args.to} \
+        --subject "${subject.replace('"','\\"')}" \
+        --body "${body.replace('"','\\"')}" \
+        --smtp-server ${smtpServer} \
+        --port ${port} \
+        --use-ssl \
+        --username ${username} \
+        --password-stdin
+    """
 }
