@@ -38,32 +38,23 @@ def call(Map args = [:]) {
     }
 
     // 2) Back on the original agent, send the email
-    withEnv(["SMTP_PW=${pw}"]) {
+        node(params.NODE_NAME) {
+        // Now on the slave
+        withEnv(["SMTP_PW=${pw}"]) {
         sh '''
             bash -c '
             python3 /home/fosqa/resources/tools/test_email.py \
                 --to-addr ${args.to} \
-                --subject "${subject.replace('"','\\"')}" \
-                --body "${body.replace('"','\\"')}" \
-                --smtp-server ${smtpServer} \
-                --port ${port} \
-                ${useSsl? "--use-ssl" : ""} \
-                ${useTls? "--use-tls" : ""} \
-                --username ${username} \
+                --subject "${args.subject.replace('"','\\"')}" \
+                --body "${args.body.replace('"','\\"')}" \
+                --smtp-server ${args.smtpServer} \
+                --port ${args.port} \
+                ${args.useSsl? "--use-ssl" : ""} \
+                ${args.useTls? "--use-tls" : ""} \
+                --username ${args.username} \
                 --password-stdin <<<"$SMTP_PW"
             '
         '''
+        }
     }
-    
-    sh """
-        printf '%s' "${pw}" | /usr/bin/python3 /home/fosqa/resources/tools/test_email.py \
-        --to-addr ${args.to} \
-        --subject "${subject.replace('"','\\"')}" \
-        --body "${body.replace('"','\\"')}" \
-        --smtp-server ${smtpServer} \
-        --port ${port} \
-        --use-ssl \
-        --username ${username} \
-        --password-stdin
-    """
 }
