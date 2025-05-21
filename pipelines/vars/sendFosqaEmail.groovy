@@ -39,15 +39,14 @@ def call(Map args = [:]) {
 
     // 2) Back on the original agent, send the email
     sh """
-      /usr/bin/python3 /home/fosqa/resources/tools/test_email.py \
+        printf '%s' "${pw}" | /usr/bin/python3 /home/fosqa/resources/tools/test_email.py \
         --to-addr ${args.to} \
         --subject "${subject.replace('"','\\"')}" \
         --body "${body.replace('"','\\"')}" \
         --smtp-server ${smtpServer} \
         --port ${port} \
-        ${useSsl ? '--use-ssl' : ''} \
-        ${useTls ? '--use-tls' : ''} \
+        --use-ssl \
         --username ${username} \
-        --password "${pw}"
+        --password-stdin
     """
 }
