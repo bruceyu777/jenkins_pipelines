@@ -1,3 +1,5 @@
+@Library('sharedLib') _
+
 pipeline {
     // Define parameters to be prompted to the user before the job starts
     parameters {
@@ -55,9 +57,9 @@ pipeline {
             }
         }
 
-        stage('Run Python Script') {
+        stage('Provisioning FGT') {
             steps {
-                echo "Running iptable script..."
+                echo "provisioning FGT..."
                 sh """
                   cd /home/fosqa/resources/tools
                   git config --global --add safe.directory /home/fosqa/resources/tools
@@ -69,11 +71,32 @@ pipeline {
                 """
             }
         }
+        stage('Get Node information summary') {
+            steps {
+                echo "Summarize useful information..."
+                sh """
+                  cd /home/fosqa/resources/tools
+                  python3 get_node_info.py
+                """
+            }
+        }
+
     }
 
     post {
-        always {
-            echo "Pipeline completed. Check console output for details."
+        success {
+            sendFosqaEmail(
+                to:       'yzhengfeng@fortinet.com',
+                subject:  "Build #${env.BUILD_NUMBER} Succeeded",
+                body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
+            )
+        }
+        failure {
+            sendFosqaEmail(
+                to:      'yzhengfeng@fortinet.com',
+                subject: "Build #${env.BUILD_NUMBER} FAILED",
+                body:    "<p>Check console output: ${env.BUILD_URL}</p>"
+            )
         }
     }
 }
