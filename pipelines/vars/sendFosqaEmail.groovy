@@ -1,6 +1,9 @@
 /**
  * sendFosqaEmail step
  *
+ * 1) On master: run get_fosqa_credential.py to retrieve the SMTP password  
+ * 2) Back on the original agent: call test_email.py with that password
+ *
  * @param to         – recipient email address (required)
  * @param subject    – email subject (default: “Jenkins Notification”)
  * @param body       – HTML body (default: empty)
@@ -11,27 +14,30 @@
  * @param username   – SMTP username (default: “fosqa”)
  */
 def call(Map args = [:]) {
-    // validate
     if (!args.to) {
         error "sendFosqaEmail: missing required parameter 'to'"
     }
 
-    // defaults
+    // set defaults
     def subject    = args.subject    ?: "Jenkins Notification"
     def body       = args.body       ?: ""
     def smtpServer = args.smtpServer ?: "mail.fortinet.com"
     def port       = args.port       ?: 465
-    def useSsl     = args.useSsl     != false  // default true
+    def useSsl     = (args.useSsl  != false)
     def useTls     = args.useTls     ?: false
     def username   = args.username   ?: "fosqa"
 
-    // 1) fetch the password via your Vault helper
-    def pw = sh(
-        script: "/usr/bin/python3 /home/fosqa/resources/tools/get_fosqa_credential.py",
-        returnStdout: true
-    ).trim()
+    // 1) Fetch the password on master
+    def pw = ''
+    node('master') {
+        pw = sh(
+            script: "/usr/bin/python3 /home/fosqa/resources/tools/get_fosqa_credential.py",
+            returnStdout: true
+        ).trim()
+        echo "🔑 Retrieved SMTP password (length=${pw.length()}) on master"
+    }
 
-    // 2) invoke the email script
+    // 2) Back on the original agent, send the email
     sh """
       /usr/bin/python3 /home/fosqa/resources/tools/test_email.py \
         --to-addr ${args.to} \
@@ -39,8 +45,8 @@ def call(Map args = [:]) {
         --body "${body.replace('"','\\"')}" \
         --smtp-server ${smtpServer} \
         --port ${port} \
-        ${useSsl? '--use-ssl' : ''} \
-        ${useTls? '--use-tls' : ''} \
+        ${useSsl ? '--use-ssl' : ''} \
+        ${useTls ? '--use-tls' : ''} \
         --username ${username} \
         --password "${pw}"
     """
