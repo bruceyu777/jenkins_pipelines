@@ -1,8 +1,10 @@
 /**
- * sendFosqaEmail – fetch creds on master, send on slave, fully hide secret.
+ * sendFosqaEmail – fetch on master, send on agent, hide secret via heredoc.
  */
 def call(Map args = [:]) {
-    if (!args.to) error "sendFosqaEmail: missing 'to' address"
+    if (!args.to) {
+        error "sendFosqaEmail: missing 'to'"
+    }
 
     // defaults
     def subject    = args.subject    ?: "Jenkins Notification"
@@ -13,7 +15,7 @@ def call(Map args = [:]) {
     def useTls     = args.useTls     ?: false
     def username   = args.username   ?: "fosqa"
 
-    // 1) On master: retrieve the password
+    // 1) On master, get the password
     def pw = ''
     node('master') {
         pw = sh(
@@ -23,21 +25,23 @@ def call(Map args = [:]) {
         echo "🔑 Retrieved SMTP password on master (length=${pw.length()})"
     }
 
-    // 2) Back on the slave: send the email without ever printing the secret
-    node {  // returns to the current agent
-      withEnv(["SMTP_PW=${pw}"]) {
-        sh '''
-          bash -c "python3 /home/fosqa/resources/tools/test_email.py \
-            --to-addr ${args.to} \
-            --subject \\\"${subject.replace('\"','\\\\\"')}\\\" \
-            --body \\\"${body.replace('\"','\\\\\"')}\\\" \
-            --smtp-server ${smtpServer} \
-            --port ${port} \
-            ${useSsl ? '--use-ssl' : ''} \
-            ${useTls ? '--use-tls' : ''} \
-            --username ${username} \
-            --password-stdin <<< \\\"\\$SMTP_PW\\\""
-        '''.stripIndent()
-      }
+    // 2) Back on the agent: heredoc into test_email.py
+    node {  
+        withEnv(["SMTP_PW=${pw}"]) {
+            sh """
+                cat <<EOF | python3 /home/fosqa/resources/tools/test_email.py \\
+                  --to-addr ${args.to} \\
+                  --subject \"${subject.replace('\"','\\\\\"')}\" \\
+                  --body \"${body.replace('\"','\\\\\"')}\" \\
+                  --smtp-server ${smtpServer} \\
+                  --port ${port} \\
+                  ${useSsl? '--use-ssl' : ''} \\
+                  ${useTls? '--use-tls' : ''} \\
+                  --username ${username} \\
+                  --password-stdin
+                \$SMTP_PW
+EOF
+            """
+        }
     }
 }
