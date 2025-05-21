@@ -25,28 +25,32 @@ def call(Map args = [:]) {
     node {
         withEnv(["SMTP_PW=${pw}"]) {
             sh '''
-                #!/usr/bin/env bash
-                set -eu
+            #!/usr/bin/env bash
+            set -eu
 
-                # write secret to a file (Jenkins won't log its contents)
-                cat <<EOF > secret.pw
-$SMTP_PW
-EOF
+            # write secret to file
+            cat <<EOF > secret.pw
+        $SMTP_PW
+        EOF
 
-                # send the email
-                python3 /home/fosqa/resources/tools/test_email.py \
-                  --to-addr ''' + args.to + ''' \
-                  --subject "''' + subject.replace('"','\\"') + '''" \
-                  --body "'''    + body   .replace('"','\\"') + '''" \
-                  --smtp-server ''' + smtpServer + ''' \
-                  --port '''       + port      + ''' \
-                  ''' + (useSsl ? '--use-ssl' : '') + ''' \
-                  ''' + (useTls ? '--use-tls' : '') + ''' \
-                  --username '''  + username  + ''' \
-                  --password-file secret.pw
+            # DEBUG: compare the MD5 of the env var vs. the file
+            echo "MD5(env) : $(printf "%s" "$SMTP_PW" | md5sum)"
+            echo "MD5(file): $(md5sum secret.pw | cut -d" " -f1)"
 
-                # clean up
-                shred -u secret.pw || rm -f secret.pw
+            # send the email
+            python3 /home/fosqa/resources/tools/test_email.py \
+                --to-addr ''' + args.to + ''' \
+                --subject "''' + subject.replace('"','\\"') + '''" \
+                --body "'''    + body   .replace('"','\\"') + '''" \
+                --smtp-server ''' + smtpServer + ''' \
+                --port '''       + port      + ''' \
+                ''' + (useSsl ? '--use-ssl' : '') + ''' \
+                ''' + (useTls ? '--use-tls' : '') + ''' \
+                --username '''  + username  + ''' \
+                --password-file secret.pw
+
+            # clean up
+            shred -u secret.pw || rm -f secret.pw
             '''
         }
     }
