@@ -28,10 +28,14 @@ def call(Map args = [:]) {
         #!/usr/bin/env bash
         set -eu
 
-        # --- write secret to workspace/secret.pw ---
-        cat <<EOF > "\$WORKSPACE/secret.pw"
-\$SMTP_PW
-EOF
+        # 1) write secret to a file WITHOUT newline
+        printf '%s' "\$SMTP_PW" > "\$WORKSPACE/secret.pw"
+
+        # 2) DEBUG: show exactly what's in env vs. file
+        echo ">>> ENV PW : [\$SMTP_PW]"
+        echo ">>> FILE PW: [\$(cat \"\$WORKSPACE/secret.pw\")]"
+
+
 
         # --- debug: compare MD5s ---
         echo "MD5(env) : \$(printf "%s" "\$SMTP_PW" | md5sum | cut -d' ' -f1)"
