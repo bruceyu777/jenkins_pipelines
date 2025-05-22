@@ -44,7 +44,7 @@ def call(Map args = [:]) {
           --subject   '${esc(subject)}' \\
           --body      '${esc(body)}' \\
           --smtp-server '${esc(smtpServer)}' \\
-          --port      '${port}' \\
+          --port      '${esc(port.toString())}' \\
           ${useSsl ? '--use-ssl' : ''} \\
           ${useTls ? '--use-tls' : ''} \\
           --username '${esc(username)}' \\
