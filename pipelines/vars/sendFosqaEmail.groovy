@@ -1,61 +1,57 @@
-/**
- * sendFosqaEmail – 
- *  1) fetch creds on master
- *  2) return to the original agent (by label) and send the email from there
- */
+// vars/sendFosqaEmail.groovy
 def call(Map args = [:]) {
-    if (!args.to) error "sendFosqaEmail: missing 'to' address"
+  if (!args.to) error "sendFosqaEmail: missing 'to' address"
 
-    // 1) Figure out which agent we're originally on
-    //    Jenkins injects NODE_NAME into env
-    def origNode = env.NODE_NAME
-    if (!origNode) {
-        error "sendFosqaEmail: cannot determine original node (NODE_NAME is unset)"
-    }
+  // Determine original node label
+  def origNode = env.NODE_NAME
+  if (!origNode) error "sendFosqaEmail: NODE_NAME is unset; cannot return to agent"
 
-    // defaults
-    def subject    = args.subject    ?: "Jenkins Notification"
-    def body       = args.body       ?: ""
-    def smtpServer = args.smtpServer ?: "mail.fortinet.com"
-    def port       = args.port       ?: 465
-    def useSsl     = (args.useSsl  != false)
-    def useTls     = args.useTls     ?: false
-    def username   = args.username   ?: "fosqa"
+  // Defaults
+  def subject    = args.subject    ?: "Jenkins Notification"
+  def body       = args.body       ?: ""
+  def smtpServer = args.smtpServer ?: "mail.fortinet.com"
+  def port       = args.port       ?: 465
+  def useSsl     = (args.useSsl  != false)
+  def useTls     = args.useTls     ?: false
+  def username   = args.username   ?: "fosqa"
 
-    // 2) On master, retrieve the SMTP password
-    def pw = ''
-    node('master') {
-        pw = sh(
-            script: "/usr/bin/python3 /home/fosqa/resources/tools/get_fosqa_credential.py",
-            returnStdout: true
-        ).trim()
-        echo "🔑 Retrieved SMTP password on master (length=${pw.length()})"
-    }
+  // Helper to escape single quotes in a shell‐safe way
+  def esc = { String s -> s.replace("'", "'\\\\''") }
 
-    // 3) Back on the original agent, send the email
-    node(origNode) {
-        // stash password in env var for this node
-        withEnv(["SMTP_PW=${pw}"]) {
-            // write it to a file (no logging of contents)
-            sh """
-                #!/usr/bin/env bash
-                set -eu
+  // 1) Fetch password on master
+  def pw = ''
+  node('master') {
+    pw = sh(
+      script: "/usr/bin/python3 /home/fosqa/resources/tools/get_fosqa_credential.py",
+      returnStdout: true
+    ).trim()
+    echo "🔑 Retrieved SMTP password on master (length=${pw.length()})"
+  }
 
-                printf '%s' "\$SMTP_PW" > "\$WORKSPACE/secret.pw"
+  // 2) Back on original agent
+  node(origNode) {
+    // Write secret to a file and call test_email.py
+    sh """
+      #!/usr/bin/env bash
+      set -eu
 
-                python3 /home/fosqa/resources/tools/test_email.py \\
-                  --to-addr ${args.to} \\
-                  --subject "${subject.replace('"','\\"')}" \\
-                  --body "${body.replace('"','\\"')}" \\
-                  --smtp-server ${smtpServer} \\
-                  --port ${port} \\
-                  ${useSsl ? '--use-ssl' : ''} \\
-                  ${useTls ? '--use-tls' : ''} \\
-                  --username ${username} \\
-                  --password-file "\$WORKSPACE/secret.pw"
+      # write password to secret.pw
+      printf '%s' "${pw}" > "\$WORKSPACE/secret.pw"
 
-                shred -u "\$WORKSPACE/secret.pw" || rm -f "\$WORKSPACE/secret.pw"
-            """.stripIndent()
-        }
-    }
+      # call test_email.py with all args single-quoted
+      python3 /home/fosqa/resources/tools/test_email.py \\
+        --to-addr  '${esc(args.to)}' \\
+        --subject   '${esc(subject)}' \\
+        --body      '${esc(body)}' \\
+        --smtp-server '${esc(smtpServer)}' \\
+        --port      '${esc(port.toString())}' \\
+        ${useSsl ? '--use-ssl' : ''} \\
+        ${useTls ? '--use-tls' : ''} \\
+        --username '${esc(username)}' \\
+        --password-file "\$WORKSPACE/secret.pw"
+
+      # clean up
+      shred -u "\$WORKSPACE/secret.pw" || rm -f "\$WORKSPACE/secret.pw"
+    """.stripIndent()
+  }
 }
