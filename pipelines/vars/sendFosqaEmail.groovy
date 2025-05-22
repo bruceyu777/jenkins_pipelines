@@ -1,58 +1,66 @@
 // vars/sendFosqaEmail.groovy
 def call(Map args = [:]) {
-  if (!args.to) error "sendFosqaEmail: missing 'to' address"
-
-  // 1) Figure out where we started
+  if (!args.to)       error "sendFosqaEmail: missing 'to' address"
+  if (!env.NODE_NAME) error "sendFosqaEmail: NODE_NAME is unset; cannot return to agent"
   def origNode = env.NODE_NAME
-  if (!origNode) error "sendFosqaEmail: NODE_NAME is unset; cannot return to agent"
 
-  // 2) Defaults + esc helper
-  def subject    = args.subject    ?: "Jenkins Notification"
-  def body       = args.body       ?: ""
-  def smtpServer = args.smtpServer ?: "mail.fortinet.com"
-  def port       = args.port       ?: 465
-  def useSsl     = (args.useSsl  != false)
-  def useTls     = args.useTls     ?: false
-  def username   = args.username   ?: "fosqa"
+  // Defaults + esc helper
+  def subject         = args.subject    ?: "Jenkins Notification"
+  def body            = args.body       ?: ""
+  def smtpServer      = args.smtpServer ?: "mail.fortinet.com"
+  def port            = args.port       ?: 465
+  def useSsl          = args.useSsl  != false
+  def useTls          = args.useTls     ?: false
+  def username        = args.username   ?: "fosqa"
+  def fallbackFrom    = args.fallbackFromAddr ?: "yzhengfeng@fortinet.com"
 
-  // Helper to escape single quotes
   def esc = { String s -> s.replace("'", "'\\\\''") }
 
-  // 3) On master: fetch the SMTP password
+  // 1) Fetch Vault‐stored SMTP password on master
   def pw = ''
   node('master') {
     pw = sh(
       script: "/usr/bin/python3 /home/fosqa/resources/tools/get_fosqa_credential.py",
       returnStdout: true
-    ).trim()
+    ).trim().replaceAll(/^"|"$/, '')  // strip any stray quotes
     echo "🔑 Retrieved SMTP password on master (length=${pw.length()})"
   }
 
-  // 4) Back on the original agent: write it safely & send email
+  // 2) Back on your original agent: write pw, grab LDAP creds, then call Python once
   node(origNode) {
+    // stash the SMTP pw in an env var and write it out
     withEnv(["SMTP_PW=${pw}"]) {
-      // WRITE the password to a file without any shell echo of its contents
       writeFile file: 'secret.pw', text: pw
 
-      // Now invoke the email script—turn off echo so none of this leaks
-      sh(script: """
-        #!/usr/bin/env bash
-        set -eu
+      // Bind your LDAP credentials from Jenkins → SVN_USER / SVN_PASS
+      withCredentials([usernamePassword(credentialsId: 'LDAP',
+                                        usernameVariable: 'SVN_USER',
+                                        passwordVariable: 'SVN_PASS')]) {
 
-        python3 /home/fosqa/resources/tools/test_email.py \\
-          --to-addr  '${esc(args.to)}' \\
-          --subject   '${esc(subject)}' \\
-          --body      '${esc(body)}' \\
-          --smtp-server '${esc(smtpServer)}' \\
-          --port      '${esc(port.toString())}' \\
-          ${useSsl ? '--use-ssl' : ''} \\
-          ${useTls ? '--use-tls' : ''} \\
-          --username '${esc(username)}' \\
-          --password-file 'secret.pw'
+        // Run the Python script, passing both primary and fallback flags.
+        // echo:false suppresses the + lines so no secrets leak.
+        sh(script: """
+          #!/usr/bin/env bash
+          set -eu
 
-        # clean up immediately
-        shred -u secret.pw || rm -f secret.pw
-      """.stripIndent(), echo: false)
+          python3 /home/fosqa/resources/tools/test_email.py \\
+            --to-addr  '${esc(args.to)}' \\
+            --subject   '${esc(subject)}' \\
+            --body      '${esc(body)}' \\
+            --smtp-server '${esc(smtpServer)}' \\
+            --port      '${port}' \\
+            ${useSsl ? '--use-ssl' : ''} \\
+            ${useTls ? '--use-tls' : ''} \\
+            --username '${esc(username)}' \\
+            --password-file 'secret.pw' \\
+            --fallback-username '$SVN_USER' \\
+            --fallback-password '$SVN_PASS' \\
+            --fallback-from-addr '${esc(fallbackFrom)}'
+        """.stripIndent(), echo: false)
+
+        // Cleanup
+        sh "shred -u secret.pw || rm -f secret.pw"
+      }
     }
   }
 }
