@@ -2,11 +2,11 @@
 def call(Map args = [:]) {
   if (!args.to) error "sendFosqaEmail: missing 'to' address"
 
-  // Determine original node label
+  // 1) Figure out where we started
   def origNode = env.NODE_NAME
   if (!origNode) error "sendFosqaEmail: NODE_NAME is unset; cannot return to agent"
 
-  // Defaults
+  // 2) Defaults + esc helper
   def subject    = args.subject    ?: "Jenkins Notification"
   def body       = args.body       ?: ""
   def smtpServer = args.smtpServer ?: "mail.fortinet.com"
@@ -15,10 +15,10 @@ def call(Map args = [:]) {
   def useTls     = args.useTls     ?: false
   def username   = args.username   ?: "fosqa"
 
-  // Helper to escape single quotes in a shell‐safe way
+  // Helper to escape single quotes
   def esc = { String s -> s.replace("'", "'\\\\''") }
 
-  // 1) Fetch password on master
+  // 3) On master: fetch the SMTP password
   def pw = ''
   node('master') {
     pw = sh(
@@ -28,17 +28,17 @@ def call(Map args = [:]) {
     echo "🔑 Retrieved SMTP password on master (length=${pw.length()})"
   }
 
-  // 2) Back on original agent—bind into SMTP_PW and hide all commands
+  // 4) Back on the original agent: write it safely & send email
   node(origNode) {
     withEnv(["SMTP_PW=${pw}"]) {
+      // WRITE the password to a file without any shell echo of its contents
+      writeFile file: 'secret.pw', text: pw
+
+      // Now invoke the email script—turn off echo so none of this leaks
       sh(script: """
         #!/usr/bin/env bash
         set -eu
 
-        # write secret to disk (never logged)
-        printf '%s' "\$SMTP_PW" > "\$WORKSPACE/secret.pw"
-
-        # invoke the email script
         python3 /home/fosqa/resources/tools/test_email.py \\
           --to-addr  '${esc(args.to)}' \\
           --subject   '${esc(subject)}' \\
@@ -48,10 +48,10 @@ def call(Map args = [:]) {
           ${useSsl ? '--use-ssl' : ''} \\
           ${useTls ? '--use-tls' : ''} \\
           --username '${esc(username)}' \\
-          --password-file "\$WORKSPACE/secret.pw"
+          --password-file 'secret.pw'
 
-        # clean up
-        shred -u "\$WORKSPACE/secret.pw" || rm -f "\$WORKSPACE/secret.pw"
+        # clean up immediately
+        shred -u secret.pw || rm -f secret.pw
       """.stripIndent(), echo: false)
     }
   }
