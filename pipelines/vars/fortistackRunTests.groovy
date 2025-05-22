@@ -234,20 +234,21 @@ def call() {
           }
         }
         echo "Pipeline completed. Check console output for details."
-        success {
+        
+      }
+      success {
             sendFosqaEmail(
                 to:       'yzhengfeng@fortinet.com',
                 subject:  "Build #${env.BUILD_NUMBER} Succeeded",
                 body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
             )
         }
-        failure {
-            sendFosqaEmail(
-                to:      'yzhengfeng@fortinet.com',
-                subject: "Build #${env.BUILD_NUMBER} FAILED",
-                body:    "<p>Check console output: ${env.BUILD_URL}</p>"
-            )
-        }
+      failure {
+          sendFosqaEmail(
+              to:      'yzhengfeng@fortinet.com',
+              subject: "Build #${env.BUILD_NUMBER} FAILED",
+              body:    "<p>Check console output: ${env.BUILD_URL}</p>"
+          )
       }
     }
   }
