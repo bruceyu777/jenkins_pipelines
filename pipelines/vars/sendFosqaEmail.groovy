@@ -30,28 +30,30 @@ def call(Map args = [:]) {
 
   // 2) Back on original agent
   node(origNode) {
-    // Write secret to a file and call test_email.py
-    sh """
-      #!/usr/bin/env bash
-      set -eu
+    withEnv(["SMTP_PW=${pw}"]) {
+        // Use single-quoted GString so Groovy does not interpolate pw
+        sh '''
+        #!/usr/bin/env bash
+        set -eu
 
-      # write password to secret.pw
-      printf '%s' "${pw}" > "\$WORKSPACE/secret.pw"
+        # write secret to a file WITHOUT ever echoing it
+        printf '%s' "$SMTP_PW" > "$WORKSPACE/secret.pw"
 
-      # call test_email.py with all args single-quoted
-      python3 /home/fosqa/resources/tools/test_email.py \\
-        --to-addr  '${esc(args.to)}' \\
-        --subject   '${esc(subject)}' \\
-        --body      '${esc(body)}' \\
-        --smtp-server '${esc(smtpServer)}' \\
-        --port      '${esc(port.toString())}' \\
-        ${useSsl ? '--use-ssl' : ''} \\
-        ${useTls ? '--use-tls' : ''} \\
-        --username '${esc(username)}' \\
-        --password-file "\$WORKSPACE/secret.pw"
+        # send the email
+        python3 /home/fosqa/resources/tools/test_email.py \
+            --to-addr '${args.to}' \
+            --subject '${subject.replace("'", "'\\''")}' \
+            --body '${body.replace("'", "'\\''")}' \
+            --smtp-server '${smtpServer}' \
+            --port '${port}' \
+            ''' + (useSsl ? "--use-ssl" : "") + ''' \
+            ''' + (useTls ? "--use-tls" : "") + ''' \
+            --username '${username}' \
+            --password-file "$WORKSPACE/secret.pw"
 
-      # clean up
-      shred -u "\$WORKSPACE/secret.pw" || rm -f "\$WORKSPACE/secret.pw"
-    """.stripIndent()
-  }
+        # clean up
+        shred -u "$WORKSPACE/secret.pw" || rm -f "$WORKSPACE/secret.pw"
+        '''
+    }
+    }
 }
