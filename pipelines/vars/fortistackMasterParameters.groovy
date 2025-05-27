@@ -9,13 +9,17 @@ def call() {
         defaultValue: '''{
   "build_name": "fortistack-",
   "send_to": "yzhengfeng@fortinet.com",
-  "FGT_TYPE": "ALL",
   "LOCAL_LIB_DIR": "autolibv3",
   "SVN_BRANCH": "trunk"
 }''',
         description: 'Centralized JSON parameters for both pipelines'
       ),
       // Manually entered build number.
+      string(
+        name: 'FGT_TYPE',
+        defaultValue: 'ALL',
+        description: 'Enter the FGT types: ALL, FGTA, FGTB, FGTC, FGTD, "FGTA,FGTB", "FGTA,FGTD"'
+      ),
       string(
         name: 'RELEASE',
         defaultValue: '7',

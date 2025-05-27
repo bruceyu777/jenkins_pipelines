@@ -131,7 +131,7 @@ def call() {
               string(name: 'NODE_NAME', value: params.NODE_NAME),
               string(name: 'RELEASE', value: params.RELEASE),
               string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
-              string(name: 'FGT_TYPE', value: paramsMap.FGT_TYPE)
+              string(name: 'FGT_TYPE', value: params.FGT_TYPE)
             ]
             echo "Triggering fortistack_provision_fgts pipeline with parameters: ${provisionParams}"
             build job: 'fortistack_provision_fgts', parameters: provisionParams, wait: true
