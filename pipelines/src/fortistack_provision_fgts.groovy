@@ -27,10 +27,10 @@ pipeline {
         )
         
         // 3. FGT Type Parameter
-        choice(
+        string(
             name: 'FGT_TYPE',
-            choices: ['ALL', 'FGT_PFW', 'FGTA', 'FGTB', 'FGTC', 'FGTD'],
-            description: 'Select the FGT type to provision.'
+            defaultValue: 'ALL',
+            description: 'Enter the FGT types: ALL, FGTA, FGTB, FGTC, FGTD, "FGTA,FGTB", "FGTA,FGTD"'
         )
     }
     
