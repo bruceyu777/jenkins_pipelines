@@ -165,6 +165,15 @@ def call() {
         defaultValue: false,
         description: 'Set to true to skip the Test Pipeline stage'
       )
+
+      
+      // New: comma- or semicolon-separated list of email recipients
+      string(
+        name: 'SEND_TO',
+        defaultValue: 'yzhengfeng@fortinet.com',
+        description: 'Comma- or semicolon-separated list of email addresses to notify'
+      ),
+
     ])
   ])
 }

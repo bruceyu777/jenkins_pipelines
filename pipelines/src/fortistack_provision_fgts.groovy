@@ -89,7 +89,7 @@ pipeline {
                   sudo -u fosqa git pull
                   sudo pwd
                   hostname
-                  sudo make provision_fgt fgt_type=${params.FGT_TYPE} node=${params.NODE_NAME} release=${params.RELEASE} build=${params.BUILD_NUMBER}
+                  sudo make provision_fgt fgt_type='${params.FGT_TYPE}' node=${params.NODE_NAME} release=${params.RELEASE} build=${params.BUILD_NUMBER}
                   sudo make update_vm_license_valid_until
                 """
             }

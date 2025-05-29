@@ -172,7 +172,7 @@ def call() {
                 string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE),
                 booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
                 string(name: 'build_name', value: paramsMap.build_name),
-                string(name: 'send_to', value: paramsMap.send_to)
+                string(name: 'SEND_TO', value: params.SEND_TO)
               ]
               echo "Triggering fortistack_runtest pipeline for test group '${group}' with parameters: ${testParams}"
               def result = build job: 'fortistack_runtest', parameters: testParams, wait: true, propagate: false
@@ -272,14 +272,14 @@ def call() {
       }
       success {
             sendFosqaEmail(
-                to:       'yzhengfeng@fortinet.com',
+                to:       params.SEND_TO,
                 subject:  "Build #${env.BUILD_NUMBER} Succeeded",
                 body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
             )
       }
       failure {
           sendFosqaEmail(
-              to:      'yzhengfeng@fortinet.com',
+              to:      params.SEND_TO,
               subject: "Build #${env.BUILD_NUMBER} FAILED",
               body:    "<p>Check console output: ${env.BUILD_URL}</p>"
           )
