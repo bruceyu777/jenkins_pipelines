@@ -237,19 +237,47 @@ def call() {
         
       }
       success {
-            sendFosqaEmail(
-                to:       params.SEND_TO,
-                subject:  "${env.BUILD_DISPLAY_NAME} Succeeded",
-                body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
-            )
-        }
-      failure {
+        script {
+          // Base URL for any archived artifact
+          def base = "${env.BUILD_URL}artifact/"
+          // Build one <a> tag per test group
+          def summaryLinks = computedTestGroups.collect { group ->
+            def name = getArchiveGroupName(group)
+            // summary_<name>.html is what you archived
+            "<a href=\"${base}summary_${name}.html\">Summary: ${name}</a>"
+          }.join("<br/>\n")
+
           sendFosqaEmail(
-              to:      params.SEND_TO,
-              subject: "${env.BUILD_DISPLAY_NAME}  FAILED",
-              body:    "<p>Check console output: ${env.BUILD_URL}</p>"
+            to:      params.SEND_TO,
+            subject: "${env.BUILD_DISPLAY_NAME} Succeeded",
+            body: """
+              <p>🎉 Good news! Job <b>${env.BUILD_DISPLAY_NAME}</b> completed at ${new Date()}.</p>
+              <p>📄 Test result summaries:</p>
+              ${summaryLinks}
+              <p>🔗 Console output: <a href=\"${env.BUILD_URL}\">${env.BUILD_URL}</a></p>
+            """
           )
+        }
       }
+      failure {
+        script {
+          def base = "${env.BUILD_URL}artifact/"
+          def summaryLinks = computedTestGroups.collect { group ->
+            def name = getArchiveGroupName(group)
+            "<a href=\"${base}summary_${name}.html\">Summary: ${name}</a>"
+          }.join("<br/>\n")
+
+          sendFosqaEmail(
+            to:      params.SEND_TO,
+            subject: "${env.BUILD_DISPLAY_NAME} FAILED",
+            body: """
+              <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
+              <p>📄 You can still peek at whatever got archived:</p>
+              ${summaryLinks}
+              <p>🔗 Console output: <a href=\"${env.BUILD_URL}\">${env.BUILD_URL}</a></p>
+            """
+          )
+        }
     }
   }
 }
