@@ -16,7 +16,7 @@ def call(Map args = [:]) {
 
   def esc = { String s -> s.replace("'", "'\\\\''") }
 
-  // 1) Fetch Vault‐stored SMTP password on master
+  // 1) Fetch Vault‐stored SMTP password on master Node: Only the master node (by IP whitelist) can access the Vault.
   def pw = ''
   node('master') {
     pw = sh(
@@ -26,7 +26,7 @@ def call(Map args = [:]) {
     echo "🔑 Retrieved SMTP password on master (length=${pw.length()})"
   }
 
-  // 2) Back on your original agent: write pw, grab LDAP creds, then call Python once
+  // 2) Back on the original agent: write pw, grab LDAP creds, then call Python script.
   node(origNode) {
     // stash the SMTP pw in an env var and write it out
     withEnv(["SMTP_PW=${pw}"]) {
@@ -58,7 +58,7 @@ def call(Map args = [:]) {
             --fallback-from-addr '${esc(fallbackFrom)}'
         """.stripIndent(), echo: false)
 
-        // Cleanup
+        // Cleanup the secret file
         sh "shred -u secret.pw || rm -f secret.pw"
       }
     }

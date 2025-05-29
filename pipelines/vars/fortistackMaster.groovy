@@ -273,14 +273,14 @@ def call() {
       success {
             sendFosqaEmail(
                 to:       params.SEND_TO,
-                subject:  "Build #${env.BUILD_NUMBER} Succeeded",
+                subject:  "${env.BUILD_DISPLAY_NAME} Succeeded",
                 body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
             )
       }
       failure {
           sendFosqaEmail(
               to:      params.SEND_TO,
-              subject: "Build #${env.BUILD_NUMBER} FAILED",
+              subject: "${env.BUILD_DISPLAY_NAME} FAILED",
               body:    "<p>Check console output: ${env.BUILD_URL}</p>"
           )
       }
