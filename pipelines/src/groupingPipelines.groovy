@@ -6,8 +6,8 @@ pipeline {
         // Standalone BUILD_NUMBER parameter.
         string(
             name: 'RELEASE',
-            defaultValue: '7',  // Default release number.
-            description: 'Enter the release number, like 7, or 8'
+            defaultValue: '7.6.4',  // Default release number.
+            description: 'Enter the release number, with 3 digits, like 7.6.4, or 8.0.0'
         )
         string(
             name: 'BUILD_NUMBER',
@@ -36,22 +36,24 @@ pipeline {
             name: 'INDIVIDUAL_CONFIGS',
             defaultValue: '''[
   {
-    "NODE_NAME": "node10",
+    "NODE_NAME": "node9",
     "FEATURE_NAME": "avfortisandbox",
     "TEST_CASE_FOLDER": "testcase",
     "TEST_CONFIG_CHOICE": "env.newman.FGT_KVM.avfortisandbox.conf",
     "TEST_GROUP_CHOICE": "grp.avfortisandbox_fortistack.full",
     "TEST_GROUPS": "[\\"grp.avfortisandbox_fortistack.full\\", \\"grp.avfortisandbox_alt.full\\"]",
-    "DOCKER_COMPOSE_FILE_CHOICE": "docker.avfortisandbox_avfortisandbox.yml"
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.avfortisandbox_avfortisandbox.yml",
+    "SEND_TO": "yzhengfeng@fortinet.com;wangd@fortinet.com;vlysak@fortinet.com"
   },
   {
-    "NODE_NAME": "node11",
+    "NODE_NAME": "node10",
     "FEATURE_NAME": "webfilter",
     "TEST_CASE_FOLDER": "testcase_v1",
     "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
     "TEST_GROUP_CHOICE": "grp.webfilter_basic.full",
     "TEST_GROUPS": "grp.webfilter_basic.full, grp.webfilter_basic2.full",
-    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml"
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml",
+    "SEND_TO": "yzhengfeng@fortinet.com;wangd@fortinet.com;hchuanjian@fortinet.com"
   }
 ]''',
             description: '''Individual configuration parameters as a JSON array.
@@ -116,6 +118,7 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                                 string(name: 'TEST_GROUP_CHOICE', value: merged.TEST_GROUP_CHOICE),
                                 string(name: 'TEST_GROUPS', value: merged.TEST_GROUPS),
                                 string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: merged.DOCKER_COMPOSE_FILE_CHOICE),
+                                string(name: 'SEND_TO', value: merged.SEND_TO),
                                 booleanParam(name: 'SKIP_PROVISION', value: merged.SKIP_PROVISION),
                                 booleanParam(name: 'SKIP_TEST', value: merged.SKIP_TEST)
                             ], wait: true

@@ -23,7 +23,7 @@ def call() {
       string(
         name: 'RELEASE',
         defaultValue: '7',
-        description: 'Enter the release number, like 7, or 8'
+        description: 'Enter the release number, with 3 digits, like 7.6.4, or 8.0.0'
       ),
       string(
         name: 'BUILD_NUMBER',
