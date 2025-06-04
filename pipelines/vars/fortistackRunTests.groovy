@@ -135,7 +135,8 @@ def call() {
               // Prepare SVN code directory and update SVN repository.
               // Note: Now using global variables LOCAL_LIB_DIR and SVN_BRANCH.
               def baseTestDir = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}"
-              sh "mkdir -p ${baseTestDir}"
+              sh "sudo mkdir -p ${baseTestDir}"
+              sh "sudo chmod -R 777 ${baseTestDir}"
               def folderPath = "${baseTestDir}/${params.FEATURE_NAME}"
               echo "Checking folder: ${folderPath}"
               def folderExists = sh(script: "if [ -d '${folderPath}' ]; then echo exists; else echo notexists; fi", returnStdout: true).trim()
