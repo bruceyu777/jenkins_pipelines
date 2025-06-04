@@ -16,6 +16,11 @@ def call() {
       ),
       // Manually entered build number.
       string(
+        name: 'SVN_BRANCH',
+        defaultValue: 'trunk',
+        description: 'Enter svn branch for pulling test cases from SVN, v760, trunk etc.'
+      ),
+      string(
         name: 'FGT_TYPE',
         defaultValue: 'ALL',
         description: 'Enter the FGT types: ALL, FGTA, FGTB, FGTC, FGTD, "FGTA,FGTB", "FGTA,FGTD"'

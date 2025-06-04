@@ -164,7 +164,7 @@ def call() {
                 string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
                 string(name: 'NODE_NAME', value: params.NODE_NAME),
                 string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR),
-                string(name: 'SVN_BRANCH', value: paramsMap.SVN_BRANCH),
+                string(name: 'SVN_BRANCH', value: params.SVN_BRANCH),
                 string(name: 'FEATURE_NAME', value: params.FEATURE_NAME),
                 string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER),
                 string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE),
