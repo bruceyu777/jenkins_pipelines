@@ -10,7 +10,6 @@ def call() {
   "build_name": "fortistack-",
   "send_to": "yzhengfeng@fortinet.com",
   "LOCAL_LIB_DIR": "autolibv3",
-  "SVN_BRANCH": "trunk"
 }''',
         description: 'Centralized JSON parameters for both pipelines'
       ),
