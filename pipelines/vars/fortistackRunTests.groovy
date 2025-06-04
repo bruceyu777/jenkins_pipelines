@@ -150,6 +150,8 @@ def call() {
               } else {
                   sh "cd ${folderPath} && sudo svn update --username \$SVN_USER --password \$SVN_PASS --non-interactive"
               }
+              sh "sudo chmod -R 777 ${baseTestDir}"
+
 
               // Create Docker file soft link.
               sh """
