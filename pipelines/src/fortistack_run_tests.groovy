@@ -141,7 +141,8 @@ pipeline {
 
                         // Prepare SVN code directory and update SVN repository
                         def baseTestDir = "/home/fosqa/${params.LOCAL_LIB_DIR}/testcase/${params.SVN_BRANCH}"
-                        sh "mkdir -p ${baseTestDir}"
+                        sh "sudo mkdir -p ${baseTestDir}"
+                        sh "sudo chmod -R 777 ${baseTestDir}"
                         def folderPath = "${baseTestDir}/${params.FEATURE_NAME}"
                         echo "Checking folder: ${folderPath}"
                         def folderExists = sh(script: "if [ -d '${folderPath}' ]; then echo exists; else echo notexists; fi", returnStdout: true).trim()
