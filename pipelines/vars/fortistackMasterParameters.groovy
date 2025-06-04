@@ -165,6 +165,12 @@ def call() {
         defaultValue: false,
         description: 'Set to true to skip the Test Pipeline stage'
       ),
+      // Oriole Submission option.
+      choice(
+        name: 'ORIOLE_SUBMIT_FLAG',
+        choices: ["succeeded", "all","none"].join("\n"),
+        description: 'Define Oriole submit rule, "succeeded" means only passed test case will be submitted. "all" means all result will be submitted.'
+      ),
 
       // New: comma- or semicolon-separated list of email recipients
       string(
