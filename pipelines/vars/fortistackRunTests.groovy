@@ -66,7 +66,7 @@ def computedTestGroups = []  // Global variable to share across stages
 
 def call() {
   fortistackMasterParameters()
-  // Expand the JSON parameters so that keys (e.g. SVN_BRANCH, LOCAL_LIB_DIR, build_name, send_to, FGT_TYPE)
+  // Expand the JSON parameters so that keys (e.g. LOCAL_LIB_DIR, build_name, send_to, FGT_TYPE)
   // are available as global variables.
   expandParamsJson(params.PARAMS_JSON)
 
@@ -98,6 +98,15 @@ def call() {
           }
         }
       }
+      stage('Debug Parameters') {
+        steps {
+          script {
+            echo "=== Debug: Printing All Parameters ==="
+            params.each { key, value -> echo "${key} = ${value}" }
+          }
+        }
+      }
+      
       
       stage('Check Docker and KVM domains') {
         steps {

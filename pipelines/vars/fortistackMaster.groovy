@@ -172,6 +172,7 @@ def call() {
                 string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE),
                 booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
                 string(name: 'build_name', value: paramsMap.build_name),
+                string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG)
                 string(name: 'SEND_TO', value: params.SEND_TO)
               ]
               echo "Triggering fortistack_runtest pipeline for test group '${group}' with parameters: ${testParams}"
