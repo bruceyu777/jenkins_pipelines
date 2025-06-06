@@ -162,8 +162,7 @@ def call() {
                         echo "Provisioning VMPCs: ${params.VMPC_NAMES}"
                         sh """
                             cd /home/fosqa/resources/tools
-                            sudo /home/fosqa/resources/tools/venv/bin/python \
-                                provision_pc_vm_working_local.py --vm_type "${params.VMPC_NAMES}"
+                            sudo make provision_kvm_pc vmpc="${params.VMPC_NAMES}"
                         """
                     }
                 }
