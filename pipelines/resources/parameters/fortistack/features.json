@@ -1,0 +1,22 @@
+{
+    "avfortisandbox": {
+      "test_case_folder": ["testcase", "testcase_v1"],
+      "test_config":       ["env.newman.FGT_KVM.avfortisandbox.conf"],
+      "test_groups":       ["grp.avfortisandbox_fortistack.full","grp.avfortisandbox_fortistack.short"],
+      "docker_compose":    ["docker.avfortisandbox_avfortisandbox.yml","other"]
+    },
+    "webfilter": {
+      "test_case_folder": ["testcase_v1", "testcase"],
+      "test_config":       ["env.FGTVM64.webfilter_demo.conf"],
+      "test_groups":       ["grp.webfilter_basic.full","grp.webfilter_ha.full","grp.webfilter_flow.full", /* etc */],
+      "docker_compose":    ["docker.webfilter_basic.yml","other"]
+    },
+    "dnsfilter": {
+      "test_case_folder": ["testcase","testcase_v1"],
+      "test_config":       ["env.FGTVM64_dnsfilter_fortistack.conf"],
+      "test_groups":       ["grp.dnsfilter_fortistack.crit","grp.dnsfilter.full"],
+      "docker_compose":    ["docker.dnsfilter_dnsfilter.yml","other"]
+    }
+    // …and just append new features here
+}
+  
