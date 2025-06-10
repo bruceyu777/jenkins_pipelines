@@ -8,7 +8,7 @@
     "webfilter": {
       "test_case_folder": ["testcase_v1", "testcase"],
       "test_config":       ["env.FGTVM64.webfilter_demo.conf"],
-      "test_groups":       ["grp.webfilter_basic.full","grp.webfilter_ha.full","grp.webfilter_flow.full", /* etc */],
+      "test_groups":       ["grp.webfilter_basic.full","grp.webfilter_ha.full","grp.webfilter_flow.full"],
       "docker_compose":    ["docker.webfilter_basic.yml","other"]
     },
     "dnsfilter": {
