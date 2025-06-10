@@ -2,9 +2,10 @@ import groovy.json.JsonSlurper
 import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.SecureGroovyScript
 
 def call() {
-  // 1) pull the raw JSON out of your shared-lib resources
-  String raw = libraryResource('parameters/fortistack/features.json')
-  def cfg = new JsonSlurper().parseText(raw)
+  // 1) read the JSON from disk
+  def configPath = '/var/jenkins_home/feature-configs/fortistack/features.json'
+  def raw       = new File(configPath).getText('UTF-8')
+  def cfg       = new JsonSlurper().parseText(raw)
 
   // 2) top-level feature list
   def features = cfg.keySet().sort() as List
@@ -59,7 +60,7 @@ def call() {
         description: 'Select the feature'
       ),
 
-      // ——— TEST_CASE_FOLDER ———
+      // Dynamic: TEST_CASE_FOLDER
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_CASE_FOLDER',
         referencedParameters: 'FEATURE_NAME',
@@ -68,15 +69,15 @@ def call() {
           $class: 'GroovyScript',
           script: new SecureGroovyScript("""
             import groovy.json.JsonSlurper
-            // re-load from the same library resource:
-            def all = new JsonSlurper()
-                        .parseText(libraryResource('parameters/fortistack/features.json'))
+            // read the same file at parameter-render time
+            def raw = new File('$configPath').getText('UTF-8')
+            def all = new JsonSlurper().parseText(raw)
             return all[FEATURE_NAME].test_case_folder
           """, true)
         ]
       ],
 
-      // ——— TEST_CONFIG_CHOICE ———
+      // Dynamic: TEST_CONFIG_CHOICE
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_CONFIG_CHOICE',
         referencedParameters: 'FEATURE_NAME',
@@ -85,21 +86,19 @@ def call() {
           $class: 'GroovyScript',
           script: new SecureGroovyScript("""
             import groovy.json.JsonSlurper
-            def all = new JsonSlurper()
-                        .parseText(libraryResource('parameters/fortistack/features.json'))
+            def raw = new File('$configPath').getText('UTF-8')
+            def all = new JsonSlurper().parseText(raw)
             return all[FEATURE_NAME].test_config
           """, true)
         ]
       ],
 
-      // ——— TEST_GROUP_FILTER ———
+      // Dynamic: TEST_GROUP_CHOICE (with filter)
       string(
         name: 'TEST_GROUP_FILTER',
         defaultValue: '',
         description: 'Enter text to filter test-group options'
       ),
-
-      // ——— TEST_GROUP_CHOICE ———
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_GROUP_CHOICE',
         referencedParameters: 'FEATURE_NAME,TEST_GROUP_FILTER',
@@ -108,8 +107,8 @@ def call() {
           $class: 'GroovyScript',
           script: new SecureGroovyScript("""
             import groovy.json.JsonSlurper
-            def all = new JsonSlurper()
-                        .parseText(libraryResource('parameters/fortistack/features.json'))
+            def raw = new File('$configPath').getText('UTF-8')
+            def all = new JsonSlurper().parseText(raw)
             def groups = all[FEATURE_NAME].test_groups
             if (TEST_GROUP_FILTER) {
               groups = groups.findAll {
@@ -121,14 +120,7 @@ def call() {
         ]
       ],
 
-      // ——— TEST_GROUPS override ———
-      text(
-        name: 'TEST_GROUPS',
-        defaultValue: '',
-        description: 'JSON array of test groups; if provided, overrides TEST_GROUP_CHOICE.'
-      ),
-
-      // ——— DOCKER_COMPOSE_FILE_CHOICE ———
+      // Dynamic: DOCKER_COMPOSE_FILE_CHOICE
       [$class: 'CascadeChoiceParameter',
         name: 'DOCKER_COMPOSE_FILE_CHOICE',
         referencedParameters: 'FEATURE_NAME',
@@ -137,8 +129,8 @@ def call() {
           $class: 'GroovyScript',
           script: new SecureGroovyScript("""
             import groovy.json.JsonSlurper
-            def all = new JsonSlurper()
-                        .parseText(libraryResource('parameters/fortistack/features.json'))
+            def raw = new File('$configPath').getText('UTF-8')
+            def all = new JsonSlurper().parseText(raw)
             return all[FEATURE_NAME].docker_compose
           """, true)
         ]

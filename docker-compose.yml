@@ -14,6 +14,7 @@ services:
       - jenkins_data:/var/jenkins_home
       - /home/fosqa/jenkins-master:/home/fosqa/jenkins-master
       - /home/fosqa/resources/tools:/home/fosqa/resources/tools
+      - /home/fosqa/jenkins-master/feature-configs:/var/jenkins_home/feature-configs:ro
       - /home/fosqa/known_hosts:/var/jenkins_home/.ssh/known_hosts:ro
     networks:
       - custom_network
