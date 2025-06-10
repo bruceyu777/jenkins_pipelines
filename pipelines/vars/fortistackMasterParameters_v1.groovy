@@ -1,14 +1,6 @@
-import groovy.json.JsonSlurper
 import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.SecureGroovyScript
 
 def call() {
-  // 1) pull the raw JSON out of your shared-lib resources
-  String raw = libraryResource('parameters/fortistack/features.json')
-  def cfg = new JsonSlurper().parseText(raw)
-
-  // 2) top-level feature list
-  def features = cfg.keySet().sort() as List
-
   properties([
     parameters([
       // Static JSON parameter for common settings.
@@ -52,95 +44,117 @@ def call() {
         defaultValue: true,
         description: 'If true, update docker file with --force option'
       ),
-            // ——— FEATURE_NAME ———
+      // Feature selection.
       choice(
         name: 'FEATURE_NAME',
-        choices: features,
+        choices: ["avfortisandbox", "webfilter", "dnsfilter"].join("\n"),
         description: 'Select the feature'
       ),
-
-      // ——— TEST_CASE_FOLDER ———
+      // Dynamic parameter for svn test case folder, testcase or testcase_v1.
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_CASE_FOLDER',
+        description: 'Select test case folder based on feature',
         referencedParameters: 'FEATURE_NAME',
         choiceType: 'PT_SINGLE_SELECT',
         script: [
           $class: 'GroovyScript',
-          script: new SecureGroovyScript("""
-            import groovy.json.JsonSlurper
-            // re-load from the same library resource:
-            def all = new JsonSlurper()
-                        .parseText(libraryResource('parameters/fortistack/features.json'))
-            return all[FEATURE_NAME].test_case_folder
-          """, true)
+          script: new SecureGroovyScript(
+            '''if (FEATURE_NAME in ["avfortisandbox","dnsfilter"]) {
+                 return ["testcase", "testcase_v1"]
+               } else if (FEATURE_NAME == "webfilter") {
+                 return ["testcase_v1", "testcase"]
+               } else {
+                 return ["unknown"]
+               }''',
+            true
+          )
         ]
       ],
-
-      // ——— TEST_CONFIG_CHOICE ———
+      // Dynamic parameter for TEST_CONFIG_CHOICE.
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_CONFIG_CHOICE',
+        description: 'Select test config based on feature',
         referencedParameters: 'FEATURE_NAME',
         choiceType: 'PT_SINGLE_SELECT',
         script: [
           $class: 'GroovyScript',
-          script: new SecureGroovyScript("""
-            import groovy.json.JsonSlurper
-            def all = new JsonSlurper()
-                        .parseText(libraryResource('parameters/fortistack/features.json'))
-            return all[FEATURE_NAME].test_config
-          """, true)
+          script: new SecureGroovyScript(
+            '''if (FEATURE_NAME == "avfortisandbox") {
+                 return ["env.newman.FGT_KVM.avfortisandbox.conf"]
+               } else if (FEATURE_NAME == "webfilter") {
+                 return ["env.FGTVM64.webfilter_demo.conf"]
+               } else if (FEATURE_NAME == "dnsfilter") {
+                 return ["env.FGTVM64_dnsfilter_fortistack.conf"]
+               } else {
+                 return ["unknown"]
+               }''',
+            true
+          )
         ]
       ],
-
-      // ——— TEST_GROUP_FILTER ———
       string(
         name: 'TEST_GROUP_FILTER',
         defaultValue: '',
-        description: 'Enter text to filter test-group options'
+        description: 'Enter text to filter test group options'
       ),
-
-      // ——— TEST_GROUP_CHOICE ———
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_GROUP_CHOICE',
+        description: 'Select one or more test groups based on feature (with filter)',
         referencedParameters: 'FEATURE_NAME,TEST_GROUP_FILTER',
         choiceType: 'PT_MULTI_SELECT',
         script: [
           $class: 'GroovyScript',
-          script: new SecureGroovyScript("""
-            import groovy.json.JsonSlurper
-            def all = new JsonSlurper()
-                        .parseText(libraryResource('parameters/fortistack/features.json'))
-            def groups = all[FEATURE_NAME].test_groups
-            if (TEST_GROUP_FILTER) {
-              groups = groups.findAll {
-                it.toLowerCase().contains(TEST_GROUP_FILTER.toLowerCase())
+          script: new SecureGroovyScript(
+            '''
+              def groups = []
+              if (FEATURE_NAME == "avfortisandbox") {
+                  groups = ["grp.avfortisandbox_fortistack.full", "grp.avfortisandbox_fortistack.short"]
+              } else if (FEATURE_NAME == "webfilter") {
+                  groups = ["grp.webfilter_basic.full", "grp.webfilter_basic2.full", "grp.webfilter_ha.full", "grp.webfilter_flow.full", "grp.webfilter_peruser.full", "grp.webfilter_onearm.full", "grp.webfilter_other.full", "grp.webfilter_other2.full"]
+              } else if (FEATURE_NAME == "dnsfilter") {
+                  groups = ["grp.dnsfilter_fortistack.crit","grp.dnsfilter.crit", "grp.dnsfilter.full"]
+              } else {
+                  groups = ["unknown"]
               }
-            }
-            return groups
-          """, true)
+              
+              def filter = TEST_GROUP_FILTER?.trim()
+              if (filter) {
+                  groups = groups.findAll { it.toLowerCase().contains(filter.toLowerCase()) }
+              }
+              return groups
+            ''',
+            true
+          )
         ]
       ],
 
-      // ——— TEST_GROUPS override ———
+
+      // New parameter: TEST_GROUPS.
       text(
         name: 'TEST_GROUPS',
         defaultValue: '',
-        description: 'JSON array of test groups; if provided, overrides TEST_GROUP_CHOICE.'
+        description: 'JSON array of test groups; if provided, overrides TEST_GROUP_CHOICE. Leave empty to use TEST_GROUP_CHOICE.'
       ),
-
-      // ——— DOCKER_COMPOSE_FILE_CHOICE ———
+      // Dynamic parameter for DOCKER_COMPOSE_FILE_CHOICE.
       [$class: 'CascadeChoiceParameter',
         name: 'DOCKER_COMPOSE_FILE_CHOICE',
+        description: 'Select docker compose file based on feature',
         referencedParameters: 'FEATURE_NAME',
         choiceType: 'PT_SINGLE_SELECT',
         script: [
           $class: 'GroovyScript',
-          script: new SecureGroovyScript("""
-            import groovy.json.JsonSlurper
-            def all = new JsonSlurper()
-                        .parseText(libraryResource('parameters/fortistack/features.json'))
-            return all[FEATURE_NAME].docker_compose
-          """, true)
+          script: new SecureGroovyScript(
+            '''if (FEATURE_NAME == "avfortisandbox") {
+                 return ["docker.avfortisandbox_avfortisandbox.yml", "other"]
+               } else if (FEATURE_NAME == "webfilter") {
+                 return ["docker.webfilter_basic.yml", "other"]
+               } else if (FEATURE_NAME == "dnsfilter") {
+                 return ["docker.dnsfilter_dnsfilter.yml", "other"]
+               } else {
+                 return ["unknown"]
+               }''',
+            true
+          )
         ]
       ],
       // Toggle parameter to skip Provision Pipeline stage.
