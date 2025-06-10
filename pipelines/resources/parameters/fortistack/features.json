@@ -17,6 +17,5 @@
       "test_groups":       ["grp.dnsfilter_fortistack.crit","grp.dnsfilter.full"],
       "docker_compose":    ["docker.dnsfilter_dnsfilter.yml","other"]
     }
-    // …and just append new features here
 }
   
