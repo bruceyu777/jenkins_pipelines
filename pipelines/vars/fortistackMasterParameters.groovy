@@ -63,6 +63,7 @@ def call() {
       // Dynamic: TEST_CASE_FOLDER
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_CASE_FOLDER',
+        description: 'Select test case folder based on feature',
         referencedParameters: 'FEATURE_NAME',
         choiceType: 'PT_SINGLE_SELECT',
         script: [
@@ -80,6 +81,7 @@ def call() {
       // Dynamic: TEST_CONFIG_CHOICE
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_CONFIG_CHOICE',
+        description: 'Select test config based on feature',
         referencedParameters: 'FEATURE_NAME',
         choiceType: 'PT_SINGLE_SELECT',
         script: [
@@ -101,6 +103,7 @@ def call() {
       ),
       [$class: 'CascadeChoiceParameter',
         name: 'TEST_GROUP_CHOICE',
+        description: 'Select one or more test groups based on feature (with filter)',
         referencedParameters: 'FEATURE_NAME,TEST_GROUP_FILTER',
         choiceType: 'PT_MULTI_SELECT',
         script: [
@@ -123,6 +126,7 @@ def call() {
       // Dynamic: DOCKER_COMPOSE_FILE_CHOICE
       [$class: 'CascadeChoiceParameter',
         name: 'DOCKER_COMPOSE_FILE_CHOICE',
+        description: 'Select docker compose file based on feature',
         referencedParameters: 'FEATURE_NAME',
         choiceType: 'PT_SINGLE_SELECT',
         script: [
