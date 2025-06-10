@@ -53,7 +53,25 @@ def call() {
         defaultValue: true,
         description: 'If true, update docker file with --force option'
       ),
-            // ——— FEATURE_NAME ———
+
+      // ── VMPC provisioning toggles, moved from the downstream script ──
+      booleanParam(
+        name: 'PROVISION_VMPC',
+        defaultValue: false,
+        description: 'Enable provisioning of KVM-PC VMs via provision_pc_vm_working_local.py'
+      ),
+      string(
+        name: 'VMPC_NAMES',
+        defaultValue: '',
+        description: 'Comma-separated list of VMPC names to provision (e.g. "VMPC1,VMPC4")'
+      ),
+      booleanParam(
+        name: 'PROVISION_DOCKER',
+        defaultValue: true,
+        description: 'Enable or disable Docker provisioning (default: true)'
+      ),
+
+      // ——— FEATURE_NAME ———
       choice(
         name: 'FEATURE_NAME',
         choices: features,

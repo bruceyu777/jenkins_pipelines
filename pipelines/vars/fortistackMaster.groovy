@@ -204,6 +204,9 @@ def call() {
                 string(name: 'TEST_GROUP_CHOICE', value: group),
                 string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE),
                 booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
+                booleanParam(name: 'PROVISION_VMPC',   value: params.PROVISION_VMPC    ),
+                string(      name: 'VMPC_NAMES',       value: params.VMPC_NAMES        ),
+                booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER  ),
                 string(name: 'build_name', value: paramsMap.build_name),
                 string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG),
                 string(name: 'SEND_TO', value: params.SEND_TO)
