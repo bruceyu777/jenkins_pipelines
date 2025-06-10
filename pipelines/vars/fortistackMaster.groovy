@@ -90,6 +90,39 @@ def call() {
     }
     
     stages {
+      stage('🔍 Debug Config & Mount') {
+        steps {
+          script {
+            // 1) Check that the directory is there
+            def cfgDir  = '/var/jenkins_home/feature-configs/fortistack'
+            def cfgFile = "${cfgDir}/features.json"
+            
+            echo ">>> DEBUG: Does config dir exist? " + sh(returnStatus: true, script: "test -d '${cfgDir}'")  // 0 means yes
+            echo ">>> DEBUG: Does config file exist? " + sh(returnStatus: true, script: "test -f '${cfgFile}'")
+            
+            // 2) List directory contents
+            echo ">>> DEBUG: Listing '${cfgDir}':\n" +
+              sh(returnStdout: true, script: "ls -1 '${cfgDir}'").trim()
+            
+            // 3) Dump raw file
+            echo ">>> DEBUG: Raw JSON content:\n" +
+              sh(returnStdout: true, script: "cat '${cfgFile}'").trim()
+            
+            // 4) Parse it and inspect
+            def raw = readFile(cfgFile)
+            def json = new groovy.json.JsonSlurper().parseText(raw)
+            
+            echo ">>> DEBUG: Parsed JSON keys (features): ${json.keySet()}"
+            if (params.FEATURE_NAME) {
+              echo ">>> DEBUG: Entry for FEATURE_NAME='${params.FEATURE_NAME}':\n" +
+                   json[params.FEATURE_NAME]?.toString()
+            } else {
+              echo ">>> DEBUG: FEATURE_NAME not yet set (form rendering time)."
+            }
+          }
+        }
+      }
+
       stage('Initialize Test Groups') {
         steps {
           script {
