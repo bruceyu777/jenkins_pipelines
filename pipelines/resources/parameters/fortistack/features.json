@@ -16,6 +16,12 @@
       "test_config":       ["env.FGTVM64_dnsfilter_fortistack.conf"],
       "test_groups":       ["grp.dnsfilter_fortistack.crit","grp.dnsfilter.full"],
       "docker_compose":    ["docker.dnsfilter_dnsfilter.yml","other"]
-    }
+    },
+    "threatfeed": {
+      "test_case_folder": ["testcase_v1"],
+      "test_config":       ["env.fortistack.threatfeed.conf"],
+      "test_groups":       ["grp.threatfeed.full"],
+      "docker_compose":    ["KVM"]
+    }  
 }
   
