@@ -31,5 +31,26 @@
       "test_config":       ["env.fortistack.threatfeed.conf"],
       "test_groups":       ["grp.threatfeed.full"],
       "docker_compose":    ["KVM"]
-    }  
+  }, 
+  "antivirus": {
+      "test_case_folder": ["testcase_v1"],
+      "test_config":      ["env.fortistack.antivirus.conf"],
+      "test_groups":      [
+        "grp.antivirus_proxy.full",
+        "grp.antivirus_proxy_ipv6.full",
+        "grp.antivirus_webproxy.full",
+        "grp.antivirus_sdwan.full",
+        "grp.antivirus_misc.full",
+        "grp.antivirus_tp.full",
+        "grp.antivirus_tp_ipv6.full",
+        "grp.antivirus_wanopt.full",
+        "grp.antivirus_flow.full",
+        "grp.antivirus_flow_ipv6.full",
+        "grp.antivirus_ngfw.full",
+        "grp.antivirus_snifint.full",
+        "grp.antivirus_ha.full",
+        "grp.avaimodel.full"
+      ],
+      "docker_compose": ["docker.antivirus_proxy.yml","other"]
+  }
 }
