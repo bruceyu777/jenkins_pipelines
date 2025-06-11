@@ -55,11 +55,17 @@ pipeline {
                 echo "provisioning FGT..."
                 sh """
                   cd /home/fosqa/resources/tools
-                  git config --global --add safe.directory /home/fosqa/resources/tools
-                  # throw away everything local, then pull
-                  sudo -u fosqa git fetch --all --prune
-                  sudo -u fosqa git reset --hard origin/${params.BRANCH_NAME ?: 'main'}
-                  sudo -u fosqa git clean -fdx
+
+                    # allow root’s Git to touch this repo
+                    sudo git config --global --add safe.directory /home/fosqa/resources/tools
+
+                    # fetch & reset to exactly what’s on origin
+                    sudo git fetch --all --prune
+                    sudo git reset --hard origin/${params.BRANCH_NAME ?: 'main'}
+
+                    # blow away all untracked / modified files as root
+                    sudo git clean -fdx
+      
                   sudo pwd
                   hostname
                   sudo make provision_fgt fgt_type='${params.FGT_TYPE}' node=${params.NODE_NAME} release=${params.RELEASE} build=${params.BUILD_NUMBER}
