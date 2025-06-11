@@ -119,6 +119,9 @@ def call(Map config = [:]) {
         .findAll { entry -> !excludes.contains(entry.key) }
         .collect { entry -> entry.defn }
 
-    // Apply to Jenkins
-    properties([parameters: visible])
-}
+        // Apply to Jenkins
+    // Note: call the 'parameters' DSL step, not pass a map entry
+    properties([
+        parameters(visible)
+    ])
+} // apply to Jenkins
