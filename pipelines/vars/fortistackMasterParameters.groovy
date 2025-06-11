@@ -2,18 +2,40 @@ import groovy.json.JsonSlurper
 import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.SecureGroovyScript
 
 def call(Map config = [:]) {
-    // Collect parameters to exclude (if any)
+    // Parameters to exclude
     List<String> excludes = config.get('exclude', []) as List<String>
 
-    // Load feature definitions from disk
+    // Load features JSON
     def configPath = '/var/jenkins_home/feature-configs/fortistack/features.json'
     def raw        = new File(configPath).getText('UTF-8')
     def cfg        = new JsonSlurper().parseText(raw)
     def features   = cfg.keySet().sort() as List<String>
 
-    // Build a complete list of ParameterDefinitions
+    // Helper to build a cascade parameter definition
+    def cascadeDef = { name, desc, refs, type, body ->
+        return [
+            $class: 'CascadeChoiceParameter',
+            name: name,
+            description: desc,
+            referencedParameters: refs,
+            choiceType: type,
+            script: [
+                $class: 'GroovyScript',
+                script: new SecureGroovyScript(
+                    """
+                    import groovy.json.JsonSlurper
+                    def all = new JsonSlurper()
+                        .parseText(new File('${configPath}').getText('UTF-8'))
+                    ${body}
+                    """, true
+                )
+            ]
+        ]
+    }
+
+    // Build list of (key, definition) pairs
     def allParams = []
-    allParams << string(
+    allParams << [ key: 'PARAMS_JSON', defn: string(
         name: 'PARAMS_JSON',
         defaultValue: '''{
   "build_name": "fortistack-",
@@ -21,118 +43,82 @@ def call(Map config = [:]) {
   "LOCAL_LIB_DIR": "autolibv3"
 }''',
         description: 'Centralized JSON parameters for both pipelines'
-    )
-    allParams << string(name: 'SVN_BRANCH',   defaultValue: 'trunk', description: 'Enter svn branch for pulling test cases from SVN')
-    allParams << string(name: 'FGT_TYPE',      defaultValue: 'ALL',   description: 'Enter the FGT types: ALL, FGTA, FGTB, etc.')
-    allParams << string(name: 'RELEASE',       defaultValue: '7',     description: 'Enter the release number (e.g. 7.6.4)')
-    allParams << string(name: 'BUILD_NUMBER',  defaultValue: '3473',  description: 'Enter the build number')
-    allParams << string(name: 'NODE_NAME',     defaultValue: 'node1', description: 'Enter the node name: node1, node2 ...')
-    allParams << booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', defaultValue: true, description: 'Update docker file with --force option')
+    ) ]
+    allParams << [ key: 'SVN_BRANCH',  defn: string(name: 'SVN_BRANCH',  defaultValue: 'trunk', description: 'Enter svn branch for pulling test cases from SVN') ]
+    allParams << [ key: 'FGT_TYPE',     defn: string(name: 'FGT_TYPE',     defaultValue: 'ALL',   description: 'Enter the FGT types: ALL, FGTA, FGTB, etc.') ]
+    allParams << [ key: 'RELEASE',      defn: string(name: 'RELEASE',      defaultValue: '7',     description: 'Enter the release number (e.g. 7.6.4)') ]
+    allParams << [ key: 'BUILD_NUMBER', defn: string(name: 'BUILD_NUMBER', defaultValue: '3473',  description: 'Enter the build number') ]
+    allParams << [ key: 'NODE_NAME',    defn: string(name: 'NODE_NAME',    defaultValue: 'node1', description: 'Enter the node name: node1, node2 ...') ]
+    allParams << [ key: 'FORCE_UPDATE_DOCKER_FILE', defn: booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', defaultValue: true, description: 'Update docker file with --force option') ]
 
-    // VMPC and Docker provisioning toggles
-    allParams << booleanParam(name: 'PROVISION_VMPC', defaultValue: false, description: 'Enable provisioning of KVM-PC VMs')
-    allParams << string(      name: 'VMPC_NAMES',    defaultValue: '',    description: 'Comma-separated list of VMPC names (e.g. "VMPC1,VMPC4")')
-    allParams << booleanParam(name: 'PROVISION_DOCKER', defaultValue: true, description: 'Enable or disable Docker provisioning')
+    allParams << [ key: 'PROVISION_VMPC', defn: booleanParam(name: 'PROVISION_VMPC', defaultValue: false, description: 'Enable provisioning of KVM-PC VMs') ]
+    allParams << [ key: 'VMPC_NAMES',     defn: string(name: 'VMPC_NAMES', defaultValue: '', description: 'Comma-separated list of VMPC names') ]
+    allParams << [ key: 'PROVISION_DOCKER', defn: booleanParam(name: 'PROVISION_DOCKER', defaultValue: true, description: 'Enable or disable Docker provisioning') ]
 
-    // Feature selection
-    allParams << choice(
+    allParams << [ key: 'FEATURE_NAME', defn: choice(
         name: 'FEATURE_NAME',
-        choices: features.join("\n"),
+        choices: features.join('\n'),
         description: 'Select the feature'
-    )
+    ) ]
 
-    // Dynamic: TEST_CASE_FOLDER
-    allParams << cascade(
+    allParams << [ key: 'TEST_CASE_FOLDER', defn: cascadeDef(
         'TEST_CASE_FOLDER',
         'Select test case folder based on feature',
         'FEATURE_NAME',
         'PT_SINGLE_SELECT',
-        'return cfg[FEATURE_NAME]?.test_case_folder ?: ["unknown"]'
-    )
+        'return all[FEATURE_NAME]?.test_case_folder ?: ["unknown"]'
+    ) ]
 
-    // Dynamic: TEST_CONFIG_CHOICE
-    allParams << cascade(
+    allParams << [ key: 'TEST_CONFIG_CHOICE', defn: cascadeDef(
         'TEST_CONFIG_CHOICE',
         'Select test config based on feature',
         'FEATURE_NAME',
         'PT_SINGLE_SELECT',
-        'return cfg[FEATURE_NAME]?.test_config ?: ["unknown"]'
-    )
+        'return all[FEATURE_NAME]?.test_config ?: ["unknown"]'
+    ) ]
 
-    // Filter
-    allParams << string(
+    allParams << [ key: 'TEST_GROUP_FILTER', defn: string(
         name: 'TEST_GROUP_FILTER',
         defaultValue: '',
         description: 'Enter text to filter test-group options'
-    )
+    ) ]
 
-    // Dynamic: TEST_GROUP_CHOICE
-    allParams << cascade(
+    allParams << [ key: 'TEST_GROUP_CHOICE', defn: cascadeDef(
         'TEST_GROUP_CHOICE',
         'Select one or more test groups based on feature (with filter)',
         'FEATURE_NAME,TEST_GROUP_FILTER',
         'PT_MULTI_SELECT',
         '''
-        def groups = cfg[FEATURE_NAME]?.test_groups ?: []
+        def groups = all[FEATURE_NAME]?.test_groups ?: []
         if (TEST_GROUP_FILTER) {
           groups = groups.findAll { it.toLowerCase().contains(TEST_GROUP_FILTER.toLowerCase()) }
         }
         return groups
         '''
-    )
+    ) ]
 
-    // Dynamic: DOCKER_COMPOSE_FILE_CHOICE
-    allParams << cascade(
+    allParams << [ key: 'DOCKER_COMPOSE_FILE_CHOICE', defn: cascadeDef(
         'DOCKER_COMPOSE_FILE_CHOICE',
         'Select docker compose file based on feature',
         'FEATURE_NAME',
         'PT_SINGLE_SELECT',
-        'return cfg[FEATURE_NAME]?.docker_compose ?: ["unknown"]'
-    )
+        'return all[FEATURE_NAME]?.docker_compose ?: ["unknown"]'
+    ) ]
 
-    // Skip toggles and submission flag
-    allParams << booleanParam(name: 'SKIP_PROVISION', defaultValue: false, description: 'Skip the Provision stage')
-    allParams << booleanParam(name: 'SKIP_TEST',      defaultValue: false, description: 'Skip the Test stage')
-    allParams << choice(
+    allParams << [ key: 'SKIP_PROVISION', defn: booleanParam(name: 'SKIP_PROVISION', defaultValue: false, description: 'Skip the Provision stage') ]
+    allParams << [ key: 'SKIP_TEST',      defn: booleanParam(name: 'SKIP_TEST',      defaultValue: false, description: 'Skip the Test stage') ]
+    allParams << [ key: 'ORIOLE_SUBMIT_FLAG', defn: choice(
         name: 'ORIOLE_SUBMIT_FLAG',
-        choices: ['succeeded','all','none'].join("\n"),
+        choices: ['succeeded','all','none'].join('\n'),
         description: 'Only passed test case submissions or all/none'
-    )
-    allParams << string(name: 'SEND_TO', defaultValue: 'yzhengfeng@fortinet.com', description: 'Email addresses to notify')
+    ) ]
+    allParams << [ key: 'SEND_TO', defn: string(name: 'SEND_TO', defaultValue: 'yzhengfeng@fortinet.com', description: 'Email addresses to notify') ]
 
-    // Filter out excluded parameters
-        // Filter out excluded parameters by property map lookup
-        // Filter out excluded parameters by inspecting the toMap()
-    def visible = allParams.findAll { pd ->
-        def meta = pd.toMap()
-        def pname = meta['name']
-        return !excludes.contains(pname)
-    }
+    // Filter and extract definitions
+    def visible = allParams
+        .findAll { entry -> !excludes.contains(entry.key) }
+        .collect { entry -> entry.defn }
 
-    // Apply to the job
-    properties([parameters: visible])([parameters: visible])([parameters: visible])([parameters: visible])
-}
-
-/**
- * Helper to define a cascade choice parameter.
- */
-private def cascade(String name, String description, String referenced, String choiceType, String body) {
-    return [
-      $class: 'CascadeChoiceParameter',
-      name: name,
-      description: description,
-      referencedParameters: referenced,
-      choiceType: choiceType,
-      script: [
-        $class: 'GroovyScript',
-        script: new SecureGroovyScript(
-          """
-            import groovy.json.JsonSlurper
-            // reload config
-            def cfg = new JsonSlurper().parseText(new File('/var/jenkins_home/feature-configs/fortistack/features.json').getText('UTF-8'))
-            ${body}
-          """, true
-        )
-      ]
-    ]
+    // Apply to Jenkins
+    properties([parameters: visible])
 }
