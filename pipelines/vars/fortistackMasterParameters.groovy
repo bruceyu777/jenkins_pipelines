@@ -24,14 +24,14 @@ def call(Map config = [:]) {
     )
     allParams << string(name: 'SVN_BRANCH',   defaultValue: 'trunk', description: 'Enter svn branch for pulling test cases from SVN')
     allParams << string(name: 'FGT_TYPE',      defaultValue: 'ALL',   description: 'Enter the FGT types: ALL, FGTA, FGTB, etc.')
-    allParams << string(name: 'RELEASE',       defaultValue: '7.6',     description: 'Enter the release number (e.g. 7.6.4)')
-    allParams << string(name: 'BUILD_NUMBER',  defaultValue: '3550',  description: 'Enter the build number')
+    allParams << string(name: 'RELEASE',       defaultValue: '7',     description: 'Enter the release number (e.g. 7.6.4)')
+    allParams << string(name: 'BUILD_NUMBER',  defaultValue: '3473',  description: 'Enter the build number')
     allParams << string(name: 'NODE_NAME',     defaultValue: 'node1', description: 'Enter the node name: node1, node2 ...')
     allParams << booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', defaultValue: true, description: 'Update docker file with --force option')
 
     // VMPC and Docker provisioning toggles
     allParams << booleanParam(name: 'PROVISION_VMPC', defaultValue: false, description: 'Enable provisioning of KVM-PC VMs')
-    allParams << string(      name: 'VMPC_NAMES',    defaultValue: 'VMPC1,VMPC4',    description: 'Comma-separated list of VMPC names (e.g. "VMPC1,VMPC4")')
+    allParams << string(      name: 'VMPC_NAMES',    defaultValue: '',    description: 'Comma-separated list of VMPC names (e.g. "VMPC1,VMPC4")')
     allParams << booleanParam(name: 'PROVISION_DOCKER', defaultValue: true, description: 'Enable or disable Docker provisioning')
 
     // Feature selection
@@ -101,14 +101,14 @@ def call(Map config = [:]) {
     allParams << string(name: 'SEND_TO', defaultValue: 'yzhengfeng@fortinet.com', description: 'Email addresses to notify')
 
     // Filter out excluded parameters
+        // Filter out excluded parameters by property map lookup
     def visible = allParams.findAll { pd ->
-        // use getName() rather than property access
-        def pname = pd.getName()
+        def pname = pd['name']  // access the 'name' property
         return !excludes.contains(pname)
     }
 
     // Apply to the job
-    properties([parameters: visible])([parameters: visible])
+    properties([parameters: visible])([parameters: visible])([parameters: visible])
 }
 
 /**
