@@ -62,7 +62,7 @@ def computedTestGroups = []  // Global variable to share across stages
 
 def call() {
     // Existing function that defines your "standard" set of upstream parameters:
-    fortistackMasterParameters()
+    fortistackMasterParameters(exclude: ['FGT_TYPE','SKIP_PROVISION'])
 
     // Expand any JSON‐style parameters so they become global variables:
     expandParamsJson(params.PARAMS_JSON)
