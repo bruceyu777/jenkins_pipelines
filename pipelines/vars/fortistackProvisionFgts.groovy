@@ -56,7 +56,10 @@ pipeline {
                 sh """
                   cd /home/fosqa/resources/tools
                   git config --global --add safe.directory /home/fosqa/resources/tools
-                  sudo -u fosqa git pull
+                  # throw away everything local, then pull
+                  sudo -u fosqa git fetch --all --prune
+                  sudo -u fosqa git reset --hard origin/${params.BRANCH_NAME ?: 'main'}
+                  sudo -u fosqa git clean -fdx
                   sudo pwd
                   hostname
                   sudo make provision_fgt fgt_type='${params.FGT_TYPE}' node=${params.NODE_NAME} release=${params.RELEASE} build=${params.BUILD_NUMBER}
