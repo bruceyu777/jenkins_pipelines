@@ -101,14 +101,10 @@ def call(Map config = [:]) {
     allParams << string(name: 'SEND_TO', defaultValue: 'yzhengfeng@fortinet.com', description: 'Email addresses to notify')
 
     // Filter out excluded parameters
-    def visible = allParams.findAll { pd ->
-        // use getName() rather than property access
-        def pname = pd.getName()
-        return !excludes.contains(pname)
-    }
+    def visible = allParams.findAll { pd -> !excludes.contains(pd.name) }
 
     // Apply to the job
-    properties([parameters: visible])([parameters: visible])
+    properties([parameters: visible])
 }
 
 /**
