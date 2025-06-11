@@ -55,16 +55,6 @@ pipeline {
                 echo "provisioning FGT..."
                 sh """
                   cd /home/fosqa/resources/tools
-
-                    # allow root’s Git to touch this repo
-                    sudo git config --global --add safe.directory /home/fosqa/resources/tools
-
-                    # fetch & reset to exactly what’s on origin
-                    sudo git fetch --all --prune
-                    sudo git reset --hard origin/${params.BRANCH_NAME ?: 'main'}
-
-                    # blow away all untracked / modified files as root
-                    sudo git clean -fdx
       
                   sudo pwd
                   hostname
