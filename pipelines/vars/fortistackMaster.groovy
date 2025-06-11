@@ -77,7 +77,7 @@ def expandParamsJson(String jsonStr) {
 def computedTestGroups = []  // Global variable to share across stages
 
 def call() {
-  fortistackMasterParameters()
+  fortistackMasterParameters(exclude:[])
   expandParamsJson(params.PARAMS_JSON)
 
   pipeline {
