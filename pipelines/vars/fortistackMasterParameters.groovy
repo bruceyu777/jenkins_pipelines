@@ -121,4 +121,3 @@ def call(Map config = [:]) {
 
     // Apply to Jenkins
     properties([parameters: visible])
-}
