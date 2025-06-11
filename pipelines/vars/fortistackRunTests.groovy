@@ -79,29 +79,6 @@ def call() {
             TZ = 'America/Vancouver'
         }
 
-        /*
-         * ───── Add new toggle & string parameters here ─────
-         *   - PROVISION_VMPC: toggle on/off VMPC provisioning (default=false)
-         *   - VMPC_NAMES:    comma‐separated list of VMPC names (string)
-         *   - PROVISION_DOCKER: toggle on/off Docker provisioning (default=true)
-         */
-        // parameters {
-        //     booleanParam(
-        //         name: 'PROVISION_VMPC',
-        //         defaultValue: false,
-        //         description: 'Enable provisioning of KVM-PC VMs via provision_pc_vm_working_local.py'
-        //     )
-        //     string(
-        //         name: 'VMPC_NAMES',
-        //         defaultValue: '',
-        //         description: 'Comma-separated list of VMPC names to provision (e.g. "VMPC1,VMPC4")'
-        //     )
-        //     booleanParam(
-        //         name: 'PROVISION_DOCKER',
-        //         defaultValue: true,
-        //         description: 'Enable or disable Docker provisioning (default: true)'
-        //     )
-        // }
 
         stages {
             stage('Initialize Test Groups') {

@@ -3,38 +3,6 @@ def call() {
 fortistackMasterParameters(only: ['NODE_NAME','RELEASE','BUILD_NUMBER','FGT_TYPE'])
 
 pipeline {
-
-    // parameters {
-    //     // 1. Node Name Parameter (customizable)
-    //     string(
-    //         name: 'NODE_NAME',
-    //         defaultValue: 'node1',
-    //         trim: true,
-    //         description: 'Enter the Jenkins node label to run the pipeline on (e.g., node1).'
-    //     )
-        
-    //     // 2. Build Number Parameter
-    //     string(
-    //         name: 'RELEASE',
-    //         defaultValue: '7',
-    //         trim: true,
-    //         description: 'Enter a 1-digit release number (e.g., 7, or 8).'
-    //     )
-
-    //     string(
-    //         name: 'BUILD_NUMBER',
-    //         defaultValue: '3473',
-    //         trim: true,
-    //         description: 'Enter a 4-digit build number (e.g., 3473).'
-    //     )
-        
-    //     // 3. FGT Type Parameter
-    //     string(
-    //         name: 'FGT_TYPE',
-    //         defaultValue: 'ALL',
-    //         description: 'Enter the FGT types: ALL, FGTA, FGTB, FGTC, FGTD, "FGTA,FGTB", "FGTA,FGTD"'
-    //     )
-    // }
     
     // Dynamically select the agent based on user input
     agent { label "${params.NODE_NAME}" }
