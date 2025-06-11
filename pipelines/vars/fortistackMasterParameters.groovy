@@ -114,12 +114,7 @@ def call(Map config = [:]) {
     ) ]
     allParams << [ key: 'SEND_TO', defn: string(name: 'SEND_TO', defaultValue: 'yzhengfeng@fortinet.com', description: 'Email addresses to notify') ]
 
-    // Filter and extract definitions
-    def visible = allParams
-        .findAll { entry -> !excludes.contains(entry.key) }
-        .collect { entry -> entry.defn }
-
-            // Determine which parameters to show: support 'only' (include) or 'exclude'
+        // Determine which parameters to show: support 'only' (include) or 'exclude': support 'only' (include) or 'exclude'
     List<String> includes = config.get('only', []) as List<String>
 
     def visible = allParams.findAll { entry ->
