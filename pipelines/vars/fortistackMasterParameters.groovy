@@ -102,13 +102,15 @@ def call(Map config = [:]) {
 
     // Filter out excluded parameters
         // Filter out excluded parameters by property map lookup
+        // Filter out excluded parameters by inspecting the toMap()
     def visible = allParams.findAll { pd ->
-        def pname = pd['name']  // access the 'name' property
+        def meta = pd.toMap()
+        def pname = meta['name']
         return !excludes.contains(pname)
     }
 
     // Apply to the job
-    properties([parameters: visible])([parameters: visible])([parameters: visible])
+    properties([parameters: visible])([parameters: visible])([parameters: visible])([parameters: visible])
 }
 
 /**
