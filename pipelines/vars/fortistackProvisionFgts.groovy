@@ -3,7 +3,6 @@ def call() {
 // fortistackMasterParameters(exclude: ['FGT_TYPE','SKIP_PROVISION'])
 
 pipeline {
-    Define parameters to be prompted to the user before the job starts
 
     parameters {
         // 1. Node Name Parameter (customizable)
