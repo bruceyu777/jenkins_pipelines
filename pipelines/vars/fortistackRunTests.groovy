@@ -223,15 +223,25 @@ def call() {
                             
                             echo "🔄 Syncing autolib repo (${LOCAL_LIB_DIR}) to branch ${AUTOLIB_BRANCH}, stashing any local edits…"
                             sh """
-                                cd /home/fosqa/${LOCAL_LIB_DIR}
-                                # stash all local changes (including untracked)
+                                REPO_DIR=/home/fosqa/${LOCAL_LIB_DIR}
+
+                                # 1) Mark this path as safe so Git won't refuse ownership mismatch
+                                git config --global --add safe.directory \$REPO_DIR
+
+                                # 2) Enter the repo
+                                cd \$REPO_DIR
+
+                                # 3) Stash everything (tracked + untracked).  || true so that stash-fail doesn't abort.
                                 git stash push -u -m "autolib auto-stash before pull" || true
-                                # ensure on the right branch
+
+                                # 4) Switch to target branch
                                 git checkout ${AUTOLIB_BRANCH}
-                                # fetch + rebase (or plain pull)
-                                git pull --rebase
-                                # try to re-apply your stash
-                                git stash pop || echo 'No stash to pop or conflicts – check manually'
+
+                                # 5) Pull with rebase  
+                                git pull --rebase --autostash
+
+                                # 6) Try to re-apply the stash if anything remains
+                                git stash pop || echo '⚠️ No stash to pop or conflicts—please resolve manually'
                             """
                             
                             /*
