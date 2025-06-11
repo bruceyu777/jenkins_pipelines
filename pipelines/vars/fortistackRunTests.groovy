@@ -220,6 +220,20 @@ def call() {
                                 passwordVariable: 'SVN_PASS'
                             )
                         ]) {
+                            
+                            echo "🔄 Syncing autolib repo (${LOCAL_LIB_DIR}) to branch ${AUTOLIB_BRANCH}, stashing any local edits…"
+                            sh """
+                                cd /home/fosqa/${LOCAL_LIB_DIR}
+                                # stash all local changes (including untracked)
+                                git stash push -u -m "autolib auto-stash before pull" || true
+                                # ensure on the right branch
+                                git checkout ${AUTOLIB_BRANCH}
+                                # fetch + rebase (or plain pull)
+                                git pull --rebase
+                                # try to re-apply your stash
+                                git stash pop || echo 'No stash to pop or conflicts – check manually'
+                            """
+                            
                             /*
                              * ───── Wrap Docker provisioning in an if (params.PROVISION_DOCKER) ─────
                              */

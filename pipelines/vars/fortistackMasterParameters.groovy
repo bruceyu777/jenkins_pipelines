@@ -44,6 +44,7 @@ def call(Map config = [:]) {
 }''',
         description: 'Centralized JSON parameters for both pipelines'
     ) ]
+    allParams << [ key: 'AUTOLIB_BRANCH', defn:  string(name: 'AUTOLIB_BRANCH', defaultValue: 'main', description: 'Which branch of the autolib_v3 repo to checkout before running tests')]
     allParams << [ key: 'SVN_BRANCH',  defn: string(name: 'SVN_BRANCH',  defaultValue: 'v760', description: 'Enter svn branch for pulling test cases from SVN') ]
     allParams << [ key: 'FGT_TYPE',     defn: string(name: 'FGT_TYPE',     defaultValue: 'ALL',   description: 'Enter the FGT types: ALL, FGTA, FGTB, etc.') ]
     allParams << [ key: 'RELEASE',      defn: string(name: 'RELEASE',      defaultValue: '7.6.4',     description: 'Enter the release number (e.g. 7.6.4)') ]
