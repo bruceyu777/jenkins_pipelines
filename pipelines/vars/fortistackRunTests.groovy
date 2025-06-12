@@ -225,17 +225,17 @@ def call() {
                             sh """
                                 REPO_DIR=/home/fosqa/${LOCAL_LIB_DIR}
 
-                                # Mark it safe for Git to operate on
+                                # mark it safe
                                 sudo -u fosqa git config --global --add safe.directory \$REPO_DIR
 
                                 cd \$REPO_DIR
 
-                                # Now everything runs as fosqa (so it picks up fosqa’s ~/.ssh/known_hosts)
-                                sudo -u fosqa bash << 'EOF'
+                                # run all three as fosqa
+                                sudo -u fosqa sh -c '
                                     git stash push -u -m "autolib auto-stash before pull" || true
                                     git checkout ${AUTOLIB_BRANCH}
                                     git pull --rebase --autostash
-                                EOF
+                                '
                                 """
                             
                             /*
