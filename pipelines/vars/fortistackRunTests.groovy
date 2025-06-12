@@ -225,24 +225,18 @@ def call() {
                             sh """
                                 REPO_DIR=/home/fosqa/${LOCAL_LIB_DIR}
 
-                                # 1) Mark this path as safe so Git won't refuse ownership mismatch
-                                git config --global --add safe.directory \$REPO_DIR
+                                # Mark it safe for Git to operate on
+                                sudo -u fosqa git config --global --add safe.directory \$REPO_DIR
 
-                                # 2) Enter the repo
                                 cd \$REPO_DIR
 
-                                # 3) Stash everything (tracked + untracked).  || true so that stash-fail doesn't abort.
-                                git stash push -u -m "autolib auto-stash before pull" || true
-
-                                # 4) Switch to target branch
-                                git checkout ${AUTOLIB_BRANCH}
-
-                                # 5) Pull with rebase  
-                                git pull --rebase --autostash
-
-                                # 6) Try to re-apply the stash if anything remains
-                                git stash pop || echo '⚠️ No stash to pop or conflicts—please resolve manually'
-                            """
+                                # Now everything runs as fosqa (so it picks up fosqa’s ~/.ssh/known_hosts)
+                                sudo -u fosqa bash << 'EOF'
+                                    git stash push -u -m "autolib auto-stash before pull" || true
+                                    git checkout ${AUTOLIB_BRANCH}
+                                    git pull --rebase --autostash
+                                EOF
+                                """
                             
                             /*
                              * ───── Wrap Docker provisioning in an if (params.PROVISION_DOCKER) ─────
