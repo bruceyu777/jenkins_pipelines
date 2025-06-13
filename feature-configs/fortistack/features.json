@@ -52,5 +52,23 @@
         "grp.avaimodel.full"
       ],
       "docker_compose": ["docker.antivirus_proxy.yml","other"]
+  },
+  "wanopt": {
+    "test_case_folder": ["testcase"],
+    "test_config":       ["env.fortistack.wanopt.conf"],
+    "test_groups":       ["grp.wanopt_linux.full"],
+    "docker_compose":    ["docker.wanopt_linux.yml","other"]
+  },
+  "webcache": {
+    "test_case_folder": ["testcase"],
+    "test_config":       ["env.fortistack.webcache.conf"],
+    "test_groups":       ["grp.webcache.full"],
+    "docker_compose":    ["docker.webcache_webcache.yml","other"]
+  },
+  "icap": {
+    "test_case_folder": ["testcase"],
+    "test_config":       ["env.fortistack.icap.conf"],
+    "test_groups":       ["grp.icap.full"],
+    "docker_compose":    ["docker.icap_icap.yml","other"]
   }
 }
