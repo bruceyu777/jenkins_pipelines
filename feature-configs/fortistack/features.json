@@ -68,7 +68,7 @@
   "icap": {
     "test_case_folder": ["testcase"],
     "test_config":       ["env.fortistack.icap.conf"],
-    "test_groups":       ["grp.icap.full"],
+    "test_groups":       ["grp.icap.full", "grp.icap.tmp"],
     "docker_compose":    ["docker.icap_icap.yml","other"]
   }
 }
