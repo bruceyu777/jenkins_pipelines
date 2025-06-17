@@ -56,7 +56,7 @@ def call(Map args = [:]) {
             --fallback-username '$SVN_USER' \\
             --fallback-password '$SVN_PASS' \\
             --fallback-from-addr '${esc(fallbackFrom)}'
-        """.stripIndent(), echo: false)
+        """.stripIndent())
 
         // Cleanup the secret file
         sh "shred -u secret.pw || rm -f secret.pw"
