@@ -48,7 +48,7 @@ def call(Map config = [:]) {
     allParams << [ key: 'SVN_BRANCH',  defn: string(name: 'SVN_BRANCH',  defaultValue: 'v760', description: 'Enter svn branch for pulling test cases from SVN') ]
     allParams << [ key: 'FGT_TYPE',     defn: string(name: 'FGT_TYPE',     defaultValue: 'ALL',   description: 'Enter the FGT types: ALL, FGTA, FGTB, etc.') ]
     allParams << [ key: 'RELEASE',      defn: string(name: 'RELEASE',      defaultValue: '7.6.4',     description: 'Enter the release number (e.g. 7.6.4)') ]
-    allParams << [ key: 'BUILD_NUMBER', defn: string(name: 'BUILD_NUMBER', defaultValue: '3552',  description: 'Enter the build number') ]
+    allParams << [ key: 'BUILD_NUMBER', defn: string(name: 'BUILD_NUMBER', defaultValue: '3563',  description: 'Enter the build number') ]
     allParams << [ key: 'NODE_NAME',    defn: string(name: 'NODE_NAME',    defaultValue: 'node1', description: 'Enter the node name: node1, node2 ...') ]
     allParams << [ key: 'FORCE_UPDATE_DOCKER_FILE', defn: booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', defaultValue: true, description: 'Update docker file with --force option') ]
 
