@@ -113,7 +113,15 @@ def call(Map config = [:]) {
         choices: ['succeeded','all','none'].join('\n'),
         description: 'Only passed test case submissions or all/none'
     ) ]
-    allParams << [ key: 'SEND_TO', defn: string(name: 'SEND_TO', defaultValue: 'yzhengfeng@fortinet.com', description: 'Email addresses to notify') ]
+    allParams << [ key: 'SEND_TO', defn: cascadeDef(
+        'SEND_TO',
+        'Email addresses to notify',
+        'FEATURE_NAME',
+        'PT_SINGLE_SELECT',
+        'return all[FEATURE_NAME]?.email ?: ["yzhengfeng@fortinet.com"]'
+    ) ]
+
+    // allParams << [ key: 'SEND_TO', defn: string(name: 'SEND_TO', defaultValue: 'yzhengfeng@fortinet.com', description: 'Email addresses to notify') ]
 
         // Determine which parameters to show: support 'only' (include) or 'exclude': support 'only' (include) or 'exclude'
     List<String> includes = config.get('only', []) as List<String>
