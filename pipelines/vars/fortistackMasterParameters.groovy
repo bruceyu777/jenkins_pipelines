@@ -110,7 +110,7 @@ def call(Map config = [:]) {
     allParams << [ key: 'SKIP_TEST',      defn: booleanParam(name: 'SKIP_TEST',      defaultValue: false, description: 'Skip the Test stage') ]
     allParams << [ key: 'ORIOLE_SUBMIT_FLAG', defn: choice(
         name: 'ORIOLE_SUBMIT_FLAG',
-        choices: ['succeeded','all','none'].join('\n'),
+        choices: ['all','succeeded','none'].join('\n'),
         description: 'Only passed test case submissions or all/none'
     ) ]
     allParams << [ key: 'SEND_TO', defn: cascadeDef(
