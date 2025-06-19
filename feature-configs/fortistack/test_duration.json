@@ -28,6 +28,18 @@
   "icap": {
     "grp.icap.tmp": "38 min"
   },
+  "wanopt": {
+    "grp.wanopt_linux.full": "1 hr 2 min"
+  },
+  "webcache": {
+    "grp.webcache.tmp": "1 hr 2 min"
+  },
+  "dnsfilter": {
+    "grp.dnsfilter_fortistack.crit": "1 hr 2 min"
+  },
+  "avfortisandbox": {
+    "grp.avfortisandbox_fortistack.full": "1 hr 2 min"
+  },
   "threatfeed": {
     "grp.threatfeed.full": "1 hr 2 min"
   }
