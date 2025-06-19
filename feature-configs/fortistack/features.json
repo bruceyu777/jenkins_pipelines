@@ -34,7 +34,10 @@
       "test_config":       ["env.fortistack.threatfeed.conf"],
       "test_groups":       ["grp.threatfeed.full"],
       "docker_compose":    ["KVM"],
-      "email": ["yzhengfeng@fortinet.com,wangd@fortinet.com"]
+      "email": ["yzhengfeng@fortinet.com,wangd@fortinet.com"],
+      "PROVISION_VMPC": true,
+      "VMPC_NAMES": "VMPC1,VMPC4",
+      "PROVISION_DOCKER": false
   }, 
   "antivirus": {
       "test_case_folder": ["testcase_v1"],
@@ -74,7 +77,7 @@
   "webcache": {
     "test_case_folder": ["testcase"],
     "test_config":       ["env.fortistack.webcache.conf"],
-    "test_groups":       ["grp.webcache.full"],
+    "test_groups":       ["grp.webcache.tmp","grp.webcache.full"],
     "docker_compose":    ["docker.webcache_webcache.yml","other"],
     "email": ["yzhengfeng@fortinet.com,wangd@fortinet.com,wangt@fortinet.com"]
   },

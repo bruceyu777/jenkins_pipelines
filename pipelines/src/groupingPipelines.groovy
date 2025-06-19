@@ -11,7 +11,7 @@ pipeline {
         )
         string(
             name: 'BUILD_NUMBER',
-            defaultValue: '3473',
+            defaultValue: '3563',
             description: 'Enter the build number'
         )
         // Multi-line text parameter for common configuration.
@@ -80,28 +80,59 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                         merged.RELEASE = params.RELEASE
 
                         // Process TEST_GROUPS field:
-                        if (merged.TEST_GROUPS?.trim()) {
-                            def tg = merged.TEST_GROUPS.trim()
-                            def validTestGroups
-                            if (tg.startsWith('[')) {
-                                // If it starts with '[' try to parse it as JSON.
+                        // if (merged.TEST_GROUPS?.trim()) {
+                        //     def tg = merged.TEST_GROUPS.trim()
+                        //     def validTestGroups
+                        //     if (tg.startsWith('[')) {
+                        //         // If it starts with '[' try to parse it as JSON.
+                        //         try {
+                        //             def parsed = readJSON text: tg
+                        //             validTestGroups = groovy.json.JsonOutput.toJson(parsed)
+                        //         } catch (Exception e) {
+                        //             echo "TEST_GROUPS value not valid JSON, splitting by comma: ${e}"
+                        //             def arr = tg.split(',').collect { it.trim() }
+                        //             validTestGroups = groovy.json.JsonOutput.toJson(arr)
+                        //         }
+                        //     } else {
+                        //         // Otherwise, assume a comma separated list.
+                        //         def arr = tg.split(',').collect { it.trim() }
+                        //         validTestGroups = groovy.json.JsonOutput.toJson(arr)
+                        //     }
+                        //     merged.TEST_GROUPS = validTestGroups
+                        // } else {
+                        //     merged.TEST_GROUPS = ""
+                        // }
+                        // Normalize TEST_GROUPS into a single JSON‐string array or empty string
+                        def rawTG = merged.TEST_GROUPS
+                        def validTestGroups = ""
+
+                        // 1) If it’s already a List (from unescaped JSON), just JSON-encode it:
+                        if (rawTG instanceof List) {
+                            validTestGroups = groovy.json.JsonOutput.toJson(rawTG)
+                        }
+                        // 2) Otherwise if it’s a String, handle escaped JSON or comma-delimited:
+                        else if (rawTG instanceof String && rawTG.trim()) {
+                            def tg = rawTG.trim()
+                            if (tg.startsWith("[")) {
                                 try {
+                                    // parse "[\"a\",\"b\"]" into a List
                                     def parsed = readJSON text: tg
                                     validTestGroups = groovy.json.JsonOutput.toJson(parsed)
                                 } catch (Exception e) {
-                                    echo "TEST_GROUPS value not valid JSON, splitting by comma: ${e}"
-                                    def arr = tg.split(',').collect { it.trim() }
+                                    echo "TEST_GROUPS not valid JSON, splitting by comma: ${e}"
+                                    def arr = tg.split(",").collect { it.trim() }
                                     validTestGroups = groovy.json.JsonOutput.toJson(arr)
                                 }
                             } else {
-                                // Otherwise, assume a comma separated list.
-                                def arr = tg.split(',').collect { it.trim() }
+                                // plain comma-separated list “a, b, c”
+                                def arr = tg.split(",").collect { it.trim() }
                                 validTestGroups = groovy.json.JsonOutput.toJson(arr)
                             }
-                            merged.TEST_GROUPS = validTestGroups
-                        } else {
-                            merged.TEST_GROUPS = ""
                         }
+
+                        // 3) If neither, leave it empty
+                        merged.TEST_GROUPS = validTestGroups
+
 
                         def branchName = "Run_${i}"
                         parallelBuilds[branchName] = {
@@ -120,7 +151,10 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                                 string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: merged.DOCKER_COMPOSE_FILE_CHOICE),
                                 string(name: 'SEND_TO', value: merged.SEND_TO),
                                 booleanParam(name: 'SKIP_PROVISION', value: merged.SKIP_PROVISION),
-                                booleanParam(name: 'SKIP_TEST', value: merged.SKIP_TEST)
+                                booleanParam(name: 'SKIP_TEST', value: merged.SKIP_TEST),
+                                booleanParam(name: 'PROVISION_VMPC',   value: merged.PROVISION_VMPC),
+                                string(      name: 'VMPC_NAMES',       value: merged.VMPC_NAMES),
+                                booleanParam(name: 'PROVISION_DOCKER', value: merged.PROVISION_DOCKER)
                             ], wait: true
                         }
                     }
