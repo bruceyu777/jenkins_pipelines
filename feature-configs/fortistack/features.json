@@ -70,7 +70,7 @@
   "wanopt": {
     "test_case_folder": ["testcase"],
     "test_config":       ["env.fortistack.wanopt.conf"],
-    "test_groups":       ["grp.wanopt_linux.full"],
+    "test_groups":       ["grp.wanopt_linux.tmp","grp.wanopt_linux.full"],
     "docker_compose":    ["docker.wanopt_linux.yml","other"],
     "email": ["yzhengfeng@fortinet.com,wangd@fortinet.com,wangt@fortinet.com"]
   },
