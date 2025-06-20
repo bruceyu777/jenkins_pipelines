@@ -76,20 +76,61 @@ pipeline {
     }
 
     post {
+        // success {
+        //     sendFosqaEmail(
+        //         to:       'yzhengfeng@fortinet.com',
+        //         subject:  "Build #${env.BUILD_NUMBER} Succeeded",
+        //         body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
+        //     )
+        // }
+        // failure {
+        //     sendFosqaEmail(
+        //         to:      'yzhengfeng@fortinet.com',
+        //         subject: "Build #${env.BUILD_NUMBER} FAILED",
+        //         body:    "<p>Check console output: ${env.BUILD_URL}</p>"
+        //     )
+        // }
         success {
-            sendFosqaEmail(
-                to:       'yzhengfeng@fortinet.com',
-                subject:  "Build #${env.BUILD_NUMBER} Succeeded",
-                body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
-            )
+            script {
+                // 1. Read the node_info we just wrote
+                def nodeInfo = readFile('/home/fosqa/KVM/node_info').trim()
+                // 2. Grab the display name you set earlier
+                def dispName = currentBuild.displayName
+
+                // 3. Build an HTML body that shows both
+                def htmlBody = """
+                <h2>Build: ${dispName}</h2>
+                <h3>Node Info</h3>
+                <pre style="font-family:monospace; white-space:pre-wrap;">${nodeInfo}</pre>
+                <p>Everything completed successfully!</p>
+                """
+
+                // 4. Send it
+                sendFosqaEmail(
+                to:      'yzhengfeng@fortinet.com',
+                subject: "Build ${env.BUILD_NUMBER} Succeeded on ${dispName}",
+                body:    htmlBody
+                )
+            }
         }
         failure {
-            sendFosqaEmail(
+            script {
+                def nodeInfo = readFile('/home/fosqa/KVM/node_info').trim()
+                def dispName = currentBuild.displayName
+                def htmlBody = """
+                <h2>Build: ${dispName}</h2>
+                <h3>Node Info</h3>
+                <pre style="font-family:monospace; white-space:pre-wrap;">${nodeInfo}</pre>
+                <p style="color:red;">❌ Build failed. Check the console log: ${env.BUILD_URL}</p>
+                """
+                sendFosqaEmail(
                 to:      'yzhengfeng@fortinet.com',
-                subject: "Build #${env.BUILD_NUMBER} FAILED",
-                body:    "<p>Check console output: ${env.BUILD_URL}</p>"
-            )
+                subject: "Build ${env.BUILD_NUMBER} FAILED on ${dispName}",
+                body:    htmlBody
+                )
+            }
         }
+
     }
 }
 }
