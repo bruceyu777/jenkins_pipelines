@@ -335,6 +335,14 @@ def call() {
                         ])
                     }
                 }
+                script {
+                    // regenerate node info
+                    sh """
+                    cd /home/fosqa/resources/tools
+                    sudo ./venv/bin/python3 get_node_info.py
+                    """
+                }
+
                 echo "Pipeline completed. Check console output for details."
             }
 
@@ -346,16 +354,32 @@ def call() {
                         "<a href=\"${base}summary_${name}.html\">Summary: ${name}</a>"
                     }.join("<br/>\n")
 
+                    def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
+
                     sendFosqaEmail(
                         to     : params.SEND_TO,
                         subject: "${env.BUILD_DISPLAY_NAME} Succeeded",
                         body   : """
-                          <p>🎉 Good news! Job <b>${env.BUILD_DISPLAY_NAME}</b> completed at ${new Date()}.</p>
-                          <p>📄 Test result summaries:</p>
-                          ${summaryLinks}
-                          <p>🔗 Console output: <a href=\"${env.BUILD_URL}\">${env.BUILD_URL}</a></p>
+                        <p>🎉 Good news! Job <b>${env.BUILD_DISPLAY_NAME}</b> completed at ${new Date()}.</p>
+                        <p>📄 Test result summaries:</p>
+                        ${summaryLinks}
+                        <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                        <h3>Node Info</h3>
+                        <pre style="font-family:monospace; white-space:pre-wrap;">${nodeInfo}</pre>
+                        <p><em>PS: Use the above node info for debugging.</em></p>
                         """
                     )
+
+                    // sendFosqaEmail(
+                    //     to     : params.SEND_TO,
+                    //     subject: "${env.BUILD_DISPLAY_NAME} Succeeded",
+                    //     body   : """
+                    //       <p>🎉 Good news! Job <b>${env.BUILD_DISPLAY_NAME}</b> completed at ${new Date()}.</p>
+                    //       <p>📄 Test result summaries:</p>
+                    //       ${summaryLinks}
+                    //       <p>🔗 Console output: <a href=\"${env.BUILD_URL}\">${env.BUILD_URL}</a></p>
+                    //     """
+                    // )
                 }
             }
 
@@ -366,17 +390,31 @@ def call() {
                         def name = getArchiveGroupName(group)
                         "<a href=\"${base}summary_${name}.html\">Summary: ${name}</a>"
                     }.join("<br/>\n")
-
+                    def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
                     sendFosqaEmail(
                         to     : params.SEND_TO,
                         subject: "${env.BUILD_DISPLAY_NAME} FAILED",
                         body   : """
-                          <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
-                          <p>📄 You can still peek at whatever got archived:</p>
-                          ${summaryLinks}
-                          <p>🔗 Console output: <a href=\"${env.BUILD_URL}\">${env.BUILD_URL}</a></p>
+                        <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
+                        <p>📄 You can still peek at whatever got archived:</p>
+                        ${summaryLinks}
+                        <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                        <h3>Node Info</h3>
+                        <pre style="font-family:monospace; white-space:pre-wrap;">${nodeInfo}</pre>
+                        <p><em>PS: Use the above node info for debugging.</em></p>
                         """
                     )
+
+                    // sendFosqaEmail(
+                    //     to     : params.SEND_TO,
+                    //     subject: "${env.BUILD_DISPLAY_NAME} FAILED",
+                    //     body   : """
+                    //       <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
+                    //       <p>📄 You can still peek at whatever got archived:</p>
+                    //       ${summaryLinks}
+                    //       <p>🔗 Console output: <a href=\"${env.BUILD_URL}\">${env.BUILD_URL}</a></p>
+                    //     """
+                    // )
                 }
             }
         }
