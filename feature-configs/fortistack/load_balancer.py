@@ -137,6 +137,7 @@ def main():
                 "PROVISION_VMPC":   cfg.get("PROVISION_VMPC", False),
                 "VMPC_NAMES":       cfg.get("VMPC_NAMES", ""),
                 "PROVISION_DOCKER": cfg.get("PROVISION_DOCKER", True),
+                "ORIOLE_SUBMIT_FLAG": cfg.get("ORIOLE_SUBMIT_FLAG", "all"),
             }
             dispatch.append(entry)
             idx += 1
