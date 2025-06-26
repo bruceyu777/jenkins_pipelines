@@ -155,7 +155,7 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                                 booleanParam(name: 'PROVISION_VMPC',   value: merged.PROVISION_VMPC),
                                 string(      name: 'VMPC_NAMES',       value: merged.VMPC_NAMES),
                                 booleanParam(name: 'PROVISION_DOCKER', value: merged.PROVISION_DOCKER),
-                                string(      name: 'ORIOLE_SUBMIT_FLAG',       value: merged.ORIOLE_SUBMIT_FLAG),
+                                string(      name: 'ORIOLE_SUBMIT_FLAG',       value:  (merged.ORIOLE_SUBMIT_FLAG?.trim() ?: 'succeeded')),
                             ], wait: true
                         }
                     }
