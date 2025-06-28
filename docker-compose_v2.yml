@@ -9,9 +9,7 @@ services:
       - "8080:8080"
       - "50000:50000"
     environment:
-      - JAVA_OPTS=-Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true \
-                 -Duser.timezone=America/Vancouver \
-                 -Dorg.jenkinsci.plugins.durabletask.BourneShellScript.HEARTBEAT_CHECK_INTERVAL=86400
+      - JAVA_OPTS=-Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true -Duser.timezone=America/Vancouver
     volumes:
       - jenkins_data:/var/jenkins_home
       - /home/fosqa/jenkins-master:/home/fosqa/jenkins-master
