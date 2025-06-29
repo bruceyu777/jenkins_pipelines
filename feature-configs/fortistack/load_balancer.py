@@ -71,7 +71,7 @@ def main():
     p.add_argument("-d","--durations", default="test_duration.json",
                    help="Path to test_duration.json")
     p.add_argument("-n","--nodes",
-                   default="node1, node2,node5,node6,node7,node8,node9,node10,node16",
+                   default="node2,node3, node4, node5,node6,node7,node8,node9,node10,node16",
                    help="Comma-separated list of node names")
     p.add_argument("-e","--exclude", default="",
                    help="Comma-separated feature names to exclude")
@@ -81,7 +81,7 @@ def main():
 
     features_cfg = json.load(open(args.features))
     raw_durs     = json.load(open(args.durations))
-    nodes        = args.nodes.split(',')
+    nodes        = [node.strip() for node in args.nodes.split(',')] #Make sure node names are stripped of whitespace
     excluded     = {f.strip() for f in args.exclude.split(',') if f.strip()}
 
     # 1) Build total seconds per feature, skipping excluded

@@ -151,7 +151,7 @@ def call() {
       
       stage('Trigger Provision Pipeline') {
         // This stage runs on the designated node.
-        agent { label "${params.NODE_NAME}" }
+        agent { label "${params.NODE_NAME.trim()}" }
         when {
           expression { return !params.SKIP_PROVISION }
         }
@@ -159,12 +159,12 @@ def call() {
           script {
             def paramsMap = new groovy.json.JsonSlurper()
                               .parseText(params.PARAMS_JSON)
-                              .collectEntries { k, v -> [k, v] }
+                              .collectEntries { k, v -> [k, v?.toString()?.trim()] }
             def provisionParams = [
-              string(name: 'NODE_NAME', value: params.NODE_NAME),
-              string(name: 'RELEASE', value: params.RELEASE),
-              string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
-              string(name: 'FGT_TYPE', value: params.FGT_TYPE)
+              string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
+              string(name: 'RELEASE', value: params.RELEASE.trim()),
+              string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
+              string(name: 'FGT_TYPE', value: params.FGT_TYPE.trim())
             ]
             echo "Triggering fortistack_provision_fgts pipeline with parameters: ${provisionParams}"
             build job: 'fortistack_provision_fgts', parameters: provisionParams, wait: true
@@ -193,23 +193,23 @@ def call() {
             // Loop through each test group.
             for (group in computedTestGroups) {
               def testParams = [
-                string(name: 'RELEASE', value: params.RELEASE),
-                string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER),
-                string(name: 'NODE_NAME', value: params.NODE_NAME),
-                string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR),
-                string(name: 'SVN_BRANCH', value: params.SVN_BRANCH),
-                string(name: 'FEATURE_NAME', value: params.FEATURE_NAME),
-                string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER),
-                string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE),
-                string(name: 'TEST_GROUP_CHOICE', value: group),
-                string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE),
+                string(name: 'RELEASE', value: params.RELEASE.trim),
+                string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
+                string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
+                string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
+                string(name: 'SVN_BRANCH', value: params.SVN_BRANCH?.trim()),
+                string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
+                string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
+                string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
+                string(name: 'TEST_GROUP_CHOICE', value: group.trim()),
+                string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
                 booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
                 booleanParam(name: 'PROVISION_VMPC',   value: params.PROVISION_VMPC    ),
-                string(      name: 'VMPC_NAMES',       value: params.VMPC_NAMES        ),
+                string(      name: 'VMPC_NAMES',       value: params.VMPC_NAMES.trim()       ),
                 booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER  ),
-                string(name: 'build_name', value: paramsMap.build_name),
-                string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG),
-                string(name: 'SEND_TO', value: params.SEND_TO)
+                string(name: 'build_name', value: paramsMap.build_name.trim()),
+                string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG.trim()),
+                string(name: 'SEND_TO', value: params.SEND_TO.trim())
               ]
               echo "Triggering fortistack_runtest pipeline for test group '${group}' with parameters: ${testParams}"
               def result = build job: 'fortistack_runtest', parameters: testParams, wait: true, propagate: false
