@@ -19,13 +19,12 @@ services:
       JENKINS_OPTS: >-
         --httpPort=8080
         --httpsPort=8443
-        --httpsKeyStore=/var/jenkins_home/jenkins.p12
-        --httpsKeyStorePassword=Fortinet=2021
-        --httpsKeyStoreType=PKCS12
+        --httpsKeyStore=/var/jenkins_home/jenkins.jks
+        --httpsKeyStorePassword=changeit
     volumes:
       - jenkins_data:/var/jenkins_home
-      - /home/fosqa/jenkins-master/QA_All_In_Certificate_2025_passUpdated.p12:/var/jenkins_home/jenkins.p12:ro
-      # - /home/fosqa/jenkins-master/jenkins.jks:/var/jenkins_home/jenkins.jks:ro
+      # - /home/fosqa/jenkins-master/QA_All_In_Certificate_2025_passUpdated.p12:/var/jenkins_home/jenkins.p12:ro
+      - /home/fosqa/jenkins-master/jenkins.jks:/var/jenkins_home/jenkins.jks:ro
       # - /home/fosqa/jenkins-master/init.groovy.d:/var/jenkins_home/init.groovy.d:ro
       - /home/fosqa/jenkins-master:/home/fosqa/jenkins-master
       - /home/fosqa/resources/tools:/home/fosqa/resources/tools
