@@ -8,14 +8,22 @@ services:
     ports:
       - "8080:8080"
       - "50000:50000"
+      - "443:8443"
     environment:
       # map-style; preserves it as one variable
       JAVA_OPTS: >-
         -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true
         -Duser.timezone=America/Vancouver
         -Dorg.jenkinsci.plugins.durabletask.BourneShellScript.HEARTBEAT_CHECK_INTERVAL=86400
+        -Dhudson.model.DirectoryBrowserSupport.CSP=""
+      JENKINS_OPTS: >-
+        --httpPort=8080
+        --httpsPort=8443
+        --httpsKeyStore=/var/jenkins_home/jenkins.jks
+        --httpsKeyStorePassword=changeit
     volumes:
       - jenkins_data:/var/jenkins_home
+      - /home/fosqa/jenkins-master/jenkins.jks:/var/jenkins_home/jenkins.jks:ro
       # - /home/fosqa/jenkins-master/init.groovy.d:/var/jenkins_home/init.groovy.d:ro
       - /home/fosqa/jenkins-master:/home/fosqa/jenkins-master
       - /home/fosqa/resources/tools:/home/fosqa/resources/tools

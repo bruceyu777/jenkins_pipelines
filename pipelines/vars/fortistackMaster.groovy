@@ -193,7 +193,7 @@ def call() {
             // Loop through each test group.
             for (group in computedTestGroups) {
               def testParams = [
-                string(name: 'RELEASE', value: params.RELEASE.trim),
+                string(name: 'RELEASE', value: params.RELEASE.trim()),
                 string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
                 string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
                 string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
