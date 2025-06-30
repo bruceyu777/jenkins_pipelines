@@ -201,7 +201,7 @@ def call() {
                 string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
                 string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
                 string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
-                string(name: 'TEST_GROUP_CHOICE', value: group.trim()),
+                string(name: 'TEST_GROUP_CHOICE', value: group),
                 string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
                 booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
                 booleanParam(name: 'PROVISION_VMPC',   value: params.PROVISION_VMPC    ),
