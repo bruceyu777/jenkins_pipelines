@@ -263,7 +263,7 @@ def call() {
                                     cd /home/fosqa/resources/tools
                                     make setup_docker_network_and_cleanup_telnet_ports
                                     docker compose \
-                                      -f /home/fosqa/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE} \
+                                      -f /home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE} \
                                       up --build -d
                                 """
                             } else {

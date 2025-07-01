@@ -71,7 +71,7 @@ def main():
     p.add_argument("-d","--durations", default="test_duration.json",
                    help="Path to test_duration.json")
     p.add_argument("-n","--nodes",
-                   default="node2,node3, node4, node5,node6,node7,node8,node9,node10,node16",
+                   default="node1,node2,node3, node4, node5,node6,node7,node8,node9,node10,node13,node15,node16",
                    help="Comma-separated list of node names")
     p.add_argument("-e","--exclude", default="",
                    help="Comma-separated feature names to exclude")
