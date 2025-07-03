@@ -339,7 +339,7 @@ def call() {
                     // regenerate node info
                     sh """
                     cd /home/fosqa/resources/tools
-                    sudo ./venv/bin/python3 get_node_info.py
+                    sudo ./venv/bin/python3 get_node_info.py --feature ${params.TEST_CONFIG_CHOICE}
                     """
                 }
 
