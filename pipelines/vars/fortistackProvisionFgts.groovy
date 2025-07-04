@@ -55,6 +55,8 @@ pipeline {
                 echo "provisioning FGT..."
                 sh """
                   cd /home/fosqa/resources/tools
+                  . /home/fosqa/resources/tools/venv/bin/activate
+                  pip install -r requirements.txt
       
                   sudo pwd
                   hostname
