@@ -287,13 +287,13 @@ def call() {
                                 sh """
                                     cd /home/fosqa/resources/tools
                                     sudo /home/fosqa/resources/tools/venv/bin/python3 \
-                                    inject_autolib_test_result.py \
+                                    inject_autolib_result.py \
                                         -r ${params.RELEASE} \
                                         -g ${group}
                                 """
-                                echo "✅ inject_autolib_test_result.py succeeded"
+                                echo "✅ inject_autolib_result.py succeeded"
                                 } catch (err) {
-                                echo "⚠️ inject_autolib_test_result.py failed, but pipeline will continue"
+                                echo "⚠️ inject_autolib_result.py failed, but pipeline will continue"
                                 }
                             }
 
