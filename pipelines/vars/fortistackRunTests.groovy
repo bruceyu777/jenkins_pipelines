@@ -281,6 +281,8 @@ def call() {
                                       -e testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE} \
                                       -g testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group} \
                                       -d -s ${params.ORIOLE_SUBMIT_FLAG}
+                                    cd /home/fosqa/resources/tools
+                                    sudo /home/fosqa/resources/tools/venv/bin/python3 inject_autolib_result.py -r ${params.RELEASE} -g ${group}
                                 """
                             }
 
