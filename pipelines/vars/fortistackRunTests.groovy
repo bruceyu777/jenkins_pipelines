@@ -295,8 +295,18 @@ def call() {
                                 } catch (err) {
                                 echo "⚠️ inject_autolib_result.py failed, but pipeline will continue"
                                 }
-                            }
 
+                                // update node info by running get_node_info.py
+                                try {
+                                sh """
+                                    cd /home/fosqa/resources/tools
+                                    sudo ./venv/bin/python3 get_node_info.py --feature ${group}
+                                """
+                                echo "✅ get_node_info.py succeeded"
+                                } catch (err) {
+                                echo "⚠️ get_node_info.py failed, but pipeline will continue"
+                                }
+                            }
                         }
                     }
                 }
@@ -348,13 +358,6 @@ def call() {
                         ])
                     }
                 }
-                script {
-                    // regenerate node info
-                    sh """
-                    cd /home/fosqa/resources/tools
-                    sudo ./venv/bin/python3 get_node_info.py --feature ${params.TEST_CONFIG_CHOICE}
-                    """
-                }
 
                 echo "Pipeline completed. Check console output for details."
             }
@@ -383,16 +386,6 @@ def call() {
                         """
                     )
 
-                    // sendFosqaEmail(
-                    //     to     : params.SEND_TO,
-                    //     subject: "${env.BUILD_DISPLAY_NAME} Succeeded",
-                    //     body   : """
-                    //       <p>🎉 Good news! Job <b>${env.BUILD_DISPLAY_NAME}</b> completed at ${new Date()}.</p>
-                    //       <p>📄 Test result summaries:</p>
-                    //       ${summaryLinks}
-                    //       <p>🔗 Console output: <a href=\"${env.BUILD_URL}\">${env.BUILD_URL}</a></p>
-                    //     """
-                    // )
                 }
             }
 
@@ -417,17 +410,6 @@ def call() {
                         <p><em>PS: Use the above node info for debugging.</em></p>
                         """
                     )
-
-                    // sendFosqaEmail(
-                    //     to     : params.SEND_TO,
-                    //     subject: "${env.BUILD_DISPLAY_NAME} FAILED",
-                    //     body   : """
-                    //       <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
-                    //       <p>📄 You can still peek at whatever got archived:</p>
-                    //       ${summaryLinks}
-                    //       <p>🔗 Console output: <a href=\"${env.BUILD_URL}\">${env.BUILD_URL}</a></p>
-                    //     """
-                    // )
                 }
             }
         }
