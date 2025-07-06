@@ -96,5 +96,17 @@
     "test_groups":       ["grp.icap.full", "grp.icap.tmp"],
     "docker_compose":    ["docker.icap_icap.yml","other"],
     "email": ["yzhengfeng@fortinet.com,wangd@fortinet.com,wangt@fortinet.com"]
+  },
+  "webproxy": {
+    "test_case_folder": ["testcase"],
+    "test_config":       ["env.fortistack.webproxy.conf"],
+    "test_groups":       ["grp.webproxy.crit", "grp.webproxy.full"],
+    "docker_compose":    ["docker.webproxy_webproxy.yml","other"]
+  },
+  "ftpproxy": {
+    "test_case_folder": ["testcase"],
+    "test_config":       ["env.fortistack.ftpproxy.conf"],
+    "test_groups":       ["grp.ftpproxy.crit","grp.ftpproxy.full"],
+    "docker_compose":    ["docker.ftpproxy_ftpproxy.yml","other"]
   }
 }
