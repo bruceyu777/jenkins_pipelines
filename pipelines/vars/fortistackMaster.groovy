@@ -81,6 +81,25 @@ def call() {
   expandParamsJson(params.PARAMS_JSON)
 
   pipeline {
+    // ────────────────────────────────────────────────────────────────────
+    // Tell the Build Pipeline plugin that *this* job has two downstream
+    // jobs, shown in the next stage of the pipeline view:
+    //   1) fortistack_provision_fgts
+    //   2) fortistack_runtest
+    // ────────────────────────────────────────────────────────────────────
+    properties([
+      [
+        $class: 'BuildTrigger',
+        configs: [
+          [
+            $class:                 'BuildTriggerConfig',
+            projects:               'fortistack_provision_fgts,fortistack_runtest',
+            condition:              'SUCCESS',
+            triggerWithNoParameters: true
+          ]
+        ]
+      ]
+    ])
     agent { label 'master' }
     options {
       buildDiscarder(logRotator(numToKeepStr: '100'))
