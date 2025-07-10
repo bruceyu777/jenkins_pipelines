@@ -2,9 +2,6 @@
 import json, re, argparse, sys
 from math import floor
 
-
-ADMIN_EMAILS = {"yzhengfeng@fortinet.com", "wangd@fortinet.com"}
-
 def parse_duration(s: str) -> int:
     """Parse "X hr Y min Z sec" into total seconds."""
     h = m = sec = 0
@@ -38,11 +35,8 @@ def allocate_nodes(feature_secs: dict, total_nodes: int) -> dict:
         i = 0
         while excess and cand:
             feat = cand[i % len(cand)]
-            if alloc[feat] > 1:
-                alloc[feat] -= 1
-                excess -= 1
-                if alloc[feat] == 1:
-                    cand.remove(feat)
+            alloc[feat] -= 1
+            excess -= 1
             i += 1
 
     # if too few, add to largest fractional until match
@@ -60,8 +54,6 @@ def allocate_nodes(feature_secs: dict, total_nodes: int) -> dict:
 
 def distribute_test_groups(groups: dict, bins: int) -> list:
     """Greedy bin-pack groups (name->secs) into bins buckets."""
-    if bins < 1:
-        raise ValueError(f"Cannot distribute into {bins} bins")
     items = sorted(groups.items(), key=lambda kv: kv[1], reverse=True)
     buckets = [{"secs":0, "names":[]} for _ in range(bins)]
     for name, secs in items:
@@ -79,7 +71,7 @@ def main():
     p.add_argument("-d","--durations", default="test_duration.json",
                    help="Path to test_duration.json")
     p.add_argument("-n","--nodes",
-                   default="node1,node2,node3,node4,node5,node6,node7,node8,node9,node10,node16,node17,node18",
+                   default="node2,node4,node6,node7,node8,node9,node10,node16,node17,node18,node19,node20",
                    help="Comma-separated list of node names")
     p.add_argument("-e","--exclude", default="",
                    help="Comma-separated feature names to exclude")
@@ -89,7 +81,7 @@ def main():
 
     features_cfg = json.load(open(args.features))
     raw_durs     = json.load(open(args.durations))
-    nodes        = [node.strip() for node in args.nodes.split(',')]
+    nodes        = [node.strip() for node in args.nodes.split(',')] #Make sure node names are stripped of whitespace
     excluded     = {f.strip() for f in args.exclude.split(',') if f.strip()}
 
     # 1) Build total seconds per feature, skipping excluded
@@ -120,28 +112,16 @@ def main():
     idx = 0
     for feat, count in alloc.items():
         cfg = features_cfg.get(feat, {})
-        case_folder = cfg.get("test_case_folder", [None])[0]
-        config_file = cfg.get("test_config", [None])[0]
-        compose     = cfg.get("docker_compose", [None])[0]
-        
-        
-        raw = cfg.get("email", [""])[0]
+        # pick first entries
+        case_folder = cfg["test_case_folder"][0]
+        config_file = cfg["test_config"][0]
+        compose     = cfg["docker_compose"][0]
+        email_list  = cfg["email"][0]
 
-        # split into a set (trims whitespace, drops empties)
-        existing = {
-            addr.strip()
-            for addr in raw.split(",")
-            if addr.strip()
-        }
-        # union with your admin set (deduplicates automatically)
-        all_recipients = existing | ADMIN_EMAILS
-
-        # turn back into a comma-delimited string, sorted for predictability
-        email_list = ",".join(sorted(all_recipients))
-        
+        # filter test groups by duration data
         groups = {
-            g: parse_duration(raw_durs[feat].get(g, "0 sec"))
-            for g in cfg.get("test_groups", [])
+            g: parse_duration(raw_durs[feat][g])
+            for g in cfg["test_groups"]
             if g in raw_durs.get(feat, {})
         }
         if not groups:
@@ -164,6 +144,7 @@ def main():
                 "SUM_DURATION": format_duration(sum_secs),
                 "DOCKER_COMPOSE_FILE_CHOICE": compose,
                 "SEND_TO": email_list,
+                # inject per-feature overrides or use defaults
                 "PROVISION_VMPC":   cfg.get("PROVISION_VMPC", False),
                 "VMPC_NAMES":       cfg.get("VMPC_NAMES", ""),
                 "PROVISION_DOCKER": cfg.get("PROVISION_DOCKER", True),

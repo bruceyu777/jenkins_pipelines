@@ -42,5 +42,13 @@
   },
   "threatfeed": {
     "grp.threatfeed.full": "1 hr 3 min"
+  }, 
+  "webproxy": {
+    "grp.webproxy.full": "8 hr 3 min",
+    "grp.webproxy.crit": "1 hr 3 min"
+  },
+  "ftpproxy": {
+    "grp.ftpproxy.crit": "1 hr 3 min",
+    "grp.ftpproxy.full": "4 hr 3 min"
   }
 }
