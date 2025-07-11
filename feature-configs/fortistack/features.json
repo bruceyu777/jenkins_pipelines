@@ -110,5 +110,14 @@
     "test_groups":       ["grp.ftpproxy.crit","grp.ftpproxy.full"],
     "docker_compose":    ["docker.ftpproxy_ftpproxy.yml","other"],
     "email": ["zachwang@fortinet.com"]
+  },
+  "sslprofile_proxy": {
+    "test_case_folder": ["testcase_v1"],
+    "test_config":       ["env.fortistack.sslprofile_proxy.conf"],
+    "test_groups":       [
+      "grp.sslprofile_proxy.crit",
+      "grp.sslprofile_proxy.full"
+  ],
+    "docker_compose":    ["docker.sslprofile_proxy.yml","other"]
   }
 }

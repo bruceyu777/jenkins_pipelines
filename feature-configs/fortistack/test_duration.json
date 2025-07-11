@@ -50,5 +50,10 @@
   "ftpproxy": {
     "grp.ftpproxy.crit": "1 hr 3 min",
     "grp.ftpproxy.full": "4 hr 3 min"
+  },
+  "sslprofile_proxy":{
+    "grp.sslprofile_proxy.crit": "1 hr 3 min",
+    "grp.sslprofile_proxy.full": "4 hr 3 min"
   }
+
 }
