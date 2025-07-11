@@ -56,7 +56,7 @@ pipeline {
                    sh """
                         cd /home/fosqa/resources/tools
                         . /home/fosqa/resources/tools/venv/bin/activate
-                        python3 -u wait_until_aio_pipeline_not_running.py
+                        sudo ./venv/bin/python3 -u wait_until_aio_pipeline_not_running.py
                    """
                 }
             }
