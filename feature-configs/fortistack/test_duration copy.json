@@ -1,0 +1,59 @@
+{
+  "webfilter": {
+    "grp.webfilter_other2.full": "6 hr 49 min",
+    "grp.webfilter_ha.full":       "1 hr 48 min",
+    "grp.webfilter_peruser.full":  "56 min",
+    "grp.webfilter_other.full":    "6 hr 13 min",
+    "grp.webfilter_onearm.full":   "1 hr 17 min",
+    "grp.webfilter_basic2.full":   "6 hr 56 min",
+    "grp.webfilter_flow.full":     "4 hr 23 min",
+    "grp.webfilter_basic.full":    "4 hr 27 min"
+  },
+  "antivirus": {
+    "grp.antivirus_ha.full":        "38 min",
+    "grp.antivirus_snifint.full":   "1 hr 47 min",
+    "grp.antivirus_misc.full":      "6 hr 38 min",
+    "grp.antivirus_sdwan.full":     "33 min",
+    "grp.antivirus_ngfw.full":      "3 hr 43 min",
+    "grp.antivirus_flow_ipv6.full": "3 hr 10 min",
+    "grp.antivirus_tp.full":        "4 hr 9 min",
+    "grp.antivirus_proxy_ipv6.full":"2 hr 27 min",
+    "grp.antivirus_webproxy.full":  "4 hr 38 min",
+    "grp.antivirus_flow.full":      "7 hr 23 min",
+    "grp.antivirus_proxy.full":     "1 hr 23 min 59 sec"
+  },
+  "avaimodel": {
+    "grp.avaimodel.full": "56 min 20 sec"
+  },
+  "icap": {
+    "grp.icap.tmp": "1 hr 9 min"
+  },
+  "wanopt": {
+    "grp.wanopt_linux.tmp": "22 hr"
+  },
+  "webcache": {
+    "grp.webcache.tmp": "3 hr 5 min"
+  },
+  "dnsfilter": {
+    "grp.dnsfilter_fortistack.crit": "8 hr 34 min"
+  },
+  "avfortisandbox": {
+    "grp.avfortisandbox_fortistack.full": "3 hr 33 min"
+  },
+  "threatfeed": {
+    "grp.threatfeed.full": "1 hr 3 min"
+  }, 
+  "webproxy": {
+    "grp.webproxy.full": "8 hr 3 min",
+    "grp.webproxy.crit": "1 hr 3 min"
+  },
+  "ftpproxy": {
+    "grp.ftpproxy.crit": "1 hr 3 min",
+    "grp.ftpproxy.full": "4 hr 3 min"
+  },
+  "sslprofile":{
+    "grp.sslprofile_proxy.crit": "1 hr 3 min",
+    "grp.sslprofile_proxy.full": "4 hr 3 min"
+  }
+
+}
