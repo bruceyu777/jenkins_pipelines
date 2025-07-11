@@ -81,6 +81,20 @@ def call() {
 
 
         stages {
+            
+            stage('Wait until previous build finish') {
+                steps {
+                    script {
+                    echo "Waiting for previous builds to finish..."
+                    sh """
+                            cd /home/fosqa/resources/tools
+                            . /home/fosqa/resources/tools/venv/bin/activate
+                            sudo ./venv/bin/python3 wait_until_aio_pipeline_not_running.py
+                    """
+                    }
+                }
+            }
+            
             stage('Initialize Test Groups') {
                 steps {
                     script {
