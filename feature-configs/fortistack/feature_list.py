@@ -1,4 +1,4 @@
-[
+FEATURE_LIST = [
   {
     "FEATURE_NAME": "avfortisandbox",
     "test_case_folder": ["testcase","testcase_v1"],
@@ -129,11 +129,18 @@
     "docker_compose":    ["docker.sslprofile_proxy.yml","other"],
     "email": ["YUZHU@fortinet.com"]
   },
-  {
-    "FEATURE_NAME": "sslprofile",
+  # {
+  #   "FEATURE_NAME": "sslprofile",
+  #   "test_case_folder": ["testcase_v1"],
+  #   "test_config":       ["env.fortistack.sslprofile_flow.conf"],
+  #   "test_groups":       ["grp.sslprofile_flow.crit","grp.sslprofile_flow.full"],
+  #   "docker_compose":    ["docker.sslprofile_flow.yml","other"]
+  # },
+  {"FEATURE_NAME": "foc",
     "test_case_folder": ["testcase_v1"],
-    "test_config":       ["env.fortistack.sslprofile_flow.conf"],
-    "test_groups":       ["grp.sslprofile_flow.crit","grp.sslprofile_flow.full"],
-    "docker_compose":    ["docker.sslprofile_flow.yml","other"]
-  }
+    "test_config":       ["env.foc.fortistack.conf"],
+    "test_groups":       [
+      "grp.foc_gtp.fstack.full"],
+    "docker_compose":    ["docker.foc_gtp.yml","other"],
+    "email": ["wangt@fortinet.com,mabbasi@fortinet.com"]}
 ]
