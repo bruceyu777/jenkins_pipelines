@@ -35,7 +35,7 @@ import requests
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
-ADMIN_EMAILS = {"yzhengfeng@fortinet.com", "wangd@fortinet.com"}
+ADMIN_EMAILS = {"yzhengfeng@fortinet.com", "wangd@fortinet.com","rainxiao@fortinet.com"}
 DEFAULT_JENKINS_URL = "http://10.96.227.206:8080"
 DEFAULT_JENKINS_USER = "fosqa"
 DEFAULT_JENKINS_TOKEN = "110dec5c2d2974a67968074deafccc1414"
