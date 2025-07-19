@@ -51,7 +51,7 @@ def call(Map config = [:]) {
     allParams << [ key: 'BUILD_NUMBER', defn: string(name: 'BUILD_NUMBER', defaultValue: '3563',  description: 'Enter the build number') ]
     allParams << [ key: 'NODE_NAME',    defn: string(name: 'NODE_NAME',    defaultValue: 'node1', description: 'Enter the node name: node1, node2 ...') ]
     allParams << [ key: 'FORCE_UPDATE_DOCKER_FILE', defn: booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', defaultValue: true, description: 'Update docker file with --force option') ]
-
+    allParams << [ key: 'TERMINATE_PREVIOUS', defn: string(name: 'TERMINATE_PREVIOUS', defaultValue: 'false', description: 'wait_until_aio_pipeline_not_running.py --terminate <TERMINATE_PREVIOUS>, true for terminiate') ]
     allParams << [ key: 'PROVISION_VMPC', defn: booleanParam(name: 'PROVISION_VMPC', defaultValue: false, description: 'Enable provisioning of KVM-PC VMs') ]
     allParams << [ key: 'VMPC_NAMES',     defn: string(name: 'VMPC_NAMES', defaultValue: 'VMPC1,VMPC4', description: 'Comma-separated list of VMPC names') ]
     allParams << [ key: 'PROVISION_DOCKER', defn: booleanParam(name: 'PROVISION_DOCKER', defaultValue: true, description: 'Enable or disable Docker provisioning') ]
