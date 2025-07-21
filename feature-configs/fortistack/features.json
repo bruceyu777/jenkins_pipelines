@@ -131,8 +131,7 @@
       "env.fortistack.avaimodel.conf"
     ],
     "test_groups": [
-      "grp.avaimodel.full",
-      "other"
+      "grp.avaimodel.full"
     ],
     "docker_compose": [
       "docker.avaimodel_proxy.yml",
@@ -148,8 +147,7 @@
       "env.fortistack.wanopt.conf"
     ],
     "test_groups": [
-      "grp.wanopt_linux.tmp",
-      "grp.wanopt_linux.full"
+      "grp.wanopt_linux.tmp"
     ],
     "docker_compose": [
       "docker.wanopt_linux.yml",
@@ -165,8 +163,7 @@
       "env.fortistack.webcache.conf"
     ],
     "test_groups": [
-      "grp.webcache.tmp",
-      "grp.webcache.full"
+      "grp.webcache.tmp"
     ],
     "docker_compose": [
       "docker.webcache_webcache.yml",
@@ -182,8 +179,7 @@
       "env.fortistack.icap.conf"
     ],
     "test_groups": [
-      "grp.icap.full",
-      "grp.icap.tmp"
+      "grp.icap.fortistack"
     ],
     "docker_compose": [
       "docker.icap_icap.yml",
@@ -224,23 +220,6 @@
       "other"
     ],
     "email": "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com,zachwang@fortinet.com"
-  },
-  "sslprofile": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.fortistack.sslprofile_proxy.conf"
-    ],
-    "test_groups": [
-      "grp.sslprofile_proxy.crit",
-      "grp.sslprofile_proxy.full"
-    ],
-    "docker_compose": [
-      "docker.sslprofile_proxy.yml",
-      "other"
-    ],
-    "email": "YUZHU@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
   },
   "foc": {
     "test_case_folder": [

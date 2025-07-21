@@ -39,7 +39,11 @@ ADMIN_EMAILS = {"yzhengfeng@fortinet.com", "wangd@fortinet.com","rainxiao@fortin
 DEFAULT_JENKINS_URL = "http://10.96.227.206:8080"
 DEFAULT_JENKINS_USER = "fosqa"
 DEFAULT_JENKINS_TOKEN = "110dec5c2d2974a67968074deafccc1414"
-DEFAULT_RESERVED_NODES = "Built-In Node,node12,node13,node14,node15,node19,node20,node28,node29,node30"
+DEFAULT_RESERVED_NODES = "Built-In Node,node12,node13,node14,node15,node19,node20,node27,node28,node29,node30"
+
+FEATURE_NODE_STATIC_BINDING = {
+  "foc": "node28",
+}
 
 # -----------------------------------------------------------------------------
 # Helper Functions
@@ -314,9 +318,11 @@ def main():
         dmap=next((dm for fn,dm in duration_entries if fn==name),{})
         gm={grp:parse_duration_to_seconds(dmap.get(grp,'1 hr')) for grp in e.get('test_groups',[])}
         buckets=distribute_groups_across_nodes(gm,cnt)
+        
         for groups,secs in buckets:
+            bind_node = FEATURE_NODE_STATIC_BINDING.get(name)
             dispatch.append({
-                'NODE_NAME':nodes[idx%len(nodes)],
+                'NODE_NAME':bind_node if bind_node else nodes[idx%len(nodes)],
                 'FEATURE_NAME':name,
                 'TEST_CASE_FOLDER':folder,
                 'TEST_CONFIG_CHOICE':cfg,

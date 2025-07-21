@@ -371,6 +371,15 @@ def call() {
                             reportName  : "Test Results Summary for ${getArchiveGroupName(computedTestGroups[0])}"
                         ])
                     }
+
+                    // Clean up the outputs directory
+                    sh """
+                        cd /home/fosqa/resources/tools
+                        make folder_control
+                    """
+
+
+
                 }
 
                 echo "Pipeline completed. Check console output for details."

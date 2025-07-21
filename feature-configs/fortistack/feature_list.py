@@ -77,7 +77,7 @@ FEATURE_LIST = [
     "FEATURE_NAME": "avaimodel",
     "test_case_folder": ["testcase_v1"],
     "test_config":      ["env.fortistack.avaimodel.conf"],
-    "test_groups":      ["grp.avaimodel.full","other"],
+    "test_groups":      ["grp.avaimodel.full"],
     "docker_compose":   ["docker.avaimodel_proxy.yml","other"],
     "email": ["lluo@fortinet.com"]
   },
@@ -85,7 +85,7 @@ FEATURE_LIST = [
     "FEATURE_NAME": "wanopt",
     "test_case_folder": ["testcase"],
     "test_config":       ["env.fortistack.wanopt.conf"],
-    "test_groups":       ["grp.wanopt_linux.tmp","grp.wanopt_linux.full"],
+    "test_groups":       ["grp.wanopt_linux.tmp"],
     "docker_compose":    ["docker.wanopt_linux.yml","other"],
     "email": ["wangt@fortinet.com"]
   },
@@ -93,7 +93,7 @@ FEATURE_LIST = [
     "FEATURE_NAME": "webcache",
     "test_case_folder": ["testcase"],
     "test_config":       ["env.fortistack.webcache.conf"],
-    "test_groups":       ["grp.webcache.tmp","grp.webcache.full"],
+    "test_groups":       ["grp.webcache.tmp"],
     "docker_compose":    ["docker.webcache_webcache.yml","other"],
     "email": ["wangt@fortinet.com"]
   },
@@ -101,7 +101,7 @@ FEATURE_LIST = [
     "FEATURE_NAME": "icap",
     "test_case_folder": ["testcase"],
     "test_config":       ["env.fortistack.icap.conf"],
-    "test_groups":       ["grp.icap.full","grp.icap.tmp"],
+    "test_groups":       ["grp.icap.fortistack"],
     "docker_compose":    ["docker.icap_icap.yml","other"],
     "email": ["wangt@fortinet.com"]
   },
@@ -121,14 +121,14 @@ FEATURE_LIST = [
     "docker_compose":    ["docker.ftpproxy_ftpproxy.yml","other"],
     "email": ["zachwang@fortinet.com"]
   },
-  {
-    "FEATURE_NAME": "sslprofile",
-    "test_case_folder": ["testcase_v1"],
-    "test_config":       ["env.fortistack.sslprofile_proxy.conf"],
-    "test_groups":       ["grp.sslprofile_proxy.crit","grp.sslprofile_proxy.full"],
-    "docker_compose":    ["docker.sslprofile_proxy.yml","other"],
-    "email": ["YUZHU@fortinet.com"]
-  },
+  # {
+  #   "FEATURE_NAME": "sslprofile",
+  #   "test_case_folder": ["testcase_v1"],
+  #   "test_config":       ["env.fortistack.sslprofile_proxy.conf"],
+  #   "test_groups":       ["grp.sslprofile_proxy.crit","grp.sslprofile_proxy.full"],
+  #   "docker_compose":    ["docker.sslprofile_proxy.yml","other"],
+  #   "email": ["YUZHU@fortinet.com"]
+  # },
   # {
   #   "FEATURE_NAME": "sslprofile",
   #   "test_case_folder": ["testcase_v1"],
@@ -139,8 +139,7 @@ FEATURE_LIST = [
   {"FEATURE_NAME": "foc",
     "test_case_folder": ["testcase_v1"],
     "test_config":       ["env.foc.fortistack.conf"],
-    "test_groups":       [
-      "grp.foc_gtp.fstack.full"],
+    "test_groups":       ["grp.foc_gtp.fstack.full"],
     "docker_compose":    ["docker.foc_gtp.yml","other"],
     "email": ["wangt@fortinet.com,mabbasi@fortinet.com"]}
 ]

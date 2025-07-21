@@ -1,1 +1,5 @@
 *dispatch.json
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
