@@ -121,6 +121,12 @@ def call(Map config = [:]) {
         'return all[FEATURE_NAME]?.email ?: ["yzhengfeng@fortinet.com"]'
     ) ]
 
+    allParams << [ key: 'ADDITIONAL_EMAIL', defn: string(
+        name: 'ADDITIONAL_EMAIL',
+        defaultValue: '',
+        description: 'Additional email addresses to notify (comma separated)'
+    ) ]
+
     // allParams << [ key: 'SEND_TO', defn: string(name: 'SEND_TO', defaultValue: 'yzhengfeng@fortinet.com', description: 'Email addresses to notify') ]
 
         // Determine which parameters to show: support 'only' (include) or 'exclude': support 'only' (include) or 'exclude'

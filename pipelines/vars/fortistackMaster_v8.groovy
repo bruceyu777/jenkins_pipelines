@@ -76,9 +76,6 @@ def expandParamsJson(String jsonStr) {
 
 def computedTestGroups = []  // Global variable to share across stages
 
-// Declare a global variable that can be used in all stages and in the post block.
-def mergedSendTo = ''
-
 def call() {
   fortistackMasterParameters(exclude:[])
   expandParamsJson(params.PARAMS_JSON)
@@ -152,23 +149,6 @@ def call() {
         }
       }
       
-      stage('Merge Email Parameters') {
-        steps {
-          script {
-            // Merge SEND_TO (feature-derived) with ADDITIONAL_EMAIL.
-            def featureEmail = params.SEND_TO?.trim() ?: ''
-            def extraEmails = params.ADDITIONAL_EMAIL ? params.ADDITIONAL_EMAIL.tokenize(',').collect { it.trim() }.findAll { it } : []
-            def mergedSendToList = []
-            if (featureEmail) {
-              mergedSendToList << featureEmail
-            }
-            mergedSendToList.addAll(extraEmails)
-            mergedSendTo = mergedSendToList.join(',')
-            echo "Merged SEND_TO: ${mergedSendTo}"
-          }
-        }
-      }
-      
       stage('Trigger Provision Pipeline') {
         // This stage runs on the designated node.
         agent { label "${params.NODE_NAME.trim()}" }
@@ -192,65 +172,62 @@ def call() {
         }
       }
       
-      
       stage('Trigger Test Pipeline') {
-            // This stage runs on the designated node and iterates over each test group sequentially.
-            agent { label "${params.NODE_NAME}" }
-            when {
-              expression { return !params.SKIP_TEST }
-            }
-            steps {
-              script {
-                def paramsMap = new groovy.json.JsonSlurper()
-                                 .parseText(params.PARAMS_JSON)
-                                 .collectEntries { k, v -> [k, v] }
-                                 
-                echo "Using computed test groups: ${computedTestGroups}"
-                
-                // Note: mergedSendTo is already computed in the previous stage.
-                
-                // Track overall result.
-                def overallSuccess = true
-                def groupResults = [:]
-                
-                // Loop through each test group.
-                for (group in computedTestGroups) {
-                  def testParams = [
-                    string(name: 'RELEASE', value: params.RELEASE.trim()),
-                    string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
-                    string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
-                    string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
-                    string(name: 'SVN_BRANCH', value: params.SVN_BRANCH?.trim()),
-                    string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
-                    string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
-                    string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
-                    string(name: 'TEST_GROUP_CHOICE', value: group),
-                    string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
-                    booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
-                    booleanParam(name: 'PROVISION_VMPC',   value: params.PROVISION_VMPC),
-                    string(      name: 'VMPC_NAMES',       value: params.VMPC_NAMES.trim()),
-                    booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER),
-                    string(name: 'build_name', value: paramsMap.build_name.trim()),
-                    string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG.trim()),
-                    string(name: 'SEND_TO', value: mergedSendTo)
-                  ]
-                  echo "Triggering fortistack_runtest pipeline for test group '${group}' with parameters: ${testParams}"
-                  def result = build job: 'fortistack_runtest', parameters: testParams, wait: true, propagate: false
-                  groupResults[group] = result.getResult()
-                  if (result.getResult() != "SUCCESS") {
-                    echo "Test pipeline for group '${group}' failed with result: ${result.getResult()}"
-                    overallSuccess = false
-                  } else {
-                    echo "Test pipeline for group '${group}' succeeded."
-                  }
-                }
-                echo "Test pipeline group results: ${groupResults}"
-                if (!overallSuccess) {
-                  error("One or more test pipelines failed: ${groupResults}")
-                }
+        // This stage runs on the designated node and iterates over each test group sequentially.
+        agent { label "${params.NODE_NAME}" }
+        when {
+          expression { return !params.SKIP_TEST }
+        }
+        steps {
+          script {
+            def paramsMap = new groovy.json.JsonSlurper()
+                             .parseText(params.PARAMS_JSON)
+                             .collectEntries { k, v -> [k, v] }
+                             
+            echo "Using computed test groups: ${computedTestGroups}"
+            
+            // Track overall result.
+            def overallSuccess = true
+            def groupResults = [:]
+            
+            // Loop through each test group.
+            for (group in computedTestGroups) {
+              def testParams = [
+                string(name: 'RELEASE', value: params.RELEASE.trim()),
+                string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
+                string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
+                string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
+                string(name: 'SVN_BRANCH', value: params.SVN_BRANCH?.trim()),
+                string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
+                string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
+                string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
+                string(name: 'TEST_GROUP_CHOICE', value: group),
+                string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
+                booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
+                booleanParam(name: 'PROVISION_VMPC',   value: params.PROVISION_VMPC    ),
+                string(      name: 'VMPC_NAMES',       value: params.VMPC_NAMES.trim()       ),
+                booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER  ),
+                string(name: 'build_name', value: paramsMap.build_name.trim()),
+                string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG.trim()),
+                string(name: 'SEND_TO', value: params.SEND_TO.trim())
+              ]
+              echo "Triggering fortistack_runtest pipeline for test group '${group}' with parameters: ${testParams}"
+              def result = build job: 'fortistack_runtest', parameters: testParams, wait: true, propagate: false
+              groupResults[group] = result.getResult()
+              if (result.getResult() != "SUCCESS") {
+                echo "Test pipeline for group '${group}' failed with result: ${result.getResult()}"
+                overallSuccess = false
+              } else {
+                echo "Test pipeline for group '${group}' succeeded."
               }
             }
+            echo "Test pipeline group results: ${groupResults}"
+            if (!overallSuccess) {
+              error("One or more test pipelines failed: ${groupResults}")
+            }
           }
+        }
+      }
     }
     post {
       always {
@@ -332,14 +309,14 @@ def call() {
       }
       success {
             sendFosqaEmail(
-                to:       mergedSendTo,
+                to:       params.SEND_TO,
                 subject:  "${env.BUILD_DISPLAY_NAME} Succeeded",
                 body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
             )
       }
       failure {
           sendFosqaEmail(
-              to:      mergedSendTo,
+              to:      params.SEND_TO,
               subject: "${env.BUILD_DISPLAY_NAME} FAILED",
               body:    "<p>Check console output: ${env.BUILD_URL}</p>"
           )
