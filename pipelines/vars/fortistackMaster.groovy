@@ -274,7 +274,7 @@ def call() {
               for (group in computedTestGroups) {
                 def archiveGroup = getArchiveGroupName(group)
                 // Build the base find command.
-                def baseCmd = "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d -name '*--group--${archiveGroup}' -printf '%T@ %p\\n'"
+                def baseCmd = "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d -name '*--group--${archiveGroup}*' -printf '%T@ %p\\n'"
                 echo "Base find command for group '${archiveGroup}': ${baseCmd}"
 
                 // Execute the base find command and capture raw output.
