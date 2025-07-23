@@ -70,7 +70,7 @@ curl -s -u ${env.JENKINS_ADMIN_USER}:${env.JENKINS_API_TOKEN} \\
                         def payload = [
                             name            : nodeName,
                             nodeDescription : "Automatically created node",
-                            numExecutors    : 4,
+                            numExecutors    : 10,
                             remoteFS        : "/home/jenkins",
                             labelString     : "",
                             mode            : "NORMAL",
