@@ -236,5 +236,22 @@
       "other"
     ],
     "email": "mabbasi@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com"
+  },
+  "sslprofile": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.sslprofile_flow.conf"
+    ],
+    "test_groups": [
+      "grp.sslprofile_flow.crit",
+      "grp.sslprofile_flow.full"
+    ],
+    "docker_compose": [
+      "docker.sslprofile_flow.yml",
+      "other"
+    ],
+    "email": "eson@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
   }
 }

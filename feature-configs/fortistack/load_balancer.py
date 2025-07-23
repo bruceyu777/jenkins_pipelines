@@ -39,7 +39,7 @@ ADMIN_EMAILS = {"yzhengfeng@fortinet.com", "wangd@fortinet.com","rainxiao@fortin
 DEFAULT_JENKINS_URL = "http://10.96.227.206:8080"
 DEFAULT_JENKINS_USER = "fosqa"
 DEFAULT_JENKINS_TOKEN = "110dec5c2d2974a67968074deafccc1414"
-DEFAULT_RESERVED_NODES = "Built-In Node,node12,node13,node14,node15,node19,node20,node27,node28,node29,node30"
+DEFAULT_RESERVED_NODES = "Built-In Node,node1,node12,node13,node14,node15,node19,node20,node27,node28"
 
 FEATURE_NODE_STATIC_BINDING = {
   "foc": "node28",
