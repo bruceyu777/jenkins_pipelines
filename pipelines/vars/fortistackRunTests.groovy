@@ -202,21 +202,35 @@ def call() {
                             ).trim()
                             echo "Folder check result: ${folderExists}"
 
+                            // if (folderExists == "notexists") {
+                            //     def svnStatus = sh(
+                            //         script: """
+                            //             cd ${baseTestDir} && \
+                            //             sudo svn checkout \
+                            //               https://qa-svn.corp.fortinet.com/svn/qa/FOS/${params.TEST_CASE_FOLDER}/${SVN_BRANCH}/${params.FEATURE_NAME} \
+                            //               --username \$SVN_USER --password \$SVN_PASS --non-interactive
+                            //         """,
+                            //         returnStatus: true
+                            //     )
+                            //     if (svnStatus != 0) {
+                            //         echo "SVN checkout failed with exit status ${svnStatus}. Continuing pipeline..."
+                            //     }
+                            // } else {
+                            //     sh "cd ${folderPath} && sudo svn update --username \$SVN_USER --password \$SVN_PASS --non-interactive"
+                            // }
+
                             if (folderExists == "notexists") {
-                                def svnStatus = sh(
-                                    script: """
-                                        cd ${baseTestDir} && \
-                                        sudo svn checkout \
-                                          https://qa-svn.corp.fortinet.com/svn/qa/FOS/${params.TEST_CASE_FOLDER}/${SVN_BRANCH}/${params.FEATURE_NAME} \
-                                          --username \$SVN_USER --password \$SVN_PASS --non-interactive
-                                    """,
-                                    returnStatus: true
-                                )
-                                if (svnStatus != 0) {
-                                    echo "SVN checkout failed with exit status ${svnStatus}. Continuing pipeline..."
-                                }
+                                runWithRetry(4, [5, 15, 45], """
+                                    cd ${baseTestDir} && \
+                                    sudo svn checkout \
+                                    https://qa-svn.corp.fortinet.com/svn/qa/FOS/${params.TEST_CASE_FOLDER}/${SVN_BRANCH}/${params.FEATURE_NAME} \
+                                    --username "$SVN_USER" --password "$SVN_PASS" --non-interactive
+                                """)
                             } else {
-                                sh "cd ${folderPath} && sudo svn update --username \$SVN_USER --password \$SVN_PASS --non-interactive"
+                                runWithRetry(4, [5, 15, 45], """
+                                    cd ${folderPath} && \
+                                    sudo svn update --username "$SVN_USER" --password "$SVN_PASS" --non-interactive
+                                """)
                             }
                             sh "sudo chmod -R 777 ${baseTestDir}"
                            
