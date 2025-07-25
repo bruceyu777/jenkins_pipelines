@@ -240,6 +240,9 @@ def call() {
             }
 
             stage('Test Running') {
+                when {
+                    expression { return !(params.SKIP_TEST?.toBoolean() ?: false) }
+                }
                 steps {
                     script {
                         withCredentials([
