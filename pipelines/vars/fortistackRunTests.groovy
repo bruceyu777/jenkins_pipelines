@@ -81,7 +81,7 @@ def call() {
 
 
         stages {
-            
+
             stage('Wait until previous build finish') {
                 steps {
                     script {
@@ -95,7 +95,7 @@ def call() {
                 }
             }
 
-            
+
             stage('Initialize Test Groups') {
                 steps {
                     script {
@@ -109,7 +109,7 @@ def call() {
                 steps {
                     script {
                         currentBuild.displayName = "#${currentBuild.number} " +
-                            "${params.NODE_NAME}-${params.BUILD_NUMBER}-" +
+                            "${params.NODE_NAME}-${params.RELEASE}-${params.BUILD_NUMBER}-" +
                             "${FEATURE_NAME}-${computedTestGroups.join(',')}"
                     }
                 }
@@ -189,7 +189,7 @@ def call() {
                                 echo "Local git pull failed: ${e.getMessage()}. Continuing without updating."
                             }
 
-                            
+
 
                             // Step 2: Prepare SVN code directory and update
                             def baseTestDir = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}"
@@ -233,7 +233,7 @@ def call() {
                                 """)
                             }
                             sh "sudo chmod -R 777 ${baseTestDir}"
-                           
+
                         }
                     }
                 }
@@ -249,7 +249,7 @@ def call() {
                                 passwordVariable: 'SVN_PASS'
                             )
                         ]) {
-                            
+
                             echo "🔄 Syncing autolib repo (${LOCAL_LIB_DIR}) to branch ${AUTOLIB_BRANCH}, stashing any local edits…"
                             sh """
                                 REPO_DIR=/home/fosqa/${LOCAL_LIB_DIR}
@@ -266,7 +266,7 @@ def call() {
                                     git pull --rebase --autostash
                                 '
                                 """
-                            
+
                             /*
                              * ───── Wrap Docker provisioning in an if (params.PROVISION_DOCKER) ─────
                              */
@@ -408,19 +408,18 @@ def call() {
                         "<a href=\"${base}summary_${name}.html\">Summary: ${name}</a>"
                     }.join("<br/>\n")
 
-                    def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
+                    def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.html').trim()
 
                     sendFosqaEmail(
                         to     : params.SEND_TO,
-                        subject: "${env.BUILD_DISPLAY_NAME} Succeeded",
+                        subject: "SUCCESS: ${env.BUILD_DISPLAY_NAME}",
                         body   : """
                         <p>🎉 Good news! Job <b>${env.BUILD_DISPLAY_NAME}</b> completed at ${new Date()}.</p>
                         <p>📄 Test result summaries:</p>
                         ${summaryLinks}
                         <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                        <h3>Node Info</h3>
-                        <pre style="font-family:monospace; white-space:pre-wrap;">${nodeInfo}</pre>
-                        <p><em>PS: Use the above node info for debugging.</em></p>
+                        <h3>==================</h3>
+                        ${nodeInfo}
                         """
                     )
 
@@ -437,15 +436,14 @@ def call() {
                     def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
                     sendFosqaEmail(
                         to     : params.SEND_TO,
-                        subject: "${env.BUILD_DISPLAY_NAME} FAILED",
+                        subject: "FAILURE: ${env.BUILD_DISPLAY_NAME}",
                         body   : """
                         <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
                         <p>📄 You can still peek at whatever got archived:</p>
                         ${summaryLinks}
                         <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                        <h3>Node Info</h3>
-                        <pre style="font-family:monospace; white-space:pre-wrap;">${nodeInfo}</pre>
-                        <p><em>PS: Use the above node info for debugging.</em></p>
+                        <h3>==================</h3>
+                        ${nodeInfo}
                         """
                     )
                 }
