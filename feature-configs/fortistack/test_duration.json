@@ -84,5 +84,18 @@
       "grp.sslprofile_flow.crit": "1 hr 3 min",
       "grp.sslprofile_flow.full": "4 hr 3 min"
     }
+  },
+  {
+    "dlp":{
+    "grp.dlp_exproxy.full": "8 hr 3 min",
+    "grp.dlp_flowbase.full": "8 hr 3 min",
+    "grp.dlp_ha.full": "3 hr 3 min",
+    "grp.dlp_interface.full": "1 hr 3 min",
+    "grp.dlp_language.full": "1 hr 3 min", 
+    "grp.dlp_nat1.full": "6 hr 3 min",
+    "grp.dlp_nat2.full": "7 hr 3 min",
+    "grp.dlp_tp.full": "1 hr 3 min",
+    "grp.dlp_wanopt.full": "4 hr 3 min"
+    }
   }
 ]

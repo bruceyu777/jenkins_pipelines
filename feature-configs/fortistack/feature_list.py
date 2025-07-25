@@ -139,7 +139,7 @@ FEATURE_LIST = [
   {"FEATURE_NAME": "foc",
     "test_case_folder": ["testcase_v1"],
     "test_config":       ["env.foc.fortistack.conf"],
-    "test_groups":       ["grp.foc_gtp.fstack.full"],
+    "test_groups":       ["grp.foc_gtp.fstack.full","grp.foc_gtp_ha.fstack.full","grp.foc_gtp_s10.fstack.full", "grp.foc_pfcp.fstack.full"],
     "docker_compose":    ["docker.foc_gtp.yml","other"],
     "email": ["wangt@fortinet.com,mabbasi@fortinet.com"]
   },
@@ -151,4 +151,29 @@ FEATURE_LIST = [
     "docker_compose":    ["docker.sslprofile_flow.yml","other"],
      "email": ["eson@fortinet.com"]
     },
+  {
+    "FEATURE_NAME": "waf",
+    "test_case_folder": ["testcase_v1"],
+    "test_config":       ["env.fstack.waf.conf"],
+    "test_groups":       ["grp.waf.fstack.full"],
+    "docker_compose":    ["docker.waf_waf.yml","other"],
+    "email": ["mabbasi@fortinet.com"]
+  },
+  {"FEATURE_NAME":"dlp",
+  "test_case_folder":  ["testcase_v1"],
+  "test_config":       ["env.fortistack.dlp.conf"],
+  "test_groups": [
+    "grp.dlp_exproxy.full",
+    "grp.dlp_flowbase.full",
+    "grp.dlp_ha.full",
+    "grp.dlp_interface.full",
+    "grp.dlp_language.full",
+    "grp.dlp_nat1.full",
+    "grp.dlp_nat2.full",
+    "grp.dlp_tp.full",
+    "grp.dlp_wanopt.full"
+  ],
+  "docker_compose":    ["docker.dlp_nat1.yml","other"],
+  "email": ["yjiaran@fortinet.com"]
+  },
 ]

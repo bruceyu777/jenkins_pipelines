@@ -229,7 +229,10 @@
       "env.foc.fortistack.conf"
     ],
     "test_groups": [
-      "grp.foc_gtp.fstack.full"
+      "grp.foc_gtp.fstack.full",
+      "grp.foc_gtp_ha.fstack.full",
+      "grp.foc_gtp_s10.fstack.full",
+      "grp.foc_pfcp.fstack.full"
     ],
     "docker_compose": [
       "docker.foc_gtp.yml",
@@ -253,5 +256,29 @@
       "other"
     ],
     "email": "eson@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+  },
+  "dlp": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.dlp.conf"
+    ],
+    "test_groups": [
+      "grp.dlp_exproxy.full",
+      "grp.dlp_flowbase.full",
+      "grp.dlp_ha.full",
+      "grp.dlp_interface.full",
+      "grp.dlp_language.full",
+      "grp.dlp_nat1.full",
+      "grp.dlp_nat2.full",
+      "grp.dlp_tp.full",
+      "grp.dlp_wanopt.full"
+    ],
+    "docker_compose": [
+      "docker.dlp_nat1.yml",
+      "other"
+    ],
+    "email": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com"
   }
 }
