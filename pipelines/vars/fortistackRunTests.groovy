@@ -60,6 +60,8 @@ def expandParamsJson(String jsonStr) {
 
 def computedTestGroups = []  // Global variable to share across stages
 
+def sendTo = (params.SEND_TO?.trim() ? params.SEND_TO : "yzhengfeng@fortinet.com")
+
 def call() {
     // Existing function that defines your "standard" set of upstream parameters:
     fortistackMasterParameters(exclude: ['FGT_TYPE','SKIP_PROVISION'])
@@ -414,7 +416,7 @@ def call() {
                     def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.html').trim()
 
                     sendFosqaEmail(
-                        to     : params.SEND_TO,
+                        to     : sendTo,
                         subject: "SUCCESS: ${env.BUILD_DISPLAY_NAME}",
                         body   : """
                         <p>🎉 Good news! Job <b>${env.BUILD_DISPLAY_NAME}</b> completed at ${new Date()}.</p>
@@ -438,7 +440,7 @@ def call() {
                     }.join("<br/>\n")
                     def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
                     sendFosqaEmail(
-                        to     : params.SEND_TO,
+                        to     : sendTo,
                         subject: "FAILURE: ${env.BUILD_DISPLAY_NAME}",
                         body   : """
                         <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
