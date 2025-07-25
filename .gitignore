@@ -3,3 +3,9 @@
 *.pyo
 *.pyd
 __pycache__/
+venv/
+*.log
+*.bak
+*.swp
+*.tmp
+*.old
