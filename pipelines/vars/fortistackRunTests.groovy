@@ -60,9 +60,10 @@ def expandParamsJson(String jsonStr) {
 
 def computedTestGroups = []  // Global variable to share across stages
 
-def sendTo = (params.SEND_TO?.trim() ? params.SEND_TO : "yzhengfeng@fortinet.com")
-
 def call() {
+    // Define sendTo inside the call() block (after params is available)
+    def sendTo = (params.SEND_TO?.trim() ? params.SEND_TO : "yzhengfeng@fortinet.com")
+
     // Existing function that defines your "standard" set of upstream parameters:
     fortistackMasterParameters(exclude: ['FGT_TYPE','SKIP_PROVISION'])
 
