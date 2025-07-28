@@ -439,7 +439,7 @@ def call() {
                         def name = getArchiveGroupName(group)
                         "<a href=\"${base}summary_${name}.html\">Summary: ${name}</a>"
                     }.join("<br/>\n")
-                    def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
+                    def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.html').trim()
                     sendFosqaEmail(
                         to     : sendTo,
                         subject: "FAILURE: ${env.BUILD_DISPLAY_NAME}",
