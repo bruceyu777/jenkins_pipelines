@@ -1,46 +1,4 @@
-def getArchiveGroupName(String group) {
-    def parts = group.tokenize('.')
-    if (parts.size() >= 2) {
-        return "${parts[0]}.${parts[1]}"
-    } else {
-        return group
-    }
-}
 
-def getTestGroups(params) {
-    def testGroups = []
-    if (params.TEST_GROUPS) {
-        if (params.TEST_GROUPS instanceof String) {
-            def tg = params.TEST_GROUPS.trim()
-            if (tg.startsWith("\"") && tg.endsWith("\"")) {
-                tg = tg.substring(1, tg.length()-1).trim()
-            }
-            if (tg.startsWith("[")) {
-                try {
-                    def parsed = readJSON text: tg
-                    if (parsed instanceof List) {
-                        testGroups = parsed
-                    } else {
-                        testGroups = tg.split(",").collect { it.trim() }
-                    }
-                } catch (e) {
-                    echo "Error parsing TEST_GROUPS as JSON: ${e}. Falling back to splitting by comma."
-                    testGroups = tg.split(",").collect { it.trim() }
-                }
-            } else {
-                testGroups = tg.split(",").collect { it.trim() }
-            }
-        } else if (params.TEST_GROUPS instanceof List) {
-            testGroups = params.TEST_GROUPS
-        } else {
-            testGroups = [params.TEST_GROUPS.toString()]
-        }
-    }
-    if (!testGroups || testGroups.isEmpty()) {
-        testGroups = [params.TEST_GROUP_CHOICE]
-    }
-    return testGroups
-}
 
 def expandParamsJson(String jsonStr) {
     try {
@@ -55,12 +13,11 @@ def expandParamsJson(String jsonStr) {
     }
 }
 
-def computedTestGroups = []  // Global variable to share across stages
 
 def call() {
     def sendTo = (params.SEND_TO?.trim() ? params.SEND_TO : "yzhengfeng@fortinet.com")
 
-    fortistackMasterParameters(exclude: ['FGT_TYPE','SKIP_PROVISION','PROVISION_DOCKER','ORIOLE_SUBMIT_FLAG','ADDITIONAL_EMAIL','SKIP_TEST','TEST_CONFIG_CHOICE','DOCKER_COMPOSE_FILE_CHOICE','PROVISION_VMPC','VMPC_NAMES','TERMINATE_PREVIOUS'])
+    fortistackMasterParameters(exclude: ['FGT_TYPE','SKIP_PROVISION','PROVISION_DOCKER','ORIOLE_SUBMIT_FLAG','ADDITIONAL_EMAIL','SKIP_TEST','TEST_CONFIG_CHOICE','DOCKER_COMPOSE_FILE_CHOICE','PROVISION_VMPC','VMPC_NAMES','TERMINATE_PREVIOUS','TEST_GROUP_FILTER'])
 
     expandParamsJson(params.PARAMS_JSON)
 
@@ -76,21 +33,13 @@ def call() {
         }
 
         stages {
-            stage('Initialize Test Groups') {
-                steps {
-                    script {
-                        computedTestGroups = getTestGroups(params)
-                        echo "Computed test groups: ${computedTestGroups}"
-                    }
-                }
-            }
 
             stage('Set Build Display Name') {
                 steps {
                     script {
                         currentBuild.displayName = "#${currentBuild.number} " +
                             "${params.NODE_NAME}-${params.RELEASE}-${params.BUILD_NUMBER}-" +
-                            "${FEATURE_NAME}-${computedTestGroups.join(',')}"
+                            "${FEATURE_NAME}}"
                     }
                 }
             }
@@ -198,19 +147,17 @@ def call() {
                                     git pull --rebase --autostash
                                 '
                             """
-
-                            for (group in computedTestGroups) {
-                                echo "Skip Running tests for test group: ${group}"
-                                try {
-                                    sh """
-                                        cd /home/fosqa/resources/tools
-                                        sudo ./venv/bin/python3 get_node_info.py --feature ${group}
-                                    """
-                                    echo "✅ get_node_info.py succeeded"
-                                } catch (err) {
-                                    echo "⚠️ get_node_info.py failed, but pipeline will continue"
-                                }
+                            echo "Skip Running tests for test group: ${group}"
+                            try {
+                                sh """
+                                    cd /home/fosqa/resources/tools
+                                    sudo ./venv/bin/python3 get_node_info.py --feature ${group}
+                                """
+                                echo "✅ get_node_info.py succeeded"
+                            } catch (err) {
+                                echo "⚠️ get_node_info.py failed, but pipeline will continue"
                             }
+
                         }
                     }
                 }
