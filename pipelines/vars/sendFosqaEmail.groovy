@@ -16,6 +16,10 @@ def call(Map args = [:]) {
 
   def esc = { String s -> s.replace("'", "'\\\\''") }
 
+  // Create safe versions of subject and body by removing line breaks.
+  def safeSubject = esc(subject.replaceAll("\\n", " "))
+  def safeBody = esc(body.replaceAll("\\n", " "))
+
   // 1) Fetch Vault‐stored SMTP password on master Node: Only the master node (by IP whitelist) can access the Vault.
   def pw = ''
   node('master') {
@@ -38,15 +42,14 @@ def call(Map args = [:]) {
                                         passwordVariable: 'SVN_PASS')]) {
 
         // Run the Python script, passing both primary and fallback flags.
-        // echo:false suppresses the + lines so no secrets leak.
         sh(script: """
           #!/usr/bin/env bash
           set -eu
 
           python3 /home/fosqa/resources/tools/test_email.py \\
             --to-addr  '${esc(args.to)}' \\
-            --subject   '${esc(subject)}' \\
-            --body      '${esc(body)}' \\
+            --subject   '${safeSubject}' \\
+            --body      '${safeBody}' \\
             --smtp-server '${esc(smtpServer)}' \\
             --port      '${port}' \\
             ${useSsl ? '--use-ssl' : ''} \\
