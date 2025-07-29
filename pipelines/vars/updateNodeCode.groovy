@@ -60,7 +60,7 @@ def computedTestGroups = []  // Global variable to share across stages
 def call() {
     def sendTo = (params.SEND_TO?.trim() ? params.SEND_TO : "yzhengfeng@fortinet.com")
 
-    fortistackMasterParameters(exclude: ['FGT_TYPE','SKIP_PROVISION'])
+    fortistackMasterParameters(exclude: ['FGT_TYPE','SKIP_PROVISION','PROVISION_DOCKER','ORIOLE_SUBMIT_FLAG','ADDITIONAL_EMAIL','SKIP_TEST'])
 
     expandParamsJson(params.PARAMS_JSON)
 
