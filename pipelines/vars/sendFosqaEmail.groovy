@@ -41,6 +41,10 @@ def call(Map args = [:]) {
                                         usernameVariable: 'SVN_USER',
                                         passwordVariable: 'SVN_PASS')]) {
 
+        // Write HTML content to temporary file
+        def tempHtmlFile = 'email_body.html'
+        writeFile file: tempHtmlFile, text: body
+
         // Run the Python script, passing both primary and fallback flags.
         sh(script: """
           #!/usr/bin/env bash
@@ -48,8 +52,8 @@ def call(Map args = [:]) {
 
           python3 /home/fosqa/resources/tools/test_email.py \\
             --to-addr  '${esc(args.to)}' \\
-            --subject   '${safeSubject}' \\
-            --body      '${safeBody}' \\
+            --subject  '${safeSubject}' \\
+            --body @${tempHtmlFile} \\
             --smtp-server '${esc(smtpServer)}' \\
             --port      '${port}' \\
             ${useSsl ? '--use-ssl' : ''} \\
@@ -60,6 +64,9 @@ def call(Map args = [:]) {
             --fallback-password '$SVN_PASS' \\
             --fallback-from-addr '${esc(fallbackFrom)}'
         """.stripIndent())
+
+        // Clean up temp file
+        sh "rm -f ${tempHtmlFile}"
 
         // Cleanup the secret file
         sh "shred -u secret.pw || rm -f secret.pw"
