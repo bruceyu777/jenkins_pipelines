@@ -120,6 +120,19 @@ def call() {
                     }
                 }
             }
+            stage('VENV update') {
+                steps {
+                    echo "VENV update..."
+                    sh """
+                    cd /home/fosqa/resources/tools
+                    . /home/fosqa/resources/tools/venv/bin/activate
+                    pip install -r requirements.txt
+
+                    sudo pwd
+                    hostname
+                    """
+                }
+            }
 
             stage('Test Running') {
                 when {
