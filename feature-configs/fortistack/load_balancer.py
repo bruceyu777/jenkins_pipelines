@@ -11,7 +11,7 @@ This script:
   - Excludes specified entries from dispatch (by FEATURE_NAME).
   - Estimates total runtime per feature-entry (defaulting missing groups to 1 hr).
   - Allocates each entry proportionally across nodes.
-  - Splits each entry’s test-groups across its allocated nodes using greedy bin-packing.
+  - Splits each entry's test-groups across its allocated nodes using greedy bin-packing.
   - Emits a dispatch JSON suitable for downstream pipeline triggers.
 
 Usage:
@@ -21,370 +21,656 @@ Usage:
 
 Author: Automated
 """
-import os
-import sys
-
+import argparse
+import importlib.util
 import json
 import logging
+import os
 import re
-import argparse
+import sys
 from math import floor
-import importlib.util
+from typing import Any, Dict, List, Set, Tuple
+
 import requests
 
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
-ADMIN_EMAILS = {"yzhengfeng@fortinet.com", "wangd@fortinet.com", "rainxiao@fortinet.com"}
-DEFAULT_JENKINS_URL = "http://10.96.227.206:8080"
-DEFAULT_JENKINS_USER = "fosqa"
-DEFAULT_JENKINS_TOKEN = "110dec5c2d2974a67968074deafccc1414"
-DEFAULT_RESERVED_NODES = "Built-In Node,node1,node12,node13,node14,node15,node19,node20,node27,node28"
+ADMIN_EMAILS: Set[str] = {"yzhengfeng@fortinet.com", "wangd@fortinet.com", "rainxiao@fortinet.com"}
+DEFAULT_JENKINS_URL: str = "http://10.96.227.206:8080"
+DEFAULT_JENKINS_USER: str = "fosqa"
+DEFAULT_JENKINS_TOKEN: str = "110dec5c2d2974a67968074deafccc1414"
+DEFAULT_RESERVED_NODES: str = "Built-In Node,node1,node5,node11,node12,node13,node14,node15,node19,node20,node27"
 
-FEATURE_NODE_STATIC_BINDING = {
-  "foc": "node28",
-  "waf": "node40",
+# Feature names mapped to dedicated Jenkins nodes
+FEATURE_NODE_STATIC_BINDING: Dict[str, str] = {
+    "foc": "node28",
+    "waf": "node40",
 }
 
-# New static exclusion list (by default empty)
-EXCLUDE_FEATURES = ['waf']
+# Features to exclude from processing
+EXCLUDE_FEATURES: List[str] = []
 
-# -----------------------------------------------------------------------------
-# Oriole submit strategy
-# -----------------------------------------------------------------------------
-# This is a mapping of feature names to the Oriole submit strategy.
-# If a feature is not listed, it defaults to 'all'.
-# The strategy can be 'all', 'succeeded', or 'none'.
-# 'all' means submit all test results, 'succeeded' means only submit if all tests succeeded,
-ORIOLE_SUBMIT_STRATEGY = {
+# ORIOLE test result submission strategy by feature
+# Options: 'all' (default), 'succeeded', 'none'
+ORIOLE_SUBMIT_STRATEGY: Dict[str, str] = {
     "dlp": "succeeded",
 }
 
-# -----------------------------------------------------------------------------
-# Helper Functions
-# -----------------------------------------------------------------------------
 
-def load_feature_list(path):
+def load_feature_list(path: str) -> List[Dict[str, Any]]:
     """
     Load feature list from JSON (.json) or Python (.py) file.
-    Python file must define FEATURE_LIST or feature_list.
-    Returns: list of dict entries each containing 'FEATURE_NAME'.
+
+    Args:
+        path: Path to the feature list file (.py or .json)
+
+    Returns:
+        List of dict entries each containing 'FEATURE_NAME'
+
+    Raises:
+        ValueError: If the file format is invalid or required variables are missing
     """
-    name, ext = os.path.splitext(path)
-    entries = []
-    if ext == '.py':
+    _, file_ext = os.path.splitext(path)
+    feature_entries = []
+
+    if file_ext == ".py":
         raw_text = open(path).read()
-        # normalize JSON-style booleans to Python booleans
-        normalized = re.sub(r'\btrue\b', 'True', raw_text, flags=re.IGNORECASE)
-        normalized = re.sub(r'\bfalse\b', 'False', normalized, flags=re.IGNORECASE)
-        spec = importlib.util.spec_from_loader('feature_list', loader=None)
-        mod = importlib.util.module_from_spec(spec)
-        exec(normalized, mod.__dict__)
-        if hasattr(mod, 'FEATURE_LIST'):
-            entries = getattr(mod, 'FEATURE_LIST')
-        elif hasattr(mod, 'feature_list'):
-            entries = getattr(mod, 'feature_list')
+        # Normalize JSON-style booleans to Python booleans
+        normalized_text = re.sub(r"\btrue\b", "True", raw_text, flags=re.IGNORECASE)
+        normalized_text = re.sub(r"\bfalse\b", "False", normalized_text, flags=re.IGNORECASE)
+
+        # Load as a module
+        module_spec = importlib.util.spec_from_loader("feature_list", loader=None)
+        feature_module = importlib.util.module_from_spec(module_spec)
+        exec(normalized_text, feature_module.__dict__)
+
+        if hasattr(feature_module, "FEATURE_LIST"):
+            feature_entries = getattr(feature_module, "FEATURE_LIST")
+        elif hasattr(feature_module, "feature_list"):
+            feature_entries = getattr(feature_module, "feature_list")
         else:
             raise ValueError(f"Python feature-list must define FEATURE_LIST or feature_list: {path}")
     else:
-        raw = json.load(open(path))
-        if isinstance(raw, dict):
-            for fname, cfg in raw.items():
-                entry = {'FEATURE_NAME': fname}
-                entry.update(cfg)
-                entries.append(entry)
-        elif isinstance(raw, list):
-            for item in raw:
+        # Assume JSON format
+        raw_data = json.load(open(path))
+
+        if isinstance(raw_data, dict):
+            # Convert {feature_name: config} format to list format
+            for feature_name, config in raw_data.items():
+                entry = {"FEATURE_NAME": feature_name}
+                entry.update(config)
+                feature_entries.append(entry)
+        elif isinstance(raw_data, list):
+            for item in raw_data:
                 if not isinstance(item, dict):
                     raise ValueError(f"Invalid entry in {path}: {item}")
-                if 'FEATURE_NAME' in item:
-                    entries.append(dict(item))
+
+                if "FEATURE_NAME" in item:
+                    feature_entries.append(dict(item))
                 elif len(item) == 1:
-                    fname, cfg = next(iter(item.items()))
-                    if not isinstance(cfg, dict):
-                        raise ValueError(f"Config for {fname} not dict: {cfg}")
-                    entry = {'FEATURE_NAME': fname}
-                    entry.update(cfg)
-                    entries.append(entry)
+                    feature_name, config = next(iter(item.items()))
+                    if not isinstance(config, dict):
+                        raise ValueError(f"Config for {feature_name} not dict: {config}")
+                    entry = {"FEATURE_NAME": feature_name}
+                    entry.update(config)
+                    feature_entries.append(entry)
                 else:
                     raise ValueError(f"Cannot decode entry: {item}")
         else:
             raise ValueError(f"Feature list {path} must be .py or JSON dict/list")
-    logging.info(f"Loaded {len(entries)} entries from {path}")
-    return entries
 
-def merge_features(entries):
-    merged = {}
+    logging.info(f"Loaded {len(feature_entries)} entries from {path}")
+    return feature_entries
+
+
+def merge_features(entries: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """
+    Merge entries with the same FEATURE_NAME into a single configuration.
+
+    Args:
+        entries: List of feature entries to merge
+
+    Returns:
+        Dictionary mapping feature names to merged configurations
+    """
+    merged_features = {}
+
     for entry in entries:
-        name = entry['FEATURE_NAME']
-        cfg = {k: v for k, v in entry.items() if k != 'FEATURE_NAME'}
-        if name not in merged:
-            merged[name] = dict(cfg)
-        base = merged[name]
-        for key in ['test_case_folder','test_config','test_groups','docker_compose','email']:
-            if key in cfg:
-                combined = base.get(key, []) + cfg[key]
-                seen = set()
-                deduped = []
-                for x in combined:
-                    if x not in seen:
-                        deduped.append(x)
-                        seen.add(x)
-                base[key] = deduped
-                if key == 'email':
-                    rec = base.get('email', [''])[0]
-                    em = ','.join(sorted({x.strip() for x in rec.split(',') if x.strip()} | ADMIN_EMAILS))
-                    base['email'] = em
-        for flag in ['PROVISION_VMPC','PROVISION_DOCKER','VMPC_NAMES','ORIOLE_SUBMIT_FLAG']:
-            if flag in cfg:
-                base[flag] = cfg[flag]
-    return merged
+        feature_name = entry["FEATURE_NAME"]
+        config = {k: v for k, v in entry.items() if k != "FEATURE_NAME"}
 
-def write_features_dict(merged, output_path='features.json'):
-    with open(output_path, 'w') as f:
-        json.dump(merged, f, indent=2)
-    logging.info(f"Wrote {len(merged)} merged features to {output_path}")
+        if feature_name not in merged_features:
+            merged_features[feature_name] = dict(config)
 
-def write_features_dict_to_all_in_one_tools(merged, output_path='/home/fosqa/resources/tools/features.json'):
-    with open(output_path, 'w') as f:
-        json.dump(merged, f, indent=2)
-    logging.info(f"Wrote {len(merged)} merged features to {output_path}")
+        base_config = merged_features[feature_name]
 
-def load_duration_entries(path):
-    raw = json.load(open(path))
-    entries = []
-    if isinstance(raw, dict):
-        for name, dmap in raw.items():
-            if isinstance(dmap, dict):
-                entries.append((name, dmap))
+        # Merge list fields with deduplication
+        for list_field in ["test_case_folder", "test_config", "test_groups", "docker_compose", "email"]:
+            if list_field in config:
+                # Ensure both are lists
+                current_values = base_config.get(list_field, [])
+                if not isinstance(current_values, list):
+                    current_values = [current_values]
+
+                new_values = config[list_field]
+                if not isinstance(new_values, list):
+                    new_values = [new_values]
+
+                # Combine and deduplicate while preserving order
+                combined_values = current_values + new_values
+                unique_values = []
+                seen_values = set()
+
+                for value in combined_values:
+                    if value not in seen_values:
+                        unique_values.append(value)
+                        seen_values.add(value)
+
+                base_config[list_field] = unique_values
+
+                # Special handling for email: convert to comma-separated string
+                if list_field == "email":
+                    email_addresses = set()
+
+                    for email_entry in unique_values:
+                        if email_entry and isinstance(email_entry, str):
+                            email_addresses.update(addr.strip() for addr in email_entry.split(",") if addr.strip())
+
+                    # Add admin emails and convert to sorted string
+                    all_emails = sorted(email_addresses | ADMIN_EMAILS)
+                    base_config["email"] = ",".join(all_emails)
+
+        # Copy scalar fields directly
+        for flag_field in ["PROVISION_VMPC", "PROVISION_DOCKER", "VMPC_NAMES", "ORIOLE_SUBMIT_FLAG"]:
+            if flag_field in config:
+                base_config[flag_field] = config[flag_field]
+
+    return merged_features
+
+
+def write_features_dict(merged_features: Dict[str, Dict[str, Any]], output_path: str = "features.json") -> None:
+    """Write merged features to a JSON file."""
+    with open(output_path, "w") as f:
+        json.dump(merged_features, f, indent=2)
+    logging.info(f"Wrote {len(merged_features)} merged features to {output_path}")
+
+
+def write_features_dict_to_all_in_one_tools(merged_features: Dict[str, Dict[str, Any]], output_path: str = "/home/fosqa/resources/tools/features.json") -> None:
+    """Write merged features to the all-in-one tools location."""
+    with open(output_path, "w") as f:
+        json.dump(merged_features, f, indent=2)
+    logging.info(f"Wrote {len(merged_features)} merged features to {output_path}")
+
+
+def load_duration_entries(path: str) -> List[Tuple[str, Dict[str, str]]]:
+    """
+    Load test duration data from JSON file.
+
+    Returns:
+        List of (feature_name, duration_map) pairs
+    """
+    raw_data = json.load(open(path))
+    duration_entries = []
+
+    if isinstance(raw_data, dict):
+        for feature_name, duration_map in raw_data.items():
+            if isinstance(duration_map, dict):
+                duration_entries.append((feature_name, duration_map))
             else:
-                logging.warning(f"Skipping durations for {name}")
-    elif isinstance(raw, list):
-        for item in raw:
+                logging.warning(f"Skipping durations for {feature_name}: not a dictionary")
+    elif isinstance(raw_data, list):
+        for item in raw_data:
             if not isinstance(item, dict):
                 raise ValueError(f"Invalid duration entry: {item}")
-            if len(item) == 1 and 'durations' not in item:
-                fname, dmap = next(iter(item.items()))
-                if isinstance(dmap, dict):
-                    entries.append((fname, dmap))
+
+            if len(item) == 1 and "durations" not in item:
+                feature_name, duration_map = next(iter(item.items()))
+                if isinstance(duration_map, dict):
+                    duration_entries.append((feature_name, duration_map))
                 else:
-                    logging.warning(f"Skipping durations for {fname}")
-            elif 'durations' in item:
-                fname = item.get('feature') or item.get('FEATURE_NAME')
-                dmap = item['durations']
-                if isinstance(dmap, dict):
-                    entries.append((fname, dmap))
+                    logging.warning(f"Skipping durations for {feature_name}: not a dictionary")
+            elif "durations" in item:
+                feature_name = item.get("feature") or item.get("FEATURE_NAME")
+                duration_map = item["durations"]
+                if isinstance(duration_map, dict):
+                    duration_entries.append((feature_name, duration_map))
                 else:
-                    logging.warning(f"Skipping durations for {fname}")
+                    logging.warning(f"Skipping durations for {feature_name}: not a dictionary")
             else:
                 logging.warning(f"Skipping unrecognized duration entry: {item}")
     else:
         raise ValueError(f"Durations {path} must be dict or list")
-    logging.info(f"Loaded {len(entries)} duration entries from {path}")
-    return entries
 
-def parse_duration_to_seconds(text):
-    h = m = s = 0
-    if m1 := re.search(r"(\d+)\s*hr", text):
-        h = int(m1.group(1))
-    if m2 := re.search(r"(\d+)\s*min", text):
-        m = int(m2.group(1))
-    if m3 := re.search(r"(\d+)\s*sec", text):
-        s = int(m3.group(1))
-    return h * 3600 + m * 60 + s
+    logging.info(f"Loaded {len(duration_entries)} duration entries from {path}")
+    return duration_entries
 
-def format_seconds_to_duration(sec):
+
+def parse_duration_to_seconds(duration_text: str) -> int:
+    """Convert a duration string like '3 hr 45 min 20 sec' to seconds."""
+    hours = minutes = seconds = 0
+
+    if hour_match := re.search(r"(\d+)\s*hr", duration_text):
+        hours = int(hour_match.group(1))
+
+    if minute_match := re.search(r"(\d+)\s*min", duration_text):
+        minutes = int(minute_match.group(1))
+
+    if second_match := re.search(r"(\d+)\s*sec", duration_text):
+        seconds = int(second_match.group(1))
+
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def format_seconds_to_duration(seconds: int) -> str:
+    """Convert seconds to a human-readable duration string."""
     parts = []
-    h, rem = divmod(sec, 3600)
-    m, s  = divmod(rem, 60)
-    if h:
-        parts.append(f"{h} hr")
-    if m:
-        parts.append(f"{m} min")
-    if s:
-        parts.append(f"{s} sec")
-    return ' '.join(parts) or '0 sec'
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
 
-def allocate_counts_to_nodes(durations, node_count):
-    total = sum(durations)
-    raw   = [d / total * node_count for d in durations]
-    frac  = [r - floor(r) for r in raw]
-    cnt   = [max(1, floor(r)) for r in raw]
-    ssum  = sum(cnt)
-    if ssum > node_count:
-        excess = ssum - node_count
-        cand   = sorted([i for i, c in enumerate(cnt) if c > 1], key=lambda i: raw[i])
-        idx = 0
-        while excess and cand:
-            j = cand[idx % len(cand)]
-            cnt[j] -= 1
+    if hours:
+        parts.append(f"{hours} hr")
+    if minutes:
+        parts.append(f"{minutes} min")
+    if seconds:
+        parts.append(f"{seconds} sec")
+
+    return " ".join(parts) or "0 sec"
+
+
+def allocate_counts_to_nodes(durations: List[int], node_count: int) -> List[int]:
+    """
+    Allocate each feature to a proportional number of nodes based on its duration.
+
+    Args:
+        durations: List of feature durations in seconds
+        node_count: Total number of available nodes
+
+    Returns:
+        List of node counts for each feature (minimum 1 per feature)
+    """
+    total_duration = sum(durations)
+    raw_allocation = [duration / total_duration * node_count for duration in durations]
+    fractional_parts = [raw - floor(raw) for raw in raw_allocation]
+    node_counts = [max(1, floor(raw)) for raw in raw_allocation]
+
+    sum_allocated = sum(node_counts)
+
+    # Handle over-allocation
+    if sum_allocated > node_count:
+        excess = sum_allocated - node_count
+        # Sort features with more than 1 node by increasing raw allocation
+        candidates = sorted([i for i, count in enumerate(node_counts) if count > 1], key=lambda i: raw_allocation[i])
+
+        # Take nodes from candidates until we're at our target
+        index = 0
+        while excess > 0 and candidates:
+            feature_index = candidates[index % len(candidates)]
+            node_counts[feature_index] -= 1
             excess -= 1
-            if cnt[j] == 1:
-                cand.remove(j)
-            idx += 1
-    elif ssum < node_count:
-        deficit = node_count - ssum
-        cand = sorted(range(len(raw)), key=lambda i: frac[i], reverse=True)
-        idx = 0
-        while deficit:
-            j = cand[idx % len(cand)]
-            cnt[j] += 1
+
+            # If we've reduced to 1 node, remove from candidates
+            if node_counts[feature_index] == 1:
+                candidates.remove(feature_index)
+            index += 1
+
+    # Handle under-allocation
+    elif sum_allocated < node_count:
+        deficit = node_count - sum_allocated
+        # Sort by fractional part (descending) to allocate extras fairly
+        candidates = sorted(range(len(raw_allocation)), key=lambda i: fractional_parts[i], reverse=True)
+
+        # Add nodes to candidates until we reach our target
+        index = 0
+        while deficit > 0:
+            feature_index = candidates[index % len(candidates)]
+            node_counts[feature_index] += 1
             deficit -= 1
-            idx += 1
-    return cnt
+            index += 1
 
-def distribute_groups_across_nodes(group_map, bins):
-    items = sorted(group_map.items(), key=lambda kv: kv[1], reverse=True)
-    buckets = [{'total': 0, 'groups': []} for _ in range(bins)]
-    for name, dur in items:
-        tgt = min(buckets, key=lambda b: b['total'])
-        tgt['groups'].append(name)
-        tgt['total'] += dur
-    return [(b['groups'], b['total']) for b in buckets]
+    return node_counts
 
-def get_idle_jenkins_nodes(url, user, token):
-    api = f"{url.rstrip('/')}/computer/api/json?tree=computer[displayName,offline,executors[currentExecutable[fullDisplayName]]]"
+
+def distribute_groups_across_nodes(group_duration_map: Dict[str, int], bin_count: int) -> List[Tuple[List[str], int]]:
+    """
+    Distribute test groups across nodes using a greedy bin-packing algorithm.
+
+    Args:
+        group_duration_map: Map of group names to durations in seconds
+        bin_count: Number of nodes/bins to distribute across
+
+    Returns:
+        List of (groups, total_duration) tuples for each node
+    """
+    # Sort groups by duration (descending)
+    sorted_groups = sorted(group_duration_map.items(), key=lambda item: item[1], reverse=True)
+
+    # Initialize bins
+    bins = [{"total_duration": 0, "groups": []} for _ in range(bin_count)]
+
+    # Greedy bin packing: assign each group to the bin with least load
+    for group_name, duration in sorted_groups:
+        target_bin = min(bins, key=lambda bin: bin["total_duration"])
+        target_bin["groups"].append(group_name)
+        target_bin["total_duration"] += duration
+
+    # Convert to return format
+    return [(bin["groups"], bin["total_duration"]) for bin in bins]
+
+
+def get_idle_jenkins_nodes(url: str, user: str, token: str) -> List[str]:
+    """
+    Query Jenkins API for idle nodes.
+
+    Args:
+        url: Jenkins base URL
+        user: Jenkins username
+        token: Jenkins API token
+
+    Returns:
+        List of idle node names
+
+    Raises:
+        SystemExit: If the Jenkins API request fails
+    """
+    api_url = f"{url.rstrip('/')}/computer/api/json?tree=computer[displayName,offline,executors[currentExecutable[fullDisplayName]]]"
+
     try:
-        r = requests.get(api, auth=(user, token))
-        r.raise_for_status()
-        data = r.json()
+        response = requests.get(api_url, auth=(user, token))
+        response.raise_for_status()
+        data = response.json()
     except Exception as e:
-        logging.error(f"Error querying Jenkins: {e}")
+        logging.error(f"Error querying Jenkins API: {e}")
         sys.exit(1)
-    avail = []
-    for comp in data.get('computer', []) or []:
-        name, off = comp.get('displayName'), comp.get('offline', True)
-        if not name or name == 'master' or off:
+
+    available_nodes = []
+
+    for computer in data.get("computer", []) or []:
+        node_name = computer.get("displayName")
+        is_offline = computer.get("offline", True)
+
+        if not node_name or node_name == "master" or is_offline:
             continue
-        busy = False
-        for ex in comp.get('executors', []) or []:
-            curr = ex.get('currentExecutable')
-            job = curr.get('fullDisplayName', '') if isinstance(curr, dict) else ''
-            if job.startswith('fortistack_runtest') or job.startswith('fortistack_provision_fgts'):
-                busy = True
+
+        # Check if any executor is running a fortistack job
+        node_is_busy = False
+        for executor in computer.get("executors", []) or []:
+            current_executable = executor.get("currentExecutable")
+            job_name = current_executable.get("fullDisplayName", "") if isinstance(current_executable, dict) else ""
+
+            if job_name.startswith("fortistack_runtest") or job_name.startswith("fortistack_provision_fgts"):
+                node_is_busy = True
                 break
-        if not busy:
-            avail.append(name)
-    logging.info(f"Found {len(avail)} idle Jenkins nodes")
-    return avail
+
+        if not node_is_busy:
+            available_nodes.append(node_name)
+
+    # Sort nodes numerically
+    available_nodes.sort(key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
+
+    logging.info(f"Found idle Jenkins nodes <{len(available_nodes)}>: {available_nodes}")
+    return available_nodes
+
 
 def main():
-    logging.basicConfig(level=logging.INFO,
-                        format='[%(asctime)s] %(levelname)s [%(lineno)d]: %(message)s')
+    """Main entry point for the load balancer script."""
+    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s [%(filename)s:%(lineno)d]: %(message)s")
+
     parser = argparse.ArgumentParser(description="Generate dispatch JSON and update features.json")
-    parser.add_argument('-l', '--feature-list', default='feature_list.py',
-                        help='Python or JSON feature list')
-    parser.add_argument('-d', '--durations', default='test_duration.json')
-    parser.add_argument('-n', '--nodes', default='node1,node2,node3')
-    parser.add_argument('-a', '--use-jenkins-nodes', action='store_true')
-    parser.add_argument('--jenkins-url', default=DEFAULT_JENKINS_URL)
-    parser.add_argument('--jenkins-user', default=DEFAULT_JENKINS_USER)
-    parser.add_argument('--jenkins-token', default=DEFAULT_JENKINS_TOKEN)
-    parser.add_argument('-r', '--reserved-nodes', default=DEFAULT_RESERVED_NODES)
-    parser.add_argument('-e', '--exclude', default='')
-    parser.add_argument('-o', '--output', default='dispatch.json')
+    parser.add_argument("-l", "--feature-list", default="feature_list.py", help="Python or JSON feature list")
+    parser.add_argument("-d", "--durations", default="test_duration.json", help="JSON file with test durations")
+    parser.add_argument("-n", "--nodes", default="node1,node2,node3", help="Comma-separated list of nodes to use")
+    parser.add_argument("-a", "--use-jenkins-nodes", action="store_true", help="Query Jenkins for idle nodes instead of using --nodes")
+    parser.add_argument("--jenkins-url", default=DEFAULT_JENKINS_URL, help="Jenkins URL for node query")
+    parser.add_argument("--jenkins-user", default=DEFAULT_JENKINS_USER, help="Jenkins username for API access")
+    parser.add_argument("--jenkins-token", default=DEFAULT_JENKINS_TOKEN, help="Jenkins API token")
+    parser.add_argument("-r", "--reserved-nodes", default=DEFAULT_RESERVED_NODES, help="Comma-separated list of nodes to exclude")
+    parser.add_argument("-e", "--exclude", default="", help="Comma-separated list of features to exclude")
+    parser.add_argument("-o", "--output", default="dispatch.json", help="Output dispatch JSON path")
     args = parser.parse_args()
 
-    # Step 1: Load and merge feature-list
+    # Step 1: Load feature list and filter excluded features
     feature_entries = load_feature_list(args.feature_list)
+
     # Combine static and CLI exclusions
-    static_exclude = set(EXCLUDE_FEATURES)
-    cli_exclude = {x.strip() for x in args.exclude.split(',') if x.strip()}
-    exclude_set = static_exclude.union(cli_exclude)
-    if exclude_set:
-        logging.info(f"Excluding features: {', '.join(exclude_set)}")
-    feature_entries = [e for e in feature_entries if e['FEATURE_NAME'] not in exclude_set]
-    logging.info(f"Loaded {len(feature_entries)} feature entries from {args.feature_list} after exclusion")
+    static_exclusions = set(EXCLUDE_FEATURES)
+    cli_exclusions = {name.strip() for name in args.exclude.split(",") if name.strip()}
+    all_exclusions = static_exclusions.union(cli_exclusions)
 
-    merged = merge_features(feature_entries)
-        
-    write_features_dict(merged)
-    write_features_dict_to_all_in_one_tools(merged)
+    if all_exclusions:
+        logging.info(f"Excluding features: {', '.join(all_exclusions)}")
 
-    # Step 2: Load durations
+    filtered_entries = [entry for entry in feature_entries if entry["FEATURE_NAME"] not in all_exclusions]
+
+    logging.info(f"Loaded {len(filtered_entries)} feature entries from {args.feature_list} after exclusion")
+
+    # Step 2: Merge features with the same name and write to features.json
+    merged_features = merge_features(filtered_entries)
+    write_features_dict(merged_features)
+    write_features_dict_to_all_in_one_tools(merged_features)
+
+    # Step 3: Load test durations
     duration_entries = load_duration_entries(args.durations)
 
-    # Step 3: Select nodes
+    # Step 4: Select Jenkins nodes
     if args.use_jenkins_nodes:
-        nodes = get_idle_jenkins_nodes(args.jenkins_url, args.jenkins_user, args.jenkins_token)
+        all_nodes = get_idle_jenkins_nodes(args.jenkins_url, args.jenkins_user, args.jenkins_token)
     else:
-        nodes = [n.strip() for n in args.nodes.split(',') if n.strip()]
-    reserved = {n.strip() for n in args.reserved_nodes.split(',') if n.strip()}
-    nodes = [n for n in nodes if n not in reserved]
-    nodes.sort()
-    logging.info(f"Dispatch across <{len(nodes)}> nodes: {nodes}")
+        all_nodes = [node.strip() for node in args.nodes.split(",") if node.strip()]
 
-    # Step 4: Filter entries
-    exclude_set = {x.strip() for x in args.exclude.split(',') if x.strip()}
-    filtered = [e for e in feature_entries if e['FEATURE_NAME'] not in exclude_set]
-    if not filtered:
+    # Remove reserved nodes
+    reserved_nodes = [node.strip() for node in args.reserved_nodes.split(",") if node.strip()]
+    reserved_nodes.sort(key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
+    logging.info(f"Reserved nodes <{len(reserved_nodes)}> : {reserved_nodes}")
+
+    available_nodes = [node for node in all_nodes if node not in reserved_nodes]
+
+    actually_reserved = set(all_nodes) & set(reserved_nodes)
+    logging.info(
+        f"Actually excluded nodes <{len(actually_reserved)}>: {sorted(list(actually_reserved), key=lambda name: int(name[4:]) if name.startswith('node') and name[4:].isdigit() else float('inf'))}"
+    )
+
+    # Sort nodes numerically by their number portion
+    available_nodes.sort(key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
+
+    logging.info(f"Dispatch across <{len(available_nodes)}> nodes: {available_nodes}")
+
+    # Step 5: Verify we have features to process
+    if not filtered_entries:
         logging.error("No entries after exclusion; aborting.")
         sys.exit(1)
 
-    # Step 5: Compute total durations
-    dq = list(duration_entries)
-    total_secs = []
-    for e in filtered:
-        name = e['FEATURE_NAME']
-        dmap = {}
-        for i, (fn, dm) in enumerate(dq):
-            if fn == name:
-                dmap = dm
-                dq.pop(i)
+    # Step 6: Compute total durations for each feature
+    durations_queue = list(duration_entries)
+    feature_durations = []
+
+    for entry in filtered_entries:
+        feature_name = entry["FEATURE_NAME"]
+        duration_map = {}
+
+        # Find matching duration entry
+        for i, (name, dur_map) in enumerate(durations_queue):
+            if name == feature_name:
+                duration_map = dur_map
+                durations_queue.pop(i)
                 break
-        if not dmap:
-            logging.warning(f"No durations for '{name}' -> 1hr/group")
-        ssum = 0
-        for grp in e.get('test_groups', []):
-            if grp in dmap:
-                ssum += parse_duration_to_seconds(dmap[grp])
+
+        if not duration_map:
+            logging.warning(f"No durations for '{feature_name}' -> using 1hr/group default")
+
+        # Sum durations for all test groups
+        total_seconds = 0
+        for group in entry.get("test_groups", []):
+            if group in duration_map:
+                total_seconds += parse_duration_to_seconds(duration_map[group])
             else:
-                logging.warning(f"Missing {name}.{grp} -> 1hr")
-                ssum += 3600
-        total_secs.append(ssum)
+                logging.warning(f"Missing duration for {feature_name}.{group} -> using 1hr default")
+                total_seconds += 3600  # Default 1 hour
 
-    # Step 6: Allocate counts
-    counts = allocate_counts_to_nodes(total_secs, len(nodes))
+        feature_durations.append(total_seconds)
 
-    # Step 7: Build dispatch
-    dispatch = []
-    idx = 0
-    for e, cnt in zip(filtered, counts):
-        name   = e['FEATURE_NAME']
-        folder = e.get('test_case_folder', [None])[0]
-        cfg    = e.get('test_config', [None])[0]
-        comp   = e.get('docker_compose', [None])[0]
-        rec    = e.get('email', [''])[0]
-        em     = ','.join(sorted({x.strip() for x in rec.split(',') if x.strip()} | ADMIN_EMAILS))
-        dmap   = next((dm for fn, dm in duration_entries if fn == name), {})
-        gm     = {grp: parse_duration_to_seconds(dmap.get(grp, '1 hr')) for grp in e.get('test_groups', [])}
-        buckets = distribute_groups_across_nodes(gm, cnt)
-        
-        for groups, secs in buckets:
-            bind_node = FEATURE_NODE_STATIC_BINDING.get(name)
-            # Use ORIOLE_SUBMIT_STRATEGY if defined for the feature, otherwise use flag from feature or default "all"
-            submit_flag = ORIOLE_SUBMIT_STRATEGY.get(name, e.get('ORIOLE_SUBMIT_FLAG', 'all'))
-            dispatch.append({
-                'NODE_NAME': bind_node if bind_node else nodes[idx % len(nodes)],
-                'FEATURE_NAME': name,
-                'TEST_CASE_FOLDER': folder,
-                'TEST_CONFIG_CHOICE': cfg,
-                'TEST_GROUP_CHOICE': groups[0] if groups else '',
-                'TEST_GROUPS': groups,
-                'SUM_DURATION': format_seconds_to_duration(secs),
-                'DOCKER_COMPOSE_FILE_CHOICE': comp,
-                'SEND_TO': em,
-                'PROVISION_VMPC': e.get('PROVISION_VMPC', False),
-                'VMPC_NAMES': e.get('VMPC_NAMES', ''),
-                'PROVISION_DOCKER': e.get('PROVISION_DOCKER', True),
-                'ORIOLE_SUBMIT_FLAG': submit_flag
-            })
-            idx += 1
+    # Step 7: Allocate nodes to features proportionally
+    node_allocations = allocate_counts_to_nodes(feature_durations, len(available_nodes))
 
-    # Step 8: Write dispatch JSON
-    with open(args.output, 'w') as f:
-        json.dump(dispatch, f, indent=2)
-    logging.info(f"Generated {len(dispatch)} entries in {args.output}")
+    # Step 8: Build dispatch with proper node assignment
+    dispatch_entries = []
+    used_nodes = set()  # Track which nodes have been assigned
 
-if __name__ == '__main__':
+    # First, handle features with static node bindings
+    static_features = []
+    dynamic_features = []
+
+    for entry, node_count in zip(filtered_entries, node_allocations):
+        feature_name = entry["FEATURE_NAME"]
+        if feature_name in FEATURE_NODE_STATIC_BINDING:
+            static_features.append((entry, node_count))
+        else:
+            dynamic_features.append((entry, node_count))
+
+    # Process static bindings first
+    for entry, node_count in static_features:
+        feature_name = entry["FEATURE_NAME"]
+        static_node = FEATURE_NODE_STATIC_BINDING[feature_name]
+        used_nodes.add(static_node)  # Mark node as used
+
+        # Extract feature configuration
+        test_folder = entry.get("test_case_folder", [None])[0]
+        test_config = entry.get("test_config", [None])[0]
+        docker_compose = entry.get("docker_compose", [None])[0]
+        email_recipients = entry.get("email", "")
+
+        if isinstance(email_recipients, list) and email_recipients:
+            email_str = email_recipients[0]
+        else:
+            email_str = email_recipients
+
+        # Create email list with admin addresses
+        if email_str:
+            email_addresses = {addr.strip() for addr in email_str.split(",") if addr.strip()}
+            all_emails = ",".join(sorted(email_addresses | ADMIN_EMAILS))
+        else:
+            all_emails = ",".join(sorted(ADMIN_EMAILS))
+
+        # Get durations for test groups
+        duration_map = next((dur_map for name, dur_map in duration_entries if name == feature_name), {})
+
+        # Create group-to-duration mapping
+        group_durations = {group: parse_duration_to_seconds(duration_map.get(group, "1 hr")) for group in entry.get("test_groups", [])}
+
+        # Distribute groups across allocated nodes
+        distributed_groups = distribute_groups_across_nodes(group_durations, node_count)
+
+        # Create dispatch entry for each node's group set
+        for groups, total_seconds in distributed_groups:
+            # Get submission strategy: first check ORIOLE_SUBMIT_STRATEGY, then entry, default to 'all'
+            submit_flag = ORIOLE_SUBMIT_STRATEGY.get(feature_name, entry.get("ORIOLE_SUBMIT_FLAG", "all"))
+
+            dispatch_entries.append(
+                {
+                    "NODE_NAME": static_node,
+                    "FEATURE_NAME": feature_name,
+                    "TEST_CASE_FOLDER": test_folder,
+                    "TEST_CONFIG_CHOICE": test_config,
+                    "TEST_GROUP_CHOICE": groups[0] if groups else "",
+                    "TEST_GROUPS": groups,
+                    "SUM_DURATION": format_seconds_to_duration(total_seconds),
+                    "DOCKER_COMPOSE_FILE_CHOICE": docker_compose,
+                    "SEND_TO": all_emails,
+                    "PROVISION_VMPC": entry.get("PROVISION_VMPC", False),
+                    "VMPC_NAMES": entry.get("VMPC_NAMES", ""),
+                    "PROVISION_DOCKER": entry.get("PROVISION_DOCKER", True),
+                    "ORIOLE_SUBMIT_FLAG": submit_flag,
+                }
+            )
+
+    # Process dynamic features, using remaining available nodes
+    remaining_nodes = [node for node in available_nodes if node not in used_nodes]
+
+    if not remaining_nodes and dynamic_features:
+        logging.error("Not enough nodes available after static bindings!")
+        sys.exit(1)
+
+    node_index = 0
+
+    for entry, node_count in dynamic_features:
+        feature_name = entry["FEATURE_NAME"]
+
+        # Extract feature configuration (same as for static features)
+        test_folder = entry.get("test_case_folder", [None])[0]
+        test_config = entry.get("test_config", [None])[0]
+        docker_compose = entry.get("docker_compose", [None])[0]
+        email_recipients = entry.get("email", "")
+
+        if isinstance(email_recipients, list) and email_recipients:
+            email_str = email_recipients[0]
+        else:
+            email_str = email_recipients
+
+        if email_str:
+            email_addresses = {addr.strip() for addr in email_str.split(",") if addr.strip()}
+            all_emails = ",".join(sorted(email_addresses | ADMIN_EMAILS))
+        else:
+            all_emails = ",".join(sorted(ADMIN_EMAILS))
+
+        # Get durations and distribute groups (same as for static features)
+        duration_map = next((dur_map for name, dur_map in duration_entries if name == feature_name), {})
+        group_durations = {group: parse_duration_to_seconds(duration_map.get(group, "1 hr")) for group in entry.get("test_groups", [])}
+        distributed_groups = distribute_groups_across_nodes(group_durations, node_count)
+
+        # Create dispatch entry for each node's group set
+        for groups, total_seconds in distributed_groups:
+            # Check if we have enough nodes left
+            if node_index >= len(remaining_nodes):
+                logging.error(f"Not enough nodes for all features! Need at least {node_index+1} but only have {len(remaining_nodes)}")
+                sys.exit(1)
+
+            # Select the next available node
+            chosen_node = remaining_nodes[node_index]
+            used_nodes.add(chosen_node)
+            node_index += 1
+
+            # Get submission strategy
+            submit_flag = ORIOLE_SUBMIT_STRATEGY.get(feature_name, entry.get("ORIOLE_SUBMIT_FLAG", "all"))
+
+            dispatch_entries.append(
+                {
+                    "NODE_NAME": chosen_node,
+                    "FEATURE_NAME": feature_name,
+                    "TEST_CASE_FOLDER": test_folder,
+                    "TEST_CONFIG_CHOICE": test_config,
+                    "TEST_GROUP_CHOICE": groups[0] if groups else "",
+                    "TEST_GROUPS": groups,
+                    "SUM_DURATION": format_seconds_to_duration(total_seconds),
+                    "DOCKER_COMPOSE_FILE_CHOICE": docker_compose,
+                    "SEND_TO": all_emails,
+                    "PROVISION_VMPC": entry.get("PROVISION_VMPC", False),
+                    "VMPC_NAMES": entry.get("VMPC_NAMES", ""),
+                    "PROVISION_DOCKER": entry.get("PROVISION_DOCKER", True),
+                    "ORIOLE_SUBMIT_FLAG": submit_flag,
+                }
+            )
+
+    # Step 9: Sort dispatch entries by node name (numerically)
+    def node_sort_key(entry):
+        """Extract node number for sorting"""
+        node_name = entry["NODE_NAME"]
+        # Extract numeric part from node name (e.g., 'node25' -> 25)
+        if node_name.startswith("node"):
+            try:
+                return int(node_name[4:])
+            except ValueError:
+                pass
+        # For non-numeric or unparseable nodes, return the original name
+        return node_name
+
+    # Sort the dispatch entries by node name
+    dispatch_entries.sort(key=node_sort_key)
+
+    # Step 10: Write dispatch JSON
+    with open(args.output, "w") as f:
+        json.dump(dispatch_entries, f, indent=2)
+    logging.info(f"Generated {len(dispatch_entries)} entries in {args.output}")
+
+
+if __name__ == "__main__":
     main()
