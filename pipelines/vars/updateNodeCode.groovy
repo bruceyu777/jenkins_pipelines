@@ -167,9 +167,79 @@ def call() {
         post {
             always {
                 script {
-                    echo "Pipeline completed. Check console output for details."
+                    def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
+                    sh "rm -rf ${WORKSPACE}/test_results"
+                    sh "rm -f ${WORKSPACE}/summary_*.html"
+
+                    def archivedFolders = []
+                    for (group in computedTestGroups) {
+                        def archiveGroup = getArchiveGroupName(group)
+                        def folder = sh(
+                            returnStdout: true,
+                            script: """
+                                find ${outputsDir} \
+                                    -mindepth 2 -maxdepth 2 -type d \
+                                    -name "*--group--${archiveGroup}" \
+                                    -printf '%T@ %p\\n' \
+                                  | sort -nr \
+                                  | head -1 \
+                                  | cut -d' ' -f2-
+                            """
+                        ).trim()
+
+                        if (!folder) {
+                            echo "Warning: No test results folder found for test group '${archiveGroup}' in ${outputsDir}."
+                        } else {
+                            echo "Found folder for group '${archiveGroup}': ${folder}"
+                            archivedFolders << folder
+                            sh "mkdir -p ${WORKSPACE}/test_results/${archiveGroup}"
+                            sh "cp -r ${folder} ${WORKSPACE}/test_results/${archiveGroup}/"
+                            sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
+                        }
+                    }
+
+                    if (archivedFolders.isEmpty()) {
+                        echo "No test results were found for any test group."
+                    } else {
+                        archiveArtifacts artifacts: "test_results/**, summary_*.html", fingerprint: false
+                        publishHTML(target: [
+                            reportDir   : ".",
+                            reportFiles : "summary_${getArchiveGroupName(computedTestGroups[0])}.html",
+                            reportName  : "Test Results Summary for ${getArchiveGroupName(computedTestGroups[0])}"
+                        ])
+                    }
+
+                    // Clean up the outputs directory
+                    sh """
+                        cd /home/fosqa/resources/tools
+                        make folder_control
+                    """
+
                 }
+
+                echo "Pipeline completed. Send email."
+                def base = "${env.BUILD_URL}artifact/"
+                    def summaryLinks = computedTestGroups.collect { group ->
+                        def name = getArchiveGroupName(group)
+                        "<a href=\"${base}summary_${name}.html\">Summary: ${name}</a>"
+                    }.join("<br/>\n")
+
+                    def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.html').trim()
+
+                    sendFosqaEmail(
+                        to     : sendTo,
+                        subject: "SUCCESS: ${env.BUILD_DISPLAY_NAME}",
+                        body   : """
+                        <p>🎉 Good news! Job <b>${env.BUILD_DISPLAY_NAME}</b> completed at ${new Date()}.</p>
+                        <p>📄 Test result summaries:</p>
+                        ${summaryLinks}
+                        <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                        <h3>==================</h3>
+                        ${nodeInfo}
+                        """
+                    )
             }
+
         }
     }
 }
