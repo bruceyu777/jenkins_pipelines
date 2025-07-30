@@ -18,8 +18,6 @@ Usage:
   ./load_balancer.py [-a] [-e webfilter,antivirus] \
       -l feature_list.py -d test_duration.json \
       -n node1,node2,... -o dispatch.json
-
-Author: Automated
 """
 import argparse
 import importlib.util
