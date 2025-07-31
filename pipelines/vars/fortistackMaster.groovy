@@ -168,8 +168,30 @@ def call() {
           }
         }
       }
+      stage('Trigger Provision FGT Pipeline') {
+        // This stage runs on the designated node.
+        agent { label "${params.NODE_NAME.trim()}" }
+        when {
+          expression { return !params.SKIP_PROVISION }
+        }
+        steps {
+          script {
+            def paramsMap = new groovy.json.JsonSlurper()
+                              .parseText(params.PARAMS_JSON)
+                              .collectEntries { k, v -> [k, v?.toString()?.trim()] }
+            def provisionParams = [
+              string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
+              string(name: 'RELEASE', value: params.RELEASE.trim()),
+              string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
+              string(name: 'FGT_TYPE', value: params.FGT_TYPE.trim())
+            ]
+            echo "Triggering fortistack_provision_fgts pipeline with parameters: ${provisionParams}"
+            build job: 'fortistack_provision_fgts', parameters: provisionParams, wait: true
+          }
+        }
+      }
 
-      stage('Trigger Provision Pipeline') {
+      stage('Trigger Provision TEST ENV Pipeline') {
         // This stage runs on the designated node
         agent { label "${params.NODE_NAME}" }
         when {
