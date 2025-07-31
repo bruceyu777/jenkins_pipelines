@@ -424,7 +424,6 @@ def call() {
                         <p>📄 Test result summaries:</p>
                         ${summaryLinks}
                         <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                        <h3>==================</h3>
                         ${nodeInfo}
                         """
                     )
@@ -448,7 +447,6 @@ def call() {
                         <p>📄 You can still peek at whatever got archived:</p>
                         ${summaryLinks}
                         <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                        <h3>==================</h3>
                         ${nodeInfo}
                         """
                     )

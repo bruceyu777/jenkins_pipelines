@@ -91,7 +91,7 @@ def call() {
     environment {
         TZ = 'America/Vancouver'
     }
-    
+
     stages {
       stage('🔍 Debug Config & Mount') {
         steps {
@@ -99,22 +99,22 @@ def call() {
             // 1) Check that the directory is there
             def cfgDir  = '/var/jenkins_home/feature-configs/fortistack'
             def cfgFile = "${cfgDir}/features.json"
-            
+
             echo ">>> DEBUG: Does config dir exist? " + sh(returnStatus: true, script: "test -d '${cfgDir}'")  // 0 means yes
             echo ">>> DEBUG: Does config file exist? " + sh(returnStatus: true, script: "test -f '${cfgFile}'")
-            
+
             // 2) List directory contents
             echo ">>> DEBUG: Listing '${cfgDir}':\n" +
               sh(returnStdout: true, script: "ls -1 '${cfgDir}'").trim()
-            
+
             // 3) Dump raw file
             echo ">>> DEBUG: Raw JSON content:\n" +
               sh(returnStdout: true, script: "cat '${cfgFile}'").trim()
-            
+
             // 4) Parse it and inspect
             def raw = readFile(cfgFile)
             def json = new groovy.json.JsonSlurper().parseText(raw)
-            
+
             echo ">>> DEBUG: Parsed JSON keys (features): ${json.keySet()}"
             if (params.FEATURE_NAME) {
               echo ">>> DEBUG: Entry for FEATURE_NAME='${params.FEATURE_NAME}':\n" +
@@ -134,7 +134,7 @@ def call() {
           }
         }
       }
-      
+
       stage('Set Build Display Name') {
         steps {
           script {
@@ -142,7 +142,7 @@ def call() {
           }
         }
       }
-      
+
       stage('Debug Parameters') {
         steps {
           script {
@@ -151,7 +151,7 @@ def call() {
           }
         }
       }
-      
+
       stage('Merge Email Parameters') {
         steps {
           script {
@@ -168,7 +168,7 @@ def call() {
           }
         }
       }
-      
+
       stage('Trigger Provision Pipeline') {
         // This stage runs on the designated node.
         agent { label "${params.NODE_NAME.trim()}" }
@@ -191,8 +191,8 @@ def call() {
           }
         }
       }
-      
-      
+
+
       stage('Trigger Test Pipeline') {
             // This stage runs on the designated node and iterates over each test group sequentially.
             agent { label "${params.NODE_NAME}" }
@@ -204,15 +204,15 @@ def call() {
                 def paramsMap = new groovy.json.JsonSlurper()
                                  .parseText(params.PARAMS_JSON)
                                  .collectEntries { k, v -> [k, v] }
-                                 
+
                 echo "Using computed test groups: ${computedTestGroups}"
-                
+
                 // Note: mergedSendTo is already computed in the previous stage.
-                
+
                 // Track overall result.
                 def overallSuccess = true
                 def groupResults = [:]
-                
+
                 // Loop through each test group.
                 for (group in computedTestGroups) {
                   def testParams = [
@@ -313,7 +313,7 @@ def call() {
                 // Sleep for 1 second before next iteration.
                 sleep time: 1, unit: 'SECONDS'
               }
-              
+
               if (archivedFolders.isEmpty()) {
                 echo "No test results were found for any test group."
               } else {
@@ -326,20 +326,19 @@ def call() {
           }
         }
 
-
         echo "Master Pipeline completed."
-        
+
       }
       success {
             sendFosqaEmail(
-                to:       mergedSendTo,
+                to:       "yzhengfeng@fortinet.com",
                 subject:  "${env.BUILD_DISPLAY_NAME} Succeeded",
                 body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
             )
       }
       failure {
           sendFosqaEmail(
-              to:      mergedSendTo,
+              to:      "yzhengfeng@fortinet.com",
               subject: "${env.BUILD_DISPLAY_NAME} FAILED",
               body:    "<p>Check console output: ${env.BUILD_URL}</p>"
           )
