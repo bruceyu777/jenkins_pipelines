@@ -212,7 +212,7 @@ def call() {
         agent { label "${params.NODE_NAME.trim()}" }
         when {
           // Only run if not skipping provision AND not skipping test env provision
-          expression { return !params.SKIP_PROVISION && !params.SKIP_PROVISION_TEST_ENV }
+          expression { return !params.SKIP_PROVISION_TEST_ENV }
         }
         steps {
           script {
