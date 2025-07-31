@@ -383,8 +383,14 @@ def call() {
             }
 
             always {
+                // Fix: Add a concrete action in the always block to avoid the ambiguity
                 script {
-                    // Archive any provisioning logs or artifacts if needed
+                    echo "Provisioning completed with result: ${currentBuild.result ?: 'SUCCESS'}"
+
+                    // Archive any provisioning logs if they exist
+                    if (fileExists('provision_logs')) {
+                        archiveArtifacts artifacts: 'provision_logs/**', allowEmptyArchive: true
+                    }
                 }
             }
         }
