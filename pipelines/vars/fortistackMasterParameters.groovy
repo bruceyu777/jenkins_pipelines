@@ -107,6 +107,7 @@ def call(Map config = [:]) {
     ) ]
 
     allParams << [ key: 'SKIP_PROVISION', defn: booleanParam(name: 'SKIP_PROVISION', defaultValue: false, description: 'Skip the Provision stage') ]
+    allParams << [ key: 'SKIP_PROVISION_TEST_ENV', defn: booleanParam(name: 'SKIP_PROVISION_TEST_ENV', defaultValue: false, description: 'Skip the provisioning of test environment (Docker, VMPCs, etc)') ]
     allParams << [ key: 'SKIP_TEST',      defn: booleanParam(name: 'SKIP_TEST',      defaultValue: false, description: 'Skip the Test stage') ]
     allParams << [ key: 'ORIOLE_SUBMIT_FLAG', defn: choice(
         name: 'ORIOLE_SUBMIT_FLAG',

@@ -1,4 +1,25 @@
 // Used by http://10.96.227.206:8080/job/fortistack_master_provision_runtest/
+
+// Define parameters function first, so it's available when called
+def fortistackMasterParameters(Map args = [:]) {
+    def defaultParams = [
+        // Add the new parameter specifically for test environment provisioning
+        booleanParam(
+            name: 'SKIP_PROVISION_TEST_ENV',
+            defaultValue: false,
+            description: 'Skip the provisioning of test environment (Docker, VMPCs, etc)'
+        ),
+        // Other existing parameters...
+        // Add other parameters here
+    ]
+
+    // Any parameters to exclude
+    def exclude = args.exclude ?: []
+
+    // Filter the parameters list
+    return defaultParams.findAll { !(it.name in exclude) }
+}
+
 // Helper function to get the archive group name (first two portions).
 def getArchiveGroupName(String group) {
     def parts = group.tokenize('.')
@@ -57,8 +78,6 @@ def getTestGroups(params) {
     return testGroups
 }
 
-
-
 // Helper function to parse PARAMS_JSON and expand its keys as global variables.
 def expandParamsJson(String jsonStr) {
     try {
@@ -74,12 +93,13 @@ def expandParamsJson(String jsonStr) {
     }
 }
 
+// Global variables should be defined at the top level
 def computedTestGroups = []  // Global variable to share across stages
+def mergedSendTo = ''        // Declare a global variable that can be used in all stages and in the post block.
 
-// Declare a global variable that can be used in all stages and in the post block.
-def mergedSendTo = ''
-
+// Main entry point for the pipeline
 def call() {
+  // Execute helper functions to set up parameters and expand JSON
   fortistackMasterParameters(exclude:[])
   expandParamsJson(params.PARAMS_JSON)
 
@@ -135,10 +155,25 @@ def call() {
         }
       }
 
+      // Update the build display name
       stage('Set Build Display Name') {
         steps {
           script {
-            currentBuild.displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.FEATURE_NAME}-${computedTestGroups.join(',')}"
+            def displayName = "#${currentBuild.number} ${params.NODE_NAME}-${params.FEATURE_NAME}-${computedTestGroups.join(',')}"
+
+            // Add indicators for skipped components
+            def skippedComponents = []
+            if (params.SKIP_PROVISION) skippedComponents << "NoProvision"
+            else {
+                if (params.SKIP_PROVISION_TEST_ENV) skippedComponents << "NoTestEnv"
+            }
+            if (params.SKIP_TEST) skippedComponents << "NoTest"
+
+            if (skippedComponents) {
+                displayName += " [${skippedComponents.join('+')}]"
+            }
+
+            currentBuild.displayName = displayName
           }
         }
       }
@@ -168,6 +203,7 @@ def call() {
           }
         }
       }
+
       stage('Trigger Provision FGT Pipeline') {
         // This stage runs on the designated node.
         agent { label "${params.NODE_NAME.trim()}" }
@@ -193,9 +229,10 @@ def call() {
 
       stage('Trigger Provision TEST ENV Pipeline') {
         // This stage runs on the designated node
-        agent { label "${params.NODE_NAME}" }
+        agent { label "${params.NODE_NAME.trim()}" }
         when {
-          expression { return !params.SKIP_PROVISION }
+          // Only run if not skipping provision AND not skipping test env provision
+          expression { return !params.SKIP_PROVISION && !params.SKIP_PROVISION_TEST_ENV }
         }
         steps {
           script {
@@ -238,50 +275,51 @@ def call() {
       }
 
       stage('Trigger Test Pipeline') {
-            // This stage runs on the designated node and iterates over each test group sequentially.
-            agent { label "${params.NODE_NAME}" }
-            when {
-              expression { return !params.SKIP_TEST }
-            }
-            steps {
-              script {
-                def paramsMap = new groovy.json.JsonSlurper()
-                                 .parseText(params.PARAMS_JSON)
-                                 .collectEntries { k, v -> [k, v] }
+        // This stage runs on the designated node and iterates over each test group sequentially.
+        agent { label "${params.NODE_NAME.trim()}" }
+        when {
+          expression { return !params.SKIP_TEST }
+        }
+        steps {
+          script {
+            def paramsMap = new groovy.json.JsonSlurper()
+                             .parseText(params.PARAMS_JSON)
+                             .collectEntries { k, v -> [k, v] }
 
-                echo "Using computed test groups: ${computedTestGroups}"
+            echo "Using computed test groups: ${computedTestGroups}"
 
-                // Build parameters for test pipeline
-                def testParams = [
-                  string(name: 'RELEASE', value: params.RELEASE.trim()),
-                  string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
-                  string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
-                  string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
-                  string(name: 'SVN_BRANCH', value: params.SVN_BRANCH?.trim()),
-                  string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
-                  string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
-                  string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
-                  string(name: 'TEST_GROUP_CHOICE', value: params.TEST_GROUP_CHOICE?.trim()),
-                  string(name: 'TEST_GROUPS', value: groovy.json.JsonOutput.toJson(computedTestGroups)),
-                  string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
-                  booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
-                  booleanParam(name: 'PROVISION_VMPC', value: params.PROVISION_VMPC),
-                  string(name: 'VMPC_NAMES', value: params.VMPC_NAMES?.trim() ?: ''),
-                  booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER),
-                  string(name: 'PARAMS_JSON', value: params.PARAMS_JSON),
-                  string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG?.trim() ?: 'all'),
-                  string(name: 'SEND_TO', value: mergedSendTo)
-                ]
-                echo "Triggering fortistackRunTests pipeline with parameters: ${testParams}"
-                def testResult = build job: 'fortistackRunTests', parameters: testParams, wait: true, propagate: false
+            // Build parameters for test pipeline
+            def testParams = [
+              string(name: 'RELEASE', value: params.RELEASE.trim()),
+              string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
+              string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
+              string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
+              string(name: 'SVN_BRANCH', value: params.SVN_BRANCH?.trim()),
+              string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
+              string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
+              string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
+              string(name: 'TEST_GROUP_CHOICE', value: params.TEST_GROUP_CHOICE?.trim()),
+              string(name: 'TEST_GROUPS', value: groovy.json.JsonOutput.toJson(computedTestGroups)),
+              string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
+              booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
+              booleanParam(name: 'PROVISION_VMPC', value: params.PROVISION_VMPC),
+              string(name: 'VMPC_NAMES', value: params.VMPC_NAMES?.trim() ?: ''),
+              booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER),
+              string(name: 'PARAMS_JSON', value: params.PARAMS_JSON),
+              string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG?.trim() ?: 'all'),
+              string(name: 'SEND_TO', value: mergedSendTo)
+            ]
+            echo "Triggering fortistackRunTests pipeline with parameters: ${testParams}"
+            def testResult = build job: 'fortistackRunTests', parameters: testParams, wait: true, propagate: false
 
-                if (testResult.getResult() != "SUCCESS") {
-                  error "Test execution failed with result: ${testResult.getResult()}"
-                }
-              }
+            if (testResult.getResult() != "SUCCESS") {
+              error "Test execution failed with result: ${testResult.getResult()}"
             }
           }
+        }
+      }
     }
+
     post {
       always {
         node("${params.NODE_NAME}") {
@@ -357,21 +395,66 @@ def call() {
         }
 
         echo "Master Pipeline completed."
+      }
 
-      }
       success {
+        script {
+            // Create summary of what was executed
+            def executedComponents = []
+            if (!params.SKIP_PROVISION) {
+                executedComponents << "Provision FGTs"
+                if (!params.SKIP_PROVISION_TEST_ENV) {
+                    executedComponents << "Provision Test Environment"
+                }
+            }
+            if (!params.SKIP_TEST) executedComponents << "Run Tests"
+
+            def componentSummary = executedComponents.isEmpty() ?
+                "<p>No components were executed.</p>" :
+                "<p>Executed components: <b>${executedComponents.join(', ')}</b></p>"
+
             sendFosqaEmail(
-                to:       "yzhengfeng@fortinet.com",
+                to:       mergedSendTo ?: "yzhengfeng@fortinet.com",
                 subject:  "${env.BUILD_DISPLAY_NAME} Succeeded",
-                body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
+                body:     """
+                <p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>
+                ${componentSummary}
+                <p>Feature: <b>${params.FEATURE_NAME}</b></p>
+                <p>Test groups: <b>${computedTestGroups.join(', ')}</b></p>
+                <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                """
             )
+        }
       }
+
       failure {
-          sendFosqaEmail(
-              to:      "yzhengfeng@fortinet.com",
-              subject: "${env.BUILD_DISPLAY_NAME} FAILED",
-              body:    "<p>Check console output: ${env.BUILD_URL}</p>"
-          )
+        script {
+            // Create summary of what was executed
+            def executedComponents = []
+            if (!params.SKIP_PROVISION) {
+                executedComponents << "Provision FGTs"
+                if (!params.SKIP_PROVISION_TEST_ENV) {
+                    executedComponents << "Provision Test Environment"
+                }
+            }
+            if (!params.SKIP_TEST) executedComponents << "Run Tests"
+
+            def componentSummary = executedComponents.isEmpty() ?
+                "<p>No components were executed.</p>" :
+                "<p>Executed components: <b>${executedComponents.join(', ')}</b></p>"
+
+            sendFosqaEmail(
+                to:      mergedSendTo ?: "yzhengfeng@fortinet.com",
+                subject: "${env.BUILD_DISPLAY_NAME} FAILED",
+                body:    """
+                <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
+                ${componentSummary}
+                <p>Feature: <b>${params.FEATURE_NAME}</b></p>
+                <p>Test groups: <b>${computedTestGroups.join(', ')}</b></p>
+                <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                """
+            )
+        }
       }
     }
   }
