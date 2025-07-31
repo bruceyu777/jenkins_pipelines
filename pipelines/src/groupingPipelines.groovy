@@ -31,53 +31,78 @@ pipeline {
 }''',
             description: 'Common configuration parameters as JSON (PARAMS_JSON is now a JSON object)'
         )
-        // Multi-line text parameter for individual configuration overrides.
-        text(
-            name: 'INDIVIDUAL_CONFIGS',
-            defaultValue: '''[
-  {
-    "NODE_NAME": "node9",
-    "FEATURE_NAME": "avfortisandbox",
-    "TEST_CASE_FOLDER": "testcase",
-    "TEST_CONFIG_CHOICE": "env.newman.FGT_KVM.avfortisandbox.conf",
-    "TEST_GROUP_CHOICE": "grp.avfortisandbox_fortistack.full",
-    "TEST_GROUPS": "[\\"grp.avfortisandbox_fortistack.full\\", \\"grp.avfortisandbox_alt.full\\"]",
-    "DOCKER_COMPOSE_FILE_CHOICE": "docker.avfortisandbox_avfortisandbox.yml",
-    "SEND_TO": "yzhengfeng@fortinet.com;wangd@fortinet.com;vlysak@fortinet.com"
-  },
-  {
-    "NODE_NAME": "node10",
-    "FEATURE_NAME": "webfilter",
-    "TEST_CASE_FOLDER": "testcase_v1",
-    "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
-    "TEST_GROUP_CHOICE": "grp.webfilter_basic.full",
-    "TEST_GROUPS": "grp.webfilter_basic.full, grp.webfilter_basic2.full",
-    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml",
-    "SEND_TO": "yzhengfeng@fortinet.com;wangd@fortinet.com;hchuanjian@fortinet.com"
-  }
-]''',
-            description: '''Individual configuration parameters as a JSON array.
-Both TEST_GROUP_CHOICE (legacy, single test group) and TEST_GROUPS (a JSON array of test suites or a comma separated list) are supported.
-Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall back to TEST_GROUP_CHOICE.'''
+        // Remove INDIVIDUAL_CONFIGS as it will be automatically generated
+        booleanParam(
+            name: 'REGENERATE_DISPATCH',
+            defaultValue: true,
+            description: 'Regenerate dispatch.json by running load_balancer.py'
+        )
+        string(
+            name: 'LOAD_BALANCER_ARGS',
+            defaultValue: '-a',
+            description: 'Arguments to pass to load_balancer.py (default: "-a" to use Jenkins nodes)'
+        )
+        // Add dry run parameter
+        booleanParam(
+            name: 'DRY_RUN',
+            defaultValue: false,
+            description: 'When enabled, only print parameters without triggering downstream jobs'
         )
     }
 
     stages {
         stage('Set Build Display Name') {
             steps {
-            script {
-                currentBuild.displayName = "#${currentBuild.number}-r${params.RELEASE}-b${params.BUILD_NUMBER}"
-            }
+                script {
+                    // Add DRY RUN indicator to the display name
+                    def displayName = "#${currentBuild.number}-r${params.RELEASE}-b${params.BUILD_NUMBER}"
+                    if (params.DRY_RUN) {
+                        displayName += "-DRY_RUN"
+                    }
+                    currentBuild.displayName = displayName
+                }
             }
         }
-        stage('Trigger fortistack_master_provision_runtest Jobs in Parallel') {
+
+        stage('Generate Dispatch Configuration') {
+            when {
+                expression { return params.REGENERATE_DISPATCH }
+            }
             steps {
                 script {
-                    // Parse the common and individual configuration JSON.
-                    def common = readJSON text: params.COMMON_CONFIG
-                    def individualConfigs = readJSON text: params.INDIVIDUAL_CONFIGS
+                    echo "Running load_balancer.py to generate dispatch.json"
+                    sh """
+                        cd /home/fosqa/jenkins-master/feature-configs/fortistack
+                        python3 load_balancer.py ${params.LOAD_BALANCER_ARGS}
+                    """
+                }
+            }
+        }
 
-                    def parallelBuilds = [:]
+        stage('Read Dispatch Configuration') {
+            steps {
+                script {
+                    echo "Reading dispatch.json for individual configurations"
+                    def dispatchJson = readFile('/home/fosqa/jenkins-master/feature-configs/fortistack/dispatch.json')
+                    def individualConfigs = readJSON text: dispatchJson
+                    echo "Loaded ${individualConfigs.size()} configurations from dispatch.json"
+
+                    // Store for later use
+                    env.INDIVIDUAL_CONFIGS_JSON = dispatchJson
+                }
+            }
+        }
+
+        stage('Prepare Job Configurations') {
+            steps {
+                script {
+                    // Parse the common config JSON
+                    def common = readJSON text: params.COMMON_CONFIG
+                    // Parse the individual configurations from the environment variable
+                    def individualConfigs = readJSON text: env.INDIVIDUAL_CONFIGS_JSON
+
+                    def jobConfigs = []
+                    def configSummary = [:]
 
                     // Iterate over each individual configuration and merge with common settings.
                     individualConfigs.eachWithIndex { individual, i ->
@@ -86,83 +111,89 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                         merged.BUILD_NUMBER = params.BUILD_NUMBER
                         merged.RELEASE = params.RELEASE
 
-                        // Process TEST_GROUPS field:
-                        // if (merged.TEST_GROUPS?.trim()) {
-                        //     def tg = merged.TEST_GROUPS.trim()
-                        //     def validTestGroups
-                        //     if (tg.startsWith('[')) {
-                        //         // If it starts with '[' try to parse it as JSON.
-                        //         try {
-                        //             def parsed = readJSON text: tg
-                        //             validTestGroups = groovy.json.JsonOutput.toJson(parsed)
-                        //         } catch (Exception e) {
-                        //             echo "TEST_GROUPS value not valid JSON, splitting by comma: ${e}"
-                        //             def arr = tg.split(',').collect { it.trim() }
-                        //             validTestGroups = groovy.json.JsonOutput.toJson(arr)
-                        //         }
-                        //     } else {
-                        //         // Otherwise, assume a comma separated list.
-                        //         def arr = tg.split(',').collect { it.trim() }
-                        //         validTestGroups = groovy.json.JsonOutput.toJson(arr)
-                        //     }
-                        //     merged.TEST_GROUPS = validTestGroups
-                        // } else {
-                        //     merged.TEST_GROUPS = ""
-                        // }
-                        // Normalize TEST_GROUPS into a single JSON‐string array or empty string
-                        def rawTG = merged.TEST_GROUPS
-                        def validTestGroups = ""
+                        // Normalize TEST_GROUPS to handle different formats
+                        def testGroups = individual.TEST_GROUPS
 
-                        // 1) If it’s already a List (from unescaped JSON), just JSON-encode it:
-                        if (rawTG instanceof List) {
-                            validTestGroups = groovy.json.JsonOutput.toJson(rawTG)
+                        // If TEST_GROUPS is already a JSON array in the input
+                        if (testGroups instanceof List) {
+                            merged.TEST_GROUPS = groovy.json.JsonOutput.toJson(testGroups)
                         }
-                        // 2) Otherwise if it’s a String, handle escaped JSON or comma-delimited:
-                        else if (rawTG instanceof String && rawTG.trim()) {
-                            def tg = rawTG.trim()
-                            if (tg.startsWith("[")) {
-                                try {
-                                    // parse "[\"a\",\"b\"]" into a List
-                                    def parsed = readJSON text: tg
-                                    validTestGroups = groovy.json.JsonOutput.toJson(parsed)
-                                } catch (Exception e) {
-                                    echo "TEST_GROUPS not valid JSON, splitting by comma: ${e}"
-                                    def arr = tg.split(",").collect { it.trim() }
-                                    validTestGroups = groovy.json.JsonOutput.toJson(arr)
-                                }
-                            } else {
-                                // plain comma-separated list “a, b, c”
-                                def arr = tg.split(",").collect { it.trim() }
-                                validTestGroups = groovy.json.JsonOutput.toJson(arr)
-                            }
+                        // If it's a string or anything else, ensure it's properly formatted
+                        else if (testGroups) {
+                            merged.TEST_GROUPS = groovy.json.JsonOutput.toJson(testGroups)
+                        } else {
+                            merged.TEST_GROUPS = "[]"
                         }
 
-                        // 3) If neither, leave it empty
-                        merged.TEST_GROUPS = validTestGroups
+                        jobConfigs << merged
 
+                        // Track node usage for summary
+                        def nodeName = individual.NODE_NAME
+                        if (!configSummary.containsKey(nodeName)) {
+                            configSummary[nodeName] = []
+                        }
+                        configSummary[nodeName] << [
+                            index: i,
+                            feature: individual.FEATURE_NAME,
+                            groups: individual.TEST_GROUPS instanceof List ? individual.TEST_GROUPS.size() : 0
+                        ]
+                    }
 
-                        def branchName = "Run_${i}"
+                    // Pretty print detailed configuration for each job
+                    echo "==== JOB CONFIGURATIONS ===="
+                    jobConfigs.eachWithIndex { config, index ->
+                        echo "CONFIG #${index} (${config.FEATURE_NAME} on ${config.NODE_NAME}):"
+                        echo groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(config))
+                        echo "------------------------"
+                    }
+
+                    // Pretty print summary of nodes and features
+                    echo "==== NODE DISTRIBUTION SUMMARY ===="
+                    configSummary.each { node, features ->
+                        echo "NODE: ${node} - ${features.size()} features"
+                        features.each { f ->
+                            echo "  #${f.index}: ${f.feature} (${f.groups} test groups)"
+                        }
+                    }
+
+                    // Store for downstream stage
+                    env.JOB_CONFIGS = groovy.json.JsonOutput.toJson(jobConfigs)
+                }
+            }
+        }
+
+        stage('Trigger Downstream Jobs') {
+            when {
+                expression { return !params.DRY_RUN }
+            }
+            steps {
+                script {
+                    def jobConfigs = readJSON text: env.JOB_CONFIGS
+                    def parallelBuilds = [:]
+
+                    jobConfigs.eachWithIndex { config, i ->
+                        def branchName = "Run_${i}_${config.FEATURE_NAME}_${config.NODE_NAME}"
                         parallelBuilds[branchName] = {
-                            echo "Triggering fortistack_master_provision_runtest with merged configuration: ${merged}"
+                            echo "Triggering fortistack_master_provision_runtest with configuration: ${config}"
                             build job: 'fortistack_master_provision_runtest', parameters: [
-                                string(name: 'PARAMS_JSON', value: groovy.json.JsonOutput.toJson(merged.PARAMS_JSON)),
-                                string(name: 'RELEASE', value: merged.RELEASE),
-                                string(name: 'BUILD_NUMBER', value: merged.BUILD_NUMBER),
-                                string(name: 'NODE_NAME', value: merged.NODE_NAME),
-                                booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: merged.FORCE_UPDATE_DOCKER_FILE),
-                                string(name: 'FEATURE_NAME', value: merged.FEATURE_NAME),
-                                string(name: 'TEST_CASE_FOLDER', value: merged.TEST_CASE_FOLDER),
-                                string(name: 'TEST_CONFIG_CHOICE', value: merged.TEST_CONFIG_CHOICE),
-                                string(name: 'TEST_GROUP_CHOICE', value: merged.TEST_GROUP_CHOICE),
-                                string(name: 'TEST_GROUPS', value: merged.TEST_GROUPS),
-                                string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: merged.DOCKER_COMPOSE_FILE_CHOICE),
-                                string(name: 'SEND_TO', value: merged.SEND_TO),
-                                booleanParam(name: 'SKIP_PROVISION', value: merged.SKIP_PROVISION),
-                                booleanParam(name: 'SKIP_TEST', value: merged.SKIP_TEST),
-                                booleanParam(name: 'PROVISION_VMPC',   value: merged.PROVISION_VMPC),
-                                string(      name: 'VMPC_NAMES',       value: merged.VMPC_NAMES),
-                                booleanParam(name: 'PROVISION_DOCKER', value: merged.PROVISION_DOCKER),
-                                string(      name: 'ORIOLE_SUBMIT_FLAG',       value:  (merged.ORIOLE_SUBMIT_FLAG?.trim() ?: 'succeeded')),
+                                string(name: 'PARAMS_JSON', value: groovy.json.JsonOutput.toJson(config.PARAMS_JSON)),
+                                string(name: 'RELEASE', value: config.RELEASE),
+                                string(name: 'BUILD_NUMBER', value: config.BUILD_NUMBER),
+                                string(name: 'NODE_NAME', value: config.NODE_NAME),
+                                booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: config.FORCE_UPDATE_DOCKER_FILE),
+                                string(name: 'FEATURE_NAME', value: config.FEATURE_NAME),
+                                string(name: 'TEST_CASE_FOLDER', value: config.TEST_CASE_FOLDER),
+                                string(name: 'TEST_CONFIG_CHOICE', value: config.TEST_CONFIG_CHOICE),
+                                string(name: 'TEST_GROUP_CHOICE', value: config.TEST_GROUP_CHOICE),
+                                string(name: 'TEST_GROUPS', value: config.TEST_GROUPS),
+                                string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: config.DOCKER_COMPOSE_FILE_CHOICE),
+                                string(name: 'SEND_TO', value: config.SEND_TO),
+                                booleanParam(name: 'SKIP_PROVISION', value: config.SKIP_PROVISION),
+                                booleanParam(name: 'SKIP_TEST', value: config.SKIP_TEST),
+                                booleanParam(name: 'PROVISION_VMPC', value: config.PROVISION_VMPC ?: false),
+                                string(name: 'VMPC_NAMES', value: config.VMPC_NAMES ?: ''),
+                                booleanParam(name: 'PROVISION_DOCKER', value: config.PROVISION_DOCKER ?: true),
+                                string(name: 'ORIOLE_SUBMIT_FLAG', value: config.ORIOLE_SUBMIT_FLAG ?: 'all'),
                             ], wait: true
                         }
                     }
@@ -172,11 +203,85 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                 }
             }
         }
+
+        stage('Dry Run Summary') {
+            when {
+                expression { return params.DRY_RUN }
+            }
+            steps {
+                script {
+                    def jobConfigs = readJSON text: env.JOB_CONFIGS
+
+                    echo "=== DRY RUN SUMMARY ==="
+                    echo "Would have triggered ${jobConfigs.size()} downstream jobs"
+                    echo "Configuration validation complete - NO JOBS WERE TRIGGERED"
+
+                    // Create artifact with all configurations for reference
+                    writeFile file: 'dry_run_configs.json', text: groovy.json.JsonOutput.prettyPrint(env.JOB_CONFIGS)
+                    archiveArtifacts artifacts: 'dry_run_configs.json', fingerprint: true
+                }
+            }
+        }
     }
 
     post {
         always {
-            echo "Upstream pipeline completed."
+            script {
+                echo "Upstream pipeline completed."
+
+                // Determine if this was a dry run
+                def dryRunPrefix = params.DRY_RUN ? "[DRY RUN] " : ""
+
+                // Get information about configurations
+                def individualConfigs = readJSON text: env.INDIVIDUAL_CONFIGS_JSON
+                def buildSummary = "<h3>${dryRunPrefix}Build Summary</h3><ul>"
+
+                // Group by node
+                def nodeMap = [:]
+                individualConfigs.each { config ->
+                    def nodeName = config.NODE_NAME
+                    if (!nodeMap.containsKey(nodeName)) {
+                        nodeMap[nodeName] = []
+                    }
+                    nodeMap[nodeName] << config
+                }
+
+                // Build summary table
+                buildSummary += "<table border='1' style='border-collapse: collapse; width: 100%;'>"
+                buildSummary += "<tr><th>Node</th><th>Features</th><th>Test Groups</th></tr>"
+
+                nodeMap.each { node, configs ->
+                    def featuresStr = configs.collect { it.FEATURE_NAME }.join(", ")
+                    def groupCount = configs.collect {
+                        it.TEST_GROUPS instanceof List ? it.TEST_GROUPS.size() : 0
+                    }.sum()
+
+                    buildSummary += "<tr><td>${node}</td><td>${featuresStr}</td><td>${groupCount}</td></tr>"
+                }
+
+                buildSummary += "</table>"
+
+                if (params.DRY_RUN) {
+                    buildSummary += "<p><b>DRY RUN:</b> No downstream jobs were triggered</p>"
+                }
+
+                // Determine addresses for notification
+                def commonConfig = readJSON text: params.COMMON_CONFIG
+                def notifyTo = commonConfig.PARAMS_JSON.send_to ?: "yzhengfeng@fortinet.com"
+
+                // Send notification email
+                emailext (
+                    subject: "${dryRunPrefix}Fortistack Group Pipeline: ${currentBuild.fullDisplayName}",
+                    body: """
+                    <p>${dryRunPrefix}Fortistack group pipeline has completed.</p>
+                    <p><b>Status:</b> ${currentBuild.result ?: 'SUCCESS'}</p>
+                    <p><b>Pipeline URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                    ${buildSummary}
+                    """,
+                    to: notifyTo,
+                    mimeType: 'text/html'
+                )
+            }
         }
     }
 }
