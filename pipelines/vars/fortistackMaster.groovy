@@ -1,25 +1,5 @@
 // Used by http://10.96.227.206:8080/job/fortistack_master_provision_runtest/
 
-// Define parameters function first, so it's available when called
-def fortistackMasterParameters(Map args = [:]) {
-    def defaultParams = [
-        // Add the new parameter specifically for test environment provisioning
-        booleanParam(
-            name: 'SKIP_PROVISION_TEST_ENV',
-            defaultValue: false,
-            description: 'Skip the provisioning of test environment (Docker, VMPCs, etc)'
-        ),
-        // Other existing parameters...
-        // Add other parameters here
-    ]
-
-    // Any parameters to exclude
-    def exclude = args.exclude ?: []
-
-    // Filter the parameters list
-    return defaultParams.findAll { !(it.name in exclude) }
-}
-
 // Helper function to get the archive group name (first two portions).
 def getArchiveGroupName(String group) {
     def parts = group.tokenize('.')
