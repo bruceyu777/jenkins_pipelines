@@ -170,50 +170,28 @@ def call() {
       }
 
       stage('Trigger Provision Pipeline') {
-        // This stage runs on the designated node
-        agent { label "${params.NODE_NAME}" }
+        // This stage runs on the designated node.
+        agent { label "${params.NODE_NAME.trim()}" }
         when {
           expression { return !params.SKIP_PROVISION }
         }
         steps {
           script {
             def paramsMap = new groovy.json.JsonSlurper()
-                             .parseText(params.PARAMS_JSON)
-                             .collectEntries { k, v -> [k, v] }
-
-            echo "Using computed test groups: ${computedTestGroups}"
-
-            // Build parameters for provision pipeline
+                              .parseText(params.PARAMS_JSON)
+                              .collectEntries { k, v -> [k, v?.toString()?.trim()] }
             def provisionParams = [
+              string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
               string(name: 'RELEASE', value: params.RELEASE.trim()),
               string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
-              string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
-              string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
-              string(name: 'SVN_BRANCH', value: params.SVN_BRANCH?.trim()),
-              string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
-              string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
-              string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
-              string(name: 'TEST_GROUP_CHOICE', value: params.TEST_GROUP_CHOICE?.trim()),
-              string(name: 'TEST_GROUPS', value: groovy.json.JsonOutput.toJson(computedTestGroups)),
-              string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
-              booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
-              booleanParam(name: 'PROVISION_VMPC', value: params.PROVISION_VMPC),
-              string(name: 'VMPC_NAMES', value: params.VMPC_NAMES?.trim() ?: ''),
-              booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER),
-              string(name: 'PARAMS_JSON', value: params.PARAMS_JSON),
-              string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG?.trim() ?: 'all'),
-              string(name: 'SEND_TO', value: mergedSendTo),
-              string(name: 'TERMINATE_PREVIOUS', value: 'false')
+              string(name: 'FGT_TYPE', value: params.FGT_TYPE.trim())
             ]
-            echo "Triggering fortistackProvisionTestEnv pipeline with parameters: ${provisionParams}"
-            def provisionResult = build job: 'fortistackProvisionTestEnv', parameters: provisionParams, wait: true, propagate: false
-
-            if (provisionResult.getResult() != "SUCCESS") {
-              error "Environment provisioning failed with result: ${provisionResult.getResult()}"
-            }
+            echo "Triggering fortistack_provision_fgts pipeline with parameters: ${provisionParams}"
+            build job: 'fortistack_provision_fgts', parameters: provisionParams, wait: true
           }
         }
       }
+
 
       stage('Trigger Test Pipeline') {
             // This stage runs on the designated node and iterates over each test group sequentially.
@@ -229,32 +207,46 @@ def call() {
 
                 echo "Using computed test groups: ${computedTestGroups}"
 
-                // Build parameters for test pipeline
-                def testParams = [
-                  string(name: 'RELEASE', value: params.RELEASE.trim()),
-                  string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
-                  string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
-                  string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
-                  string(name: 'SVN_BRANCH', value: params.SVN_BRANCH?.trim()),
-                  string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
-                  string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
-                  string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
-                  string(name: 'TEST_GROUP_CHOICE', value: params.TEST_GROUP_CHOICE?.trim()),
-                  string(name: 'TEST_GROUPS', value: groovy.json.JsonOutput.toJson(computedTestGroups)),
-                  string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
-                  booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
-                  booleanParam(name: 'PROVISION_VMPC', value: params.PROVISION_VMPC),
-                  string(name: 'VMPC_NAMES', value: params.VMPC_NAMES?.trim() ?: ''),
-                  booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER),
-                  string(name: 'PARAMS_JSON', value: params.PARAMS_JSON),
-                  string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG?.trim() ?: 'all'),
-                  string(name: 'SEND_TO', value: mergedSendTo)
-                ]
-                echo "Triggering fortistackRunTests pipeline with parameters: ${testParams}"
-                def testResult = build job: 'fortistackRunTests', parameters: testParams, wait: true, propagate: false
+                // Note: mergedSendTo is already computed in the previous stage.
 
-                if (testResult.getResult() != "SUCCESS") {
-                  error "Test execution failed with result: ${testResult.getResult()}"
+                // Track overall result.
+                def overallSuccess = true
+                def groupResults = [:]
+
+                // Loop through each test group.
+                for (group in computedTestGroups) {
+                  def testParams = [
+                    string(name: 'RELEASE', value: params.RELEASE.trim()),
+                    string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
+                    string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
+                    string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
+                    string(name: 'SVN_BRANCH', value: params.SVN_BRANCH?.trim()),
+                    string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
+                    string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
+                    string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
+                    string(name: 'TEST_GROUP_CHOICE', value: group),
+                    string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
+                    booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
+                    booleanParam(name: 'PROVISION_VMPC',   value: params.PROVISION_VMPC),
+                    string(      name: 'VMPC_NAMES',       value: params.VMPC_NAMES.trim()),
+                    booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER),
+                    string(name: 'build_name', value: paramsMap.build_name.trim()),
+                    string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG.trim()),
+                    string(name: 'SEND_TO', value: mergedSendTo)
+                  ]
+                  echo "Triggering fortistack_runtest pipeline for test group '${group}' with parameters: ${testParams}"
+                  def result = build job: 'fortistack_runtest', parameters: testParams, wait: true, propagate: false
+                  groupResults[group] = result.getResult()
+                  if (result.getResult() != "SUCCESS") {
+                    echo "Test pipeline for group '${group}' failed with result: ${result.getResult()}"
+                    overallSuccess = false
+                  } else {
+                    echo "Test pipeline for group '${group}' succeeded."
+                  }
+                }
+                echo "Test pipeline group results: ${groupResults}"
+                if (!overallSuccess) {
+                  error("One or more test pipelines failed: ${groupResults}")
                 }
               }
             }
