@@ -63,6 +63,13 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
     }
 
     stages {
+        stage('Set Build Display Name') {
+            steps {
+            script {
+                currentBuild.displayName = "#${currentBuild.number}-r${params.RELEASE}-b${params.BUILD_NUMBER}"
+            }
+            }
+        }
         stage('Trigger fortistack_master_provision_runtest Jobs in Parallel') {
             steps {
                 script {
