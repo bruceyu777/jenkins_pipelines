@@ -268,32 +268,44 @@ def call() {
 
             echo "Using computed test groups: ${computedTestGroups}"
 
-            // Build parameters for test pipeline
-            def testParams = [
-              string(name: 'RELEASE', value: params.RELEASE.trim()),
-              string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
-              string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
-              string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
-              string(name: 'SVN_BRANCH', value: params.SVN_BRANCH?.trim()),
-              string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
-              string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
-              string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
-              string(name: 'TEST_GROUP_CHOICE', value: params.TEST_GROUP_CHOICE?.trim()),
-              string(name: 'TEST_GROUPS', value: groovy.json.JsonOutput.toJson(computedTestGroups)),
-              string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
-              booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
-              booleanParam(name: 'PROVISION_VMPC', value: params.PROVISION_VMPC),
-              string(name: 'VMPC_NAMES', value: params.VMPC_NAMES?.trim() ?: ''),
-              booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER),
-              string(name: 'PARAMS_JSON', value: params.PARAMS_JSON),
-              string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG?.trim() ?: 'all'),
-              string(name: 'SEND_TO', value: mergedSendTo)
-            ]
-            echo "Triggering fortistackRunTests pipeline with parameters: ${testParams}"
-            def testResult = build job: 'fortistackRunTests', parameters: testParams, wait: true, propagate: false
+            // Track overall result.
+            def overallSuccess = true
+            def groupResults = [:]
 
-            if (testResult.getResult() != "SUCCESS") {
-              error "Test execution failed with result: ${testResult.getResult()}"
+            // Loop through each test group.
+            for (group in computedTestGroups) {
+                def testParams = [
+                    string(name: 'RELEASE', value: params.RELEASE.trim()),
+                    string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
+                    string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
+                    string(name: 'LOCAL_LIB_DIR', value: paramsMap.LOCAL_LIB_DIR?.trim()),
+                    string(name: 'SVN_BRANCH', value: params.SVN_BRANCH?.trim()),
+                    string(name: 'FEATURE_NAME', value: params.FEATURE_NAME?.trim()),
+                    string(name: 'TEST_CASE_FOLDER', value: params.TEST_CASE_FOLDER?.trim()),
+                    string(name: 'TEST_CONFIG_CHOICE', value: params.TEST_CONFIG_CHOICE?.trim()),
+                    string(name: 'TEST_GROUP_CHOICE', value: group),
+                    string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: params.DOCKER_COMPOSE_FILE_CHOICE?.trim()),
+                    booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: params.FORCE_UPDATE_DOCKER_FILE),
+                    booleanParam(name: 'PROVISION_VMPC',   value: params.PROVISION_VMPC),
+                    string(      name: 'VMPC_NAMES',       value: params.VMPC_NAMES?.trim() ?: ''),
+                    booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER),
+                    string(name: 'PARAMS_JSON', value: params.PARAMS_JSON),
+                    string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG?.trim() ?: 'all'),
+                    string(name: 'SEND_TO', value: mergedSendTo)
+                ]
+                echo "Triggering fortistackRunTests pipeline for test group '${group}' with parameters: ${testParams}"
+                def result = build job: 'fortistackRunTests', parameters: testParams, wait: true, propagate: false
+                groupResults[group] = result.getResult()
+                if (result.getResult() != "SUCCESS") {
+                    echo "Test pipeline for group '${group}' failed with result: ${result.getResult()}"
+                    overallSuccess = false
+                } else {
+                    echo "Test pipeline for group '${group}' succeeded."
+                }
+            }
+            echo "Test pipeline group results: ${groupResults}"
+            if (!overallSuccess) {
+                error("One or more test pipelines failed: ${groupResults}")
             }
           }
         }
@@ -393,14 +405,27 @@ def call() {
                 "<p>No components were executed.</p>" :
                 "<p>Executed components: <b>${executedComponents.join(', ')}</b></p>"
 
+            // Create summary links for test results
+            def summaryLinks = ""
+            if (!params.SKIP_TEST) {
+                def base = "${env.BUILD_URL}artifact/"
+                summaryLinks = "<p>📄 Test result summaries:</p><ul>"
+                computedTestGroups.each { group ->
+                    def name = getArchiveGroupName(group)
+                    summaryLinks += "<li><a href=\"${base}summary_${name}.html\">Summary: ${name}</a></li>"
+                }
+                summaryLinks += "</ul>"
+            }
+
             sendFosqaEmail(
-                to:       mergedSendTo ?: "yzhengfeng@fortinet.com",
+                to:       "yzhengfeng@fortinet.com",
                 subject:  "${env.BUILD_DISPLAY_NAME} Succeeded",
                 body:     """
-                <p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>
+                <p>🎉 Good news! Job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>
                 ${componentSummary}
                 <p>Feature: <b>${params.FEATURE_NAME}</b></p>
                 <p>Test groups: <b>${computedTestGroups.join(', ')}</b></p>
+                ${summaryLinks}
                 <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                 """
             )
@@ -423,14 +448,27 @@ def call() {
                 "<p>No components were executed.</p>" :
                 "<p>Executed components: <b>${executedComponents.join(', ')}</b></p>"
 
+            // Create summary links for test results (if any)
+            def summaryLinks = ""
+            if (!params.SKIP_TEST) {
+                def base = "${env.BUILD_URL}artifact/"
+                summaryLinks = "<p>📄 Test result summaries (may be incomplete):</p><ul>"
+                computedTestGroups.each { group ->
+                    def name = getArchiveGroupName(group)
+                    summaryLinks += "<li><a href=\"${base}summary_${name}.html\">Summary: ${name}</a></li>"
+                }
+                summaryLinks += "</ul>"
+            }
+
             sendFosqaEmail(
-                to:      mergedSendTo ?: "yzhengfeng@fortinet.com",
+                to:      "yzhengfeng@fortinet.com",
                 subject: "${env.BUILD_DISPLAY_NAME} FAILED",
                 body:    """
                 <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
                 ${componentSummary}
                 <p>Feature: <b>${params.FEATURE_NAME}</b></p>
                 <p>Test groups: <b>${computedTestGroups.join(', ')}</b></p>
+                ${summaryLinks}
                 <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                 """
             )

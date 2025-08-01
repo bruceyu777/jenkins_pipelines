@@ -38,7 +38,7 @@ ADMIN_EMAILS: Set[str] = {"yzhengfeng@fortinet.com", "wangd@fortinet.com", "rain
 DEFAULT_JENKINS_URL: str = "http://10.96.227.206:8080"
 DEFAULT_JENKINS_USER: str = "fosqa"
 DEFAULT_JENKINS_TOKEN: str = "110dec5c2d2974a67968074deafccc1414"
-DEFAULT_RESERVED_NODES: str = "Built-In Node,node1,node5,node11,node12,node13,node14,node15,node19,node20,node27"
+DEFAULT_RESERVED_NODES: str = "Built-In Node,node1,node5,node11,node12,node13,node14,node15,node19,node20,node27,node33"
 
 # Feature names mapped to dedicated Jenkins nodes
 FEATURE_NODE_STATIC_BINDING: Dict[str, str] = {
