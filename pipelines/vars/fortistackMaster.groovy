@@ -167,6 +167,27 @@ def call() {
         }
       }
 
+      stage('🔍 SVN_BRANCH Value Check') {
+          steps {
+              script {
+                  echo "--- Verifying SVN_BRANCH before triggering downstream jobs ---"
+                  echo "[INFO] The default value for SVN_BRANCH is 'v760'."
+                  echo "[DEBUG] Current value of 'params.SVN_BRANCH': '${params.SVN_BRANCH}'"
+                  echo "[DEBUG] Checking if PARAMS_JSON contains an override for SVN_BRANCH..."
+
+                  def paramsMap = new groovy.json.JsonSlurper().parseText(params.PARAMS_JSON)
+                  if (paramsMap.containsKey('SVN_BRANCH')) {
+                      echo "[WARNING] PARAMS_JSON contains 'SVN_BRANCH: \"${paramsMap.SVN_BRANCH}\"'. This value will be used by downstream jobs that use global variables."
+                  } else {
+                      echo "[INFO] PARAMS_JSON does not contain an override for SVN_BRANCH."
+                  }
+                  echo "[DEBUG] Full PARAMS_JSON content:"
+                  echo "${params.PARAMS_JSON}"
+                  echo "------------------------------------------------------------"
+              }
+          }
+      }
+
       stage('Merge Email Parameters') {
         steps {
           script {
@@ -274,6 +295,8 @@ def call() {
 
             // Loop through each test group.
             for (group in computedTestGroups) {
+                echo "--- Preparing fortistackRunTests for group: ${group} ---"
+                echo "[DEBUG] Passing 'SVN_BRANCH' with value: '${params.SVN_BRANCH}'"
                 def testParams = [
                     string(name: 'RELEASE', value: params.RELEASE.trim()),
                     string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),

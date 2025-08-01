@@ -187,6 +187,19 @@ def call() {
             stage('Environment Preparation') {
                 steps {
                     script {
+                        echo "--- SVN_BRANCH Debugging in fortistackProvisionTestEnv ---"
+                        echo "[DEBUG] Value received in 'params.SVN_BRANCH': '${params.SVN_BRANCH}'"
+                        try {
+                            // The 'SVN_BRANCH' variable used below comes from expandParamsJson
+                            echo "[DEBUG] Value of global variable 'SVN_BRANCH' that will be used for checkout: '${SVN_BRANCH}'"
+                            if (SVN_BRANCH != params.SVN_BRANCH) {
+                                echo "[WARNING] Global 'SVN_BRANCH' ('${SVN_BRANCH}') differs from 'params.SVN_BRANCH' ('${params.SVN_BRANCH}'). The global variable from PARAMS_JSON takes precedence here."
+                            }
+                        } catch (MissingPropertyException e) {
+                            echo "[INFO] Global variable 'SVN_BRANCH' was not set by PARAMS_JSON. The script will rely on 'params.SVN_BRANCH'."
+                        }
+                        echo "--------------------------------------------------------"
+
                         withCredentials([
                             usernamePassword(
                                 credentialsId: 'LDAP',
