@@ -238,8 +238,8 @@ def call() {
         steps {
           script {
             def paramsMap = new groovy.json.JsonSlurper()
-                             .parseText(params.PARAMS_JSON)
-                             .collectEntries { k, v -> [k, v] }
+                              .parseText(params.PARAMS_JSON)
+                              .collectEntries { k, v -> [k, v?.toString()?.trim()] }
 
             echo "Using computed test groups: ${computedTestGroups}"
 
@@ -284,8 +284,8 @@ def call() {
         steps {
           script {
             def paramsMap = new groovy.json.JsonSlurper()
-                             .parseText(params.PARAMS_JSON)
-                             .collectEntries { k, v -> [k, v] }
+                              .parseText(params.PARAMS_JSON)
+                              .collectEntries { k, v -> [k, v?.toString()?.trim()] }
 
             echo "Using computed test groups: ${computedTestGroups}"
 
