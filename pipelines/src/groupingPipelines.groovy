@@ -23,7 +23,7 @@ pipeline {
     "send_to": "yzhengfeng@fortinet.com",
     "FGT_TYPE": "ALL",
     "LOCAL_LIB_DIR": "autolibv3",
-    "SVN_BRANCH": "trunk"
+    "SVN_BRANCH": "v760"
   },
   "FORCE_UPDATE_DOCKER_FILE": true,
   "SKIP_PROVISION": false,
