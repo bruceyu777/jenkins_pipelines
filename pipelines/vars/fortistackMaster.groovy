@@ -1,5 +1,59 @@
 // Used by http://10.96.227.206:8080/job/fortistack_master_provision_runtest/
 
+// Helper function for debugging parameters
+def debugAllParameters() {
+    echo "=========================================="
+    echo "         PARAMETER DEBUG"
+    echo "=========================================="
+
+    // 1. Show all params.* variables (sorted)
+    echo "\n--- params.* Variables ---"
+    params.sort().each { key, value ->
+        echo "params.${key} = '${value}'"
+    }
+
+    // 2. Show global variables (if any exist)
+    echo "\n--- Global Variables ---"
+    def commonGlobals = ['SVN_BRANCH', 'LOCAL_LIB_DIR', 'FGT_TYPE', 'build_name', 'send_to']
+    def foundGlobals = []
+
+    commonGlobals.each { varName ->
+        try {
+            def value = binding.getVariable(varName)
+            echo "GLOBAL ${varName} = '${value}'"
+            foundGlobals << varName
+        } catch (Exception e) {
+            // Variable doesn't exist, skip silently
+        }
+    }
+
+    if (foundGlobals.isEmpty()) {
+        echo "No global variables found"
+    }
+
+    // 3. Show conflicts (where global differs from params)
+    echo "\n--- Conflicts (Global vs params) ---"
+    def conflicts = []
+    foundGlobals.each { varName ->
+        try {
+            def globalValue = binding.getVariable(varName)
+            def paramValue = params."${varName}"
+            if (globalValue?.toString() != paramValue?.toString()) {
+                echo "⚠️  ${varName}: params='${paramValue}' vs global='${globalValue}'"
+                conflicts << varName
+            }
+        } catch (Exception e) {
+            // Skip if params doesn't have this variable
+        }
+    }
+
+    if (conflicts.isEmpty()) {
+        echo "No conflicts found"
+    }
+
+    echo "=========================================="
+}
+
 // Helper function to get the archive group name (first two portions).
 def getArchiveGroupName(String group) {
     def parts = group.tokenize('.')
@@ -161,8 +215,7 @@ def call() {
       stage('Debug Parameters') {
         steps {
           script {
-            echo "=== Debug: Printing All Parameters ==="
-            params.each { key, value -> echo "${key} = ${value}" }
+            debugAllParameters()
           }
         }
       }
