@@ -276,7 +276,7 @@ def format_seconds_to_duration(seconds: int) -> str:
     return " ".join(parts) or "0 sec"
 
 
-def allocate_counts_to_nodes(durations: List[int], node_count: int) -> List[int]:
+def allocate_counts_to_nodes(durations: List[int], node_count: int, feature_entries: List[Dict]) -> List[int]:
     """
     Allocate each feature to a proportional number of nodes based on its duration.
 
@@ -325,6 +325,12 @@ def allocate_counts_to_nodes(durations: List[int], node_count: int) -> List[int]
             node_counts[feature_index] += 1
             deficit -= 1
             index += 1
+
+    # CONSTRAINT: Don't allocate more nodes than test groups available
+    for i, (duration, entry) in enumerate(zip(durations, feature_entries)):
+        max_groups = len(entry.get("test_groups", []))
+        if max_groups > 0:  # Only constrain if there are actual groups
+            node_counts[i] = min(node_counts[i], max_groups)
 
     return node_counts
 
@@ -508,7 +514,7 @@ def main():
         feature_durations.append(total_seconds)
 
     # Step 7: Allocate nodes to features proportionally
-    node_allocations = allocate_counts_to_nodes(feature_durations, len(available_nodes))
+    node_allocations = allocate_counts_to_nodes(feature_durations, len(available_nodes), filtered_entries)
 
     # Step 8: Build dispatch with proper node assignment
     dispatch_entries = []
