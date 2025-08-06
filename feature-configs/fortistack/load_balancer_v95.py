@@ -416,29 +416,6 @@ def get_idle_jenkins_nodes(url: str, user: str, token: str) -> List[str]:
     return available_nodes
 
 
-def filter_test_groups_by_choice(test_groups: List[str], group_choice: str) -> List[str]:
-    """
-    Filter test groups based on the group choice criteria.
-
-    Args:
-        test_groups: List of test group names
-        group_choice: "all", "crit", or "full"
-
-    Returns:
-        Filtered list of test groups
-    """
-    if group_choice == "all":
-        return test_groups
-
-    # Filter groups by suffix
-    filtered_groups = []
-    for group in test_groups:
-        if group.endswith(f"{group_choice}"):
-            filtered_groups.append(group)
-
-    return filtered_groups
-
-
 def main():
     """Main entry point for the load balancer script."""
     logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s [%(filename)s:%(lineno)d]: %(message)s")
@@ -454,15 +431,6 @@ def main():
     parser.add_argument("-r", "--reserved-nodes", default=DEFAULT_RESERVED_NODES, help="Comma-separated list of nodes to exclude")
     parser.add_argument("-e", "--exclude", default="", help="Comma-separated list of features to exclude")
     parser.add_argument("-o", "--output", default="dispatch.json", help="Output dispatch JSON path")
-    parser.add_argument(
-        "-g",
-        "--group-choice",
-        nargs="?",
-        const="all",
-        default="all",
-        choices=["all", "crit", "full", "tmp"],
-        help="Filter test groups: 'all' (default), 'crit' (only .crit groups), 'full' (only .full groups). Use -g without value for 'all'",
-    )
     args = parser.parse_args()
 
     # Step 1: Load feature list and filter excluded features
@@ -478,33 +446,12 @@ def main():
 
     filtered_entries = [entry for entry in feature_entries if entry["FEATURE_NAME"] not in all_exclusions]
 
+    logging.info(f"Loaded {len(filtered_entries)} feature entries from {args.feature_list} after exclusion")
+
     # Step 2: Merge features with the same name and write to features.json
     merged_features = merge_features(filtered_entries)
     write_features_dict(merged_features)
     write_features_dict_to_all_in_one_tools(merged_features)
-
-    # NEW: Filter test groups based on group choice and exclude features with no matching groups
-    if args.group_choice != "all":
-        logging.info(f"Filtering test groups by choice: {args.group_choice}")
-        entries_with_groups = []
-
-        for entry in filtered_entries:
-            original_groups = entry.get("test_groups", [])
-            filtered_groups = filter_test_groups_by_choice(original_groups, args.group_choice)
-
-            if filtered_groups:
-                # Create a copy of the entry with filtered groups
-                filtered_entry = dict(entry)
-                filtered_entry["test_groups"] = filtered_groups
-                entries_with_groups.append(filtered_entry)
-                logging.info(f"Feature '{entry['FEATURE_NAME']}': {len(original_groups)} -> {len(filtered_groups)} groups")
-            else:
-                logging.info(f"Feature '{entry['FEATURE_NAME']}': excluded (no {args.group_choice} groups)")
-
-        filtered_entries = entries_with_groups
-        logging.info(f"After group filtering: {len(filtered_entries)} features remaining")
-
-    logging.info(f"Loaded {len(filtered_entries)} feature entries from {args.feature_list} after exclusion and group filtering")
 
     # Step 3: Load test durations
     duration_entries = load_duration_entries(args.durations)
@@ -555,7 +502,7 @@ def main():
         if not duration_map:
             logging.warning(f"No durations for '{feature_name}' -> using 1hr/group default")
 
-        # Sum durations for all test groups (now filtered)
+        # Sum durations for all test groups
         total_seconds = 0
         for group in entry.get("test_groups", []):
             if group in duration_map:
@@ -619,11 +566,6 @@ def main():
 
         # Create dispatch entry for each node's group set
         for groups, total_seconds in distributed_groups:
-            # FIX: Skip entries with no test groups - they're not useful
-            if not groups:
-                logging.warning(f"Skipping empty group assignment for {feature_name} - not enough test groups for allocated nodes")
-                continue
-
             # Get submission strategy: first check ORIOLE_SUBMIT_STRATEGY, then entry, default to 'all'
             submit_flag = ORIOLE_SUBMIT_STRATEGY.get(feature_name, entry.get("ORIOLE_SUBMIT_FLAG", "all"))
 
@@ -731,54 +673,7 @@ def main():
     # Step 10: Write dispatch JSON
     with open(args.output, "w") as f:
         json.dump(dispatch_entries, f, indent=2)
-
-    # Enhanced logging for node usage summary
     logging.info(f"Generated {len(dispatch_entries)} entries in {args.output}")
-
-    # Log final node usage summary
-    all_chosen_nodes = sorted(list(used_nodes), key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
-    unused_nodes = sorted(
-        [node for node in available_nodes if node not in used_nodes], key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf")
-    )
-
-    logging.info("=" * 60)
-    logging.info("NODE ALLOCATION SUMMARY")
-    logging.info("=" * 60)
-    logging.info(f"Total available nodes: {len(available_nodes)}")
-    logging.info(f"Nodes chosen for dispatch: {len(all_chosen_nodes)}")
-    logging.info(f"Nodes remaining unused: {len(unused_nodes)}")
-    logging.info("")
-    logging.info(f"Chosen nodes <{len(all_chosen_nodes)}>: {all_chosen_nodes}")
-    if unused_nodes:
-        logging.info(f"Unused nodes <{len(unused_nodes)}>: {unused_nodes}")
-    else:
-        logging.info("Unused nodes: None (all nodes allocated)")
-
-    # Log node usage breakdown by feature
-    logging.info("")
-    logging.info("NODE USAGE BY FEATURE:")
-    feature_node_map = {}
-    for entry in dispatch_entries:
-        feature_name = entry["FEATURE_NAME"]
-        node_name = entry["NODE_NAME"]
-        if feature_name not in feature_node_map:
-            feature_node_map[feature_name] = []
-        feature_node_map[feature_name].append(node_name)
-
-    for feature_name in sorted(feature_node_map.keys()):
-        nodes = feature_node_map[feature_name]
-        unique_nodes = sorted(list(set(nodes)), key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
-        node_assignments = len(nodes)
-        unique_node_count = len(unique_nodes)
-
-        if feature_name in FEATURE_NODE_STATIC_BINDING:
-            binding_info = f" (static: {FEATURE_NODE_STATIC_BINDING[feature_name]})"
-        else:
-            binding_info = " (dynamic)"
-
-        logging.info(f"  {feature_name}{binding_info}: {node_assignments} assignments across {unique_node_count} nodes: {unique_nodes}")
-
-    logging.info("=" * 60)
 
 
 if __name__ == "__main__":
