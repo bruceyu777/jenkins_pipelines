@@ -350,54 +350,72 @@ def call() {
         }
 
         post {
-            success {
+            always {
                 script {
-                    if (env.PROVISION_COMPLETED == 'true') {
-                        def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.html').trim()
-
-                        sendFosqaEmail(
-                            to     : sendTo,
-                            subject: "Environment Provisioned: ${env.BUILD_DISPLAY_NAME}",
-                            body   : """
-                            <p>✅ Test environment has been successfully provisioned for <b>${env.BUILD_DISPLAY_NAME}</b>.</p>
-                            <p>Feature: <b>${params.FEATURE_NAME}</b></p>
-                            <p>Test groups: <b>${computedTestGroups.join(', ')}</b></p>
-                            <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                            <h3>Environment Details</h3>
-                            ${nodeInfo}
-                            """
-                        )
+                    // 1) Generate the node_info file
+                    try {
+                        sh """
+                            cd /home/fosqa/resources/tools
+                            sudo ./venv/bin/python3 get_node_info.py
+                        """
+                        echo "✅ get_node_info.py succeeded"
+                    } catch (err) {
+                        echo "⚠️ get_node_info.py failed, but pipeline will continue"
                     }
-                }
-            }
 
-            failure {
-                script {
+                    // 2) Read node info (try both HTML and TXT formats)
                     def nodeInfo = ""
                     try {
                         nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.html').trim()
                     } catch (e) {
-                        nodeInfo = "<p>Node information not available</p>"
+                        try {
+                            def nodeInfoTxt = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
+                            nodeInfo = "<pre style=\"font-family:monospace; white-space:pre-wrap;\">${nodeInfoTxt}</pre>"
+                        } catch (e2) {
+                            nodeInfo = "<p>Node information not available</p>"
+                        }
                     }
 
-                    sendFosqaEmail(
-                        to     : sendTo,
-                        subject: "PROVISION FAILED: ${env.BUILD_DISPLAY_NAME}",
-                        body   : """
-                        <p>❌ Environment provisioning for <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
-                        <p>Feature: <b>${params.FEATURE_NAME}</b></p>
-                        <p>Test groups: <b>${computedTestGroups.join(', ')}</b></p>
-                        <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                    // 3) Determine build status and create appropriate messaging
+                    def dispName = currentBuild.displayName ?: "${env.BUILD_NUMBER}"
+                    def isSuccess = (currentBuild.currentResult == 'SUCCESS')
+                    def isProvisingCompleted = (env.PROVISION_COMPLETED == 'true')
+
+                    // 4) Build subject and body based on status
+                    def subject = ""
+                    def body = ""
+
+                    if (isSuccess && isProvisingCompleted) {
+                        subject = "Environment Provisioned: ${dispName}"
+                        body = """
+                        <h2>Build: ${dispName}</h2>
+                        <p>✅ Test environment has been successfully provisioned.</p>
+                        <p><b>Feature:</b> ${params.FEATURE_NAME}</p>
+                        <p><b>Test groups:</b> ${computedTestGroups.join(', ')}</p>
+                        <p>🔗 <a href="${env.BUILD_URL}">Console output</a></p>
+                        <h3>Environment Details</h3>
+                        ${nodeInfo}
+                        """
+                    } else {
+                        subject = "PROVISION FAILED: ${dispName}"
+                        body = """
+                        <h2>Build: ${dispName}</h2>
+                        <p>❌ Environment provisioning failed.</p>
+                        <p><b>Feature:</b> ${params.FEATURE_NAME}</p>
+                        <p><b>Test groups:</b> ${computedTestGroups.join(', ')}</p>
+                        <p style="color:red;">Build failed. Check the <a href="${env.BUILD_URL}">console log</a>.</p>
                         <h3>Environment Details (Partial)</h3>
                         ${nodeInfo}
                         """
-                    )
-                }
-            }
+                    }
 
-            always {
-                // Fix: Add a concrete action in the always block to avoid the ambiguity
-                script {
+                    // 5) Send email using the same receiver logic as fortistackRunTests.groovy
+                    sendFosqaEmail(
+                        to     : sendTo,
+                        subject: subject,
+                        body   : body
+                    )
+
                     echo "Provisioning completed with result: ${currentBuild.result ?: 'SUCCESS'}"
 
                     // Archive any provisioning logs if they exist
