@@ -184,7 +184,7 @@ def call() {
                                 try {
                                     sh """
                                         cd /home/fosqa/resources/tools
-                                        sudo ./venv/bin/python3 get_node_info.py --feature ${group}
+                                        sudo ./venv/bin/python3 get_node_info.py --feature ${group} --with-exact-report
                                     """
                                     echo "✅ get_node_info.py succeeded"
                                 } catch (err) {

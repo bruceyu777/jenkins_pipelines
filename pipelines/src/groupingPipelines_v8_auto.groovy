@@ -11,7 +11,7 @@ pipeline {
         )
         string(
             name: 'BUILD_NUMBER',
-            defaultValue: '3563',
+            defaultValue: '3589',
             description: 'Enter the build number'
         )
         // Multi-line text parameter for common configuration.
@@ -42,6 +42,16 @@ pipeline {
             defaultValue: '-a',
             description: 'Arguments to pass to load_balancer.py (default: "-a" to use Jenkins nodes)'
         )
+        string(
+            name: 'TEST_GROUP_TYPE',
+            defaultValue: 'full',
+            description: 'Type of group to create (default: "full", can be "full","crit","tmp")'
+        )
+        string(
+            name: 'FEATURE_FILTER_LIST',
+            defaultValue: '',
+            description: 'Comma-separated list of features to include (e.g., "webfilter,antivirus,dlp"). Leave empty to include all features.'
+        )
         // Add dry run parameter
         booleanParam(
             name: 'DRY_RUN',
@@ -59,6 +69,11 @@ pipeline {
                     if (params.DRY_RUN) {
                         displayName += "-DRY_RUN"
                     }
+                    // Add feature filter indicator if specified
+                    if (params.FEATURE_FILTER_LIST?.trim()) {
+                        def featureCount = params.FEATURE_FILTER_LIST.split(',').size()
+                        displayName += "-${featureCount}features"
+                    }
                     currentBuild.displayName = displayName
                 }
             }
@@ -71,10 +86,24 @@ pipeline {
             steps {
                 script {
                     echo "Running load_balancer.py to generate dispatch.json"
-                    sh """
-                        cd /home/fosqa/jenkins-master/feature-configs/fortistack
-                        python3 load_balancer.py ${params.LOAD_BALANCER_ARGS}
-                    """
+
+                    // Build the command with feature filter if specified
+                    def command = "cd /home/fosqa/jenkins-master/feature-configs/fortistack && " +
+                                 "python3 load_balancer.py -g ${params.TEST_GROUP_TYPE}"
+
+                    // Add feature filter if specified
+                    if (params.FEATURE_FILTER_LIST?.trim()) {
+                        echo "Applying feature filter: ${params.FEATURE_FILTER_LIST}"
+                        command += " -f \"${params.FEATURE_FILTER_LIST}\""
+                    } else {
+                        echo "No feature filtering applied - including all features"
+                    }
+
+                    // Add other load balancer arguments
+                    command += " ${params.LOAD_BALANCER_ARGS}"
+
+                    echo "Executing command: ${command}"
+                    sh command
                 }
             }
         }
@@ -86,6 +115,15 @@ pipeline {
                     def dispatchJson = readFile('/home/fosqa/jenkins-master/feature-configs/fortistack/dispatch.json')
                     def individualConfigs = readJSON text: dispatchJson
                     echo "Loaded ${individualConfigs.size()} configurations from dispatch.json"
+
+                    // Log feature filtering summary
+                    if (params.FEATURE_FILTER_LIST?.trim()) {
+                        def requestedFeatures = params.FEATURE_FILTER_LIST.split(',').collect { it.trim() }
+                        def actualFeatures = individualConfigs.collect { it.FEATURE_NAME }.unique().sort()
+                        echo "Feature filter applied:"
+                        echo "  Requested: ${requestedFeatures}"
+                        echo "  Generated: ${actualFeatures}"
+                    }
 
                     // Store for later use
                     env.INDIVIDUAL_CONFIGS_JSON = dispatchJson
@@ -156,6 +194,20 @@ pipeline {
                         }
                     }
 
+                    // Print feature filtering summary
+                    if (params.FEATURE_FILTER_LIST?.trim()) {
+                        def actualFeatures = individualConfigs.collect { it.FEATURE_NAME }.unique().sort()
+                        echo "==== FEATURE FILTERING SUMMARY ===="
+                        echo "Requested features: ${params.FEATURE_FILTER_LIST}"
+                        echo "Generated features: ${actualFeatures.join(', ')}"
+                        echo "Total features in dispatch: ${actualFeatures.size()}"
+                    } else {
+                        def allFeatures = individualConfigs.collect { it.FEATURE_NAME }.unique().sort()
+                        echo "==== ALL FEATURES INCLUDED ===="
+                        echo "Features: ${allFeatures.join(', ')}"
+                        echo "Total features: ${allFeatures.size()}"
+                    }
+
                     // Store for downstream stage
                     env.JOB_CONFIGS = groovy.json.JsonOutput.toJson(jobConfigs)
                 }
@@ -175,26 +227,63 @@ pipeline {
                         def branchName = "Run_${i}_${config.FEATURE_NAME}_${config.NODE_NAME}"
                         parallelBuilds[branchName] = {
                             echo "Triggering fortistack_master_provision_runtest with configuration: ${config}"
-                            build job: 'fortistack_master_provision_runtest', parameters: [
+
+                            // Start with required parameters that are always present
+                            def buildParams = [
                                 string(name: 'PARAMS_JSON', value: groovy.json.JsonOutput.toJson(config.PARAMS_JSON)),
                                 string(name: 'RELEASE', value: config.RELEASE),
                                 string(name: 'BUILD_NUMBER', value: config.BUILD_NUMBER),
                                 string(name: 'NODE_NAME', value: config.NODE_NAME),
-                                booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: config.FORCE_UPDATE_DOCKER_FILE),
-                                string(name: 'FEATURE_NAME', value: config.FEATURE_NAME),
-                                string(name: 'TEST_CASE_FOLDER', value: config.TEST_CASE_FOLDER),
-                                string(name: 'TEST_CONFIG_CHOICE', value: config.TEST_CONFIG_CHOICE),
-                                string(name: 'TEST_GROUP_CHOICE', value: config.TEST_GROUP_CHOICE),
-                                string(name: 'TEST_GROUPS', value: config.TEST_GROUPS),
-                                string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: config.DOCKER_COMPOSE_FILE_CHOICE),
-                                string(name: 'SEND_TO', value: config.SEND_TO),
-                                booleanParam(name: 'SKIP_PROVISION', value: config.SKIP_PROVISION),
-                                booleanParam(name: 'SKIP_TEST', value: config.SKIP_TEST),
-                                booleanParam(name: 'PROVISION_VMPC', value: config.PROVISION_VMPC ?: false),
-                                string(name: 'VMPC_NAMES', value: config.VMPC_NAMES ?: ''),
-                                booleanParam(name: 'PROVISION_DOCKER', value: config.PROVISION_DOCKER ?: true),
-                                string(name: 'ORIOLE_SUBMIT_FLAG', value: config.ORIOLE_SUBMIT_FLAG ?: 'all'),
-                            ], wait: true
+                                string(name: 'FEATURE_NAME', value: config.FEATURE_NAME)
+                            ]
+
+                            // Defensively add optional string parameters only if they exist in config
+                            if (config.containsKey('TEST_CASE_FOLDER')) {
+                                buildParams << string(name: 'TEST_CASE_FOLDER', value: config.TEST_CASE_FOLDER)
+                            }
+                            if (config.containsKey('TEST_CONFIG_CHOICE')) {
+                                buildParams << string(name: 'TEST_CONFIG_CHOICE', value: config.TEST_CONFIG_CHOICE)
+                            }
+                            if (config.containsKey('TEST_GROUP_CHOICE')) {
+                                buildParams << string(name: 'TEST_GROUP_CHOICE', value: config.TEST_GROUP_CHOICE)
+                            }
+                            if (config.containsKey('TEST_GROUPS')) {
+                                buildParams << string(name: 'TEST_GROUPS', value: config.TEST_GROUPS)
+                            }
+                            if (config.containsKey('DOCKER_COMPOSE_FILE_CHOICE')) {
+                                buildParams << string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: config.DOCKER_COMPOSE_FILE_CHOICE)
+                            }
+                            if (config.containsKey('SEND_TO')) {
+                                buildParams << string(name: 'SEND_TO', value: config.SEND_TO)
+                            }
+                            if (config.containsKey('VMPC_NAMES')) {
+                                buildParams << string(name: 'VMPC_NAMES', value: config.VMPC_NAMES)
+                            }
+                            if (config.containsKey('ORIOLE_SUBMIT_FLAG')) {
+                                buildParams << string(name: 'ORIOLE_SUBMIT_FLAG', value: config.ORIOLE_SUBMIT_FLAG)
+                            }
+
+                            // Defensively add boolean parameters only if they exist in config
+                            if (config.containsKey('FORCE_UPDATE_DOCKER_FILE')) {
+                                buildParams << booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: config.FORCE_UPDATE_DOCKER_FILE)
+                            }
+                            if (config.containsKey('SKIP_PROVISION')) {
+                                buildParams << booleanParam(name: 'SKIP_PROVISION', value: config.SKIP_PROVISION)
+                            }
+                            if (config.containsKey('SKIP_PROVISION_TEST_ENV')) {
+                                buildParams << booleanParam(name: 'SKIP_PROVISION_TEST_ENV', value: config.SKIP_PROVISION_TEST_ENV)
+                            }
+                            if (config.containsKey('SKIP_TEST')) {
+                                buildParams << booleanParam(name: 'SKIP_TEST', value: config.SKIP_TEST)
+                            }
+                            if (config.containsKey('PROVISION_VMPC')) {
+                                buildParams << booleanParam(name: 'PROVISION_VMPC', value: config.PROVISION_VMPC)
+                            }
+                            if (config.containsKey('PROVISION_DOCKER')) {
+                                buildParams << booleanParam(name: 'PROVISION_DOCKER', value: config.PROVISION_DOCKER)
+                            }
+
+                            build job: 'fortistack_master_provision_runtest', parameters: buildParams, wait: true
                         }
                     }
 
@@ -214,6 +303,14 @@ pipeline {
 
                     echo "=== DRY RUN SUMMARY ==="
                     echo "Would have triggered ${jobConfigs.size()} downstream jobs"
+
+                    if (params.FEATURE_FILTER_LIST?.trim()) {
+                        def actualFeatures = jobConfigs.collect { it.FEATURE_NAME }.unique().sort()
+                        echo "Feature filtering applied:"
+                        echo "  Requested: ${params.FEATURE_FILTER_LIST}"
+                        echo "  Generated: ${actualFeatures.join(', ')}"
+                    }
+
                     echo "Configuration validation complete - NO JOBS WERE TRIGGERED"
 
                     // Create artifact with all configurations for reference
@@ -234,7 +331,16 @@ pipeline {
 
                 // Get information about configurations
                 def individualConfigs = readJSON text: env.INDIVIDUAL_CONFIGS_JSON
-                def buildSummary = "<h3>${dryRunPrefix}Build Summary</h3><ul>"
+                def buildSummary = "<h3>${dryRunPrefix}Build Summary</h3>"
+
+                // Add feature filtering information to summary
+                if (params.FEATURE_FILTER_LIST?.trim()) {
+                    def actualFeatures = individualConfigs.collect { it.FEATURE_NAME }.unique().sort()
+                    buildSummary += "<p><b>Feature Filter Applied:</b> ${params.FEATURE_FILTER_LIST}</p>"
+                    buildSummary += "<p><b>Generated Features:</b> ${actualFeatures.join(', ')}</p>"
+                }
+
+                buildSummary += "<ul>"
 
                 // Group by node
                 def nodeMap = [:]

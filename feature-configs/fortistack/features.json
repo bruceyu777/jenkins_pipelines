@@ -15,7 +15,9 @@
       "docker.avfortisandbox_avfortisandbox.yml",
       "other"
     ],
-    "email": "rainxiao@fortinet.com,vlysak@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "yzhengfeng@fortinet.com,vlysak@fortinet.com"
+    ]
   },
   "webfilter": {
     "test_case_folder": [
@@ -39,7 +41,9 @@
       "docker.webfilter_basic.yml",
       "other"
     ],
-    "email": "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "hchuanjian@fortinet.com"
+    ]
   },
   "avenregres": {
     "test_case_folder": [
@@ -56,7 +60,9 @@
       "docker.avenregres_avenregres.yml",
       "other"
     ],
-    "email": "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "hchuanjian@fortinet.com"
+    ]
   },
   "dnsfilter": {
     "test_case_folder": [
@@ -75,7 +81,9 @@
       "docker.dnsfilter_dnsfilter.yml",
       "other"
     ],
-    "email": "rainxiao@fortinet.com,vlysak@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "vlysak@fortinet.com"
+    ]
   },
   "threatfeed": {
     "test_case_folder": [
@@ -90,7 +98,9 @@
     "docker_compose": [
       "KVM"
     ],
-    "email": "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "email": [
+      "yzhengfeng@fortinet.com,wangd@fortinet.com"
+    ],
     "PROVISION_VMPC": true,
     "VMPC_NAMES": "VMPC1,VMPC4",
     "PROVISION_DOCKER": false
@@ -121,7 +131,9 @@
       "docker.antivirus_proxy.yml",
       "other"
     ],
-    "email": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "lluo@fortinet.com"
+    ]
   },
   "avaimodel": {
     "test_case_folder": [
@@ -137,7 +149,9 @@
       "docker.avaimodel_proxy.yml",
       "other"
     ],
-    "email": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "lluo@fortinet.com"
+    ]
   },
   "wanopt": {
     "test_case_folder": [
@@ -153,7 +167,9 @@
       "docker.wanopt_linux.yml",
       "other"
     ],
-    "email": "rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "wangt@fortinet.com"
+    ]
   },
   "webcache": {
     "test_case_folder": [
@@ -169,7 +185,9 @@
       "docker.webcache_webcache.yml",
       "other"
     ],
-    "email": "rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "wangt@fortinet.com"
+    ]
   },
   "icap": {
     "test_case_folder": [
@@ -185,7 +203,9 @@
       "docker.icap_icap.yml",
       "other"
     ],
-    "email": "rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "wangt@fortinet.com"
+    ]
   },
   "webproxy": {
     "test_case_folder": [
@@ -202,7 +222,9 @@
       "docker.webproxy_webproxy.yml",
       "other"
     ],
-    "email": "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com,zachwang@fortinet.com"
+    "email": [
+      "zachwang@fortinet.com"
+    ]
   },
   "ftpproxy": {
     "test_case_folder": [
@@ -219,7 +241,9 @@
       "docker.ftpproxy_ftpproxy.yml",
       "other"
     ],
-    "email": "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com,zachwang@fortinet.com"
+    "email": [
+      "zachwang@fortinet.com"
+    ]
   },
   "sslprofile": {
     "test_case_folder": [
@@ -259,7 +283,9 @@
       "docker.foc_gtp.yml",
       "other"
     ],
-    "email": "mabbasi@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "wangt@fortinet.com,mabbasi@fortinet.com"
+    ]
   },
   "waf": {
     "test_case_folder": [
@@ -275,7 +301,9 @@
       "docker.waf_waf.yml",
       "other"
     ],
-    "email": "mabbasi@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "mabbasi@fortinet.com"
+    ]
   },
   "dlp": {
     "test_case_folder": [
@@ -299,6 +327,8 @@
       "docker.dlp_nat1.yml",
       "other"
     ],
-    "email": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com"
+    "email": [
+      "yjiaran@fortinet.com"
+    ]
   }
 }
