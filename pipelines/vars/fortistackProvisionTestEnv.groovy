@@ -400,10 +400,36 @@ def call() {
                     echo "DEBUG: isProvisioningCompleted = ${isProvisioningCompleted}"
                     echo "DEBUG: computedTestGroups = ${computedTestGroups}"
 
+                    // Merge email recipients: sendTo + any additional emails from features.json
+                    def finalSendTo = sendTo
+                    try {
+                        // Try to read the features.json file for additional email recipients
+                        def featuresJsonPath = '/home/fosqa/jenkins-master/feature-configs/fortistack/features.json'
+                        if (fileExists(featuresJsonPath)) {
+                            def featuresJson = readJSON file: featuresJsonPath
+                            def featureConfig = featuresJson[params.FEATURE_NAME]
+
+                            if (featureConfig && featureConfig.email) {
+                                echo "Found additional emails in features.json: ${featureConfig.email}"
+
+                                // Merge emails: split both, combine, and deduplicate
+                                def sendToEmails = sendTo.split(',').collect { it.trim() }.findAll { it }
+                                def additionalEmails = featureConfig.email.split(',').collect { it.trim() }.findAll { it }
+                                def allEmails = (sendToEmails + additionalEmails).unique()
+                                finalSendTo = allEmails.join(',')
+
+                                echo "Merged email recipients: ${finalSendTo}"
+                            }
+                        }
+                    } catch (Exception e) {
+                        echo "Warning: Could not read additional emails from features.json: ${e.getMessage()}"
+                        echo "Using original sendTo: ${sendTo}"
+                    }
+
                     if (isProvisioningCompleted) {
-                        echo "Sending SUCCESS email..."
+                        echo "Sending SUCCESS email to: ${finalSendTo}"
                         sendFosqaEmail(
-                            to     : sendTo,
+                            to     : finalSendTo,
                             subject: "Environment Provisioned: ${dispName}",
                             body   : """
                             <h2>Build: ${dispName}</h2>
@@ -416,9 +442,9 @@ def call() {
                             """
                         )
                     } else {
-                        echo "Sending INCOMPLETE email..."
+                        echo "Sending INCOMPLETE email to: ${finalSendTo}"
                         sendFosqaEmail(
-                            to     : sendTo,
+                            to     : finalSendTo,
                             subject: "Environment Setup Incomplete: ${dispName}",
                             body   : """
                             <h2>Build: ${dispName}</h2>
@@ -451,8 +477,28 @@ def call() {
 
                     def dispName = currentBuild.displayName ?: "${env.BUILD_NUMBER}"
 
+                    // Merge email recipients for failure case too
+                    def finalSendTo = sendTo
+                    try {
+                        def featuresJsonPath = '/home/fosqa/jenkins-master/feature-configs/fortistack/features.json'
+                        if (fileExists(featuresJsonPath)) {
+                            def featuresJson = readJSON file: featuresJsonPath
+                            def featureConfig = featuresJson[params.FEATURE_NAME]
+
+                            if (featureConfig && featureConfig.email) {
+                                def sendToEmails = sendTo.split(',').collect { it.trim() }.findAll { it }
+                                def additionalEmails = featureConfig.email.split(',').collect { it.trim() }.findAll { it }
+                                def allEmails = (sendToEmails + additionalEmails).unique()
+                                finalSendTo = allEmails.join(',')
+                            }
+                        }
+                    } catch (Exception e) {
+                        echo "Warning: Could not read additional emails from features.json: ${e.getMessage()}"
+                    }
+
+                    echo "Sending FAILURE email to: ${finalSendTo}"
                     sendFosqaEmail(
-                        to     : sendTo,
+                        to     : finalSendTo,
                         subject: "PROVISION FAILED: ${dispName}",
                         body   : """
                         <h2>Build: ${dispName}</h2>
