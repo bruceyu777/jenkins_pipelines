@@ -338,12 +338,17 @@ def call() {
                                 sudo ./venv/bin/python3 get_node_info.py --feature ${computedTestGroups[0]}
                             """
                             echo "✅ get_node_info.py succeeded"
+
+                            // Set provisioning completed flag
+                            env.PROVISION_COMPLETED = 'true'
+                            echo "✅ Provisioning marked as completed"
+
                         } catch (err) {
                             echo "⚠️ get_node_info.py failed, but pipeline will continue"
+                            // Still mark as completed since this is just node info gathering
+                            env.PROVISION_COMPLETED = 'true'
+                            echo "⚠️ Provisioning marked as completed despite node info failure"
                         }
-
-                        // Set a flag to indicate provisioning was completed
-                        env.PROVISION_COMPLETED = 'true'
                     }
                 }
             }
@@ -383,7 +388,13 @@ def call() {
                     def dispName = currentBuild.displayName ?: "${env.BUILD_NUMBER}"
                     def isProvisioningCompleted = (env.PROVISION_COMPLETED == 'true')
 
+                    // Debug logging
+                    echo "DEBUG: env.PROVISION_COMPLETED = '${env.PROVISION_COMPLETED}'"
+                    echo "DEBUG: isProvisioningCompleted = ${isProvisioningCompleted}"
+                    echo "DEBUG: computedTestGroups = ${computedTestGroups}"
+
                     if (isProvisioningCompleted) {
+                        echo "Sending SUCCESS email..."
                         sendFosqaEmail(
                             to     : sendTo,
                             subject: "Environment Provisioned: ${dispName}",
@@ -398,6 +409,7 @@ def call() {
                             """
                         )
                     } else {
+                        echo "Sending INCOMPLETE email..."
                         sendFosqaEmail(
                             to     : sendTo,
                             subject: "Environment Setup Incomplete: ${dispName}",
