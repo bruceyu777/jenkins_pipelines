@@ -156,6 +156,16 @@ def call() {
                         ]) {
                             // Run tests for each computed test group
                             for (group in computedTestGroups) {
+                                echo "get node info by running get_node_info.py"
+                                try {
+                                    sh """
+                                        cd /home/fosqa/resources/tools
+                                        sudo ./venv/bin/python3 get_node_info.py --feature ${group}
+                                    """
+                                    echo "✅ get_node_info.py succeeded"
+                                } catch (err) {
+                                    echo "⚠️ get_node_info.py failed, but pipeline will continue"
+                                }
                                 echo "Running tests for test group: ${group}"
                                 sh """
                                     cd /home/fosqa/${LOCAL_LIB_DIR}
