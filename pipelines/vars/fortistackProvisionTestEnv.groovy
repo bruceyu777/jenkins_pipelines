@@ -333,22 +333,29 @@ def call() {
                 steps {
                     script {
                         try {
+                            // Check if we have test groups before using them
+                            def featureArg = ""
+                            if (computedTestGroups && computedTestGroups.size() > 0) {
+                                featureArg = "--feature ${computedTestGroups[0]}"
+                            } else if (params.FEATURE_NAME) {
+                                featureArg = "--feature ${params.FEATURE_NAME}"
+                            }
+
+                            echo "Running get_node_info.py with feature argument: '${featureArg}'"
+
                             sh """
                                 cd /home/fosqa/resources/tools
-                                sudo ./venv/bin/python3 get_node_info.py --feature ${computedTestGroups[0]}
+                                sudo ./venv/bin/python3 get_node_info.py ${featureArg}
                             """
                             echo "✅ get_node_info.py succeeded"
 
-                            // Set provisioning completed flag
-                            env.PROVISION_COMPLETED = 'true'
-                            echo "✅ Provisioning marked as completed"
-
                         } catch (err) {
-                            echo "⚠️ get_node_info.py failed, but pipeline will continue"
-                            // Still mark as completed since this is just node info gathering
-                            env.PROVISION_COMPLETED = 'true'
-                            echo "⚠️ Provisioning marked as completed despite node info failure"
+                            echo "⚠️ get_node_info.py failed: ${err.getMessage()}, but pipeline will continue"
                         }
+
+                        // ALWAYS set provisioning completed flag, regardless of get_node_info.py result
+                        env.PROVISION_COMPLETED = 'true'
+                        echo "✅ Provisioning marked as completed"
                     }
                 }
             }
