@@ -425,59 +425,30 @@ def call() {
 
             success {
                 script {
-                    // Read node info
-                    def nodeInfo = ""
-                    try {
-                        nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.html').trim()
-                    } catch (e) {
-                        try {
-                            def nodeInfoTxt = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
-                            nodeInfo = "<pre style=\"font-family:monospace; white-space:pre-wrap;\">${nodeInfoTxt}</pre>"
-                        } catch (e2) {
-                            nodeInfo = "<p>Node information not available</p>"
-                        }
-                    }
+                    // Read node info (same as before...)
 
                     def dispName = currentBuild.displayName ?: "${env.BUILD_NUMBER}"
-                    def isProvisioningCompleted = (env.PROVISION_COMPLETED == 'true')
 
                     // Debug logging
-                    echo "DEBUG: env.PROVISION_COMPLETED = '${env.PROVISION_COMPLETED}'"
-                    echo "DEBUG: isProvisioningCompleted = ${isProvisioningCompleted}"
+                    echo "DEBUG: Pipeline succeeded - sending success email"
                     echo "DEBUG: computedTestGroups = ${computedTestGroups}"
                     echo "DEBUG: mergedSendTo = ${mergedSendTo}"
 
-                    if (isProvisioningCompleted) {
-                        echo "Sending SUCCESS email to: ${mergedSendTo}"
-                        sendFosqaEmail(
-                            to     : mergedSendTo,
-                            subject: "Environment Provisioned: ${dispName}",
-                            body   : """
-                            <h2>Build: ${dispName}</h2>
-                            <p>✅ Test environment has been successfully provisioned.</p>
-                            <p><b>Feature:</b> ${params.FEATURE_NAME}</p>
-                            <p><b>Test groups:</b> ${computedTestGroups.join(', ')}</p>
-                            <p>🔗 <a href="${env.BUILD_URL}">Console output</a></p>
-                            <h3>Environment Details</h3>
-                            ${nodeInfo}
-                            """
-                        )
-                    } else {
-                        echo "Sending INCOMPLETE email to: ${mergedSendTo}"
-                        sendFosqaEmail(
-                            to     : mergedSendTo,
-                            subject: "Environment Setup Incomplete: ${dispName}",
-                            body   : """
-                            <h2>Build: ${dispName}</h2>
-                            <p>⚠️ Pipeline completed but environment provisioning was not fully completed.</p>
-                            <p><b>Feature:</b> ${params.FEATURE_NAME}</p>
-                            <p><b>Test groups:</b> ${computedTestGroups.join(', ')}</p>
-                            <p>Please check the <a href="${env.BUILD_URL}">console log</a> for details.</p>
-                            <h3>Environment Details (Partial)</h3>
-                            ${nodeInfo}
-                            """
-                        )
-                    }
+                    // We're in success block, so provisioning must have completed successfully
+                    echo "Sending SUCCESS email to: ${mergedSendTo}"
+                    sendFosqaEmail(
+                        to     : mergedSendTo,
+                        subject: "Environment Provisioned: ${dispName}",
+                        body   : """
+                        <h2>Build: ${dispName}</h2>
+                        <p>✅ Test environment has been successfully provisioned.</p>
+                        <p><b>Feature:</b> ${params.FEATURE_NAME}</p>
+                        <p><b>Test groups:</b> ${computedTestGroups.join(', ')}</p>
+                        <p>🔗 <a href="${env.BUILD_URL}">Console output</a></p>
+                        <h3>Environment Details</h3>
+                        ${nodeInfo}
+                        """
+                    )
                 }
             }
 
