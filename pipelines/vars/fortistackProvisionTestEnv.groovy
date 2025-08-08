@@ -86,6 +86,7 @@ def runWithRetry(int maxAttempts, List waitTimes, String command) {
 }
 
 def computedTestGroups = []  // Global variable to share across stages
+def mergedSendTo = ''        // Global variable for merged email recipients
 
 def call() {
     // Define sendTo inside the call() block (after params is available)
@@ -129,6 +130,51 @@ def call() {
                     script {
                         computedTestGroups = getTestGroups(params)
                         echo "Computed test groups: ${computedTestGroups}"
+                    }
+                }
+            }
+
+            stage('Merge Email Parameters') {
+                steps {
+                    script {
+                        // Merge email recipients: start with SEND_TO parameter
+                        def sendToEmails = []
+                        if (params.SEND_TO?.trim()) {
+                            sendToEmails.addAll(params.SEND_TO.split(',').collect { it.trim() }.findAll { it })
+                        }
+
+                        // Add additional emails from features.json
+                        try {
+                            def featuresJsonPath = '/home/fosqa/jenkins-master/feature-configs/fortistack/features.json'
+                            if (fileExists(featuresJsonPath)) {
+                                def featuresJson = readJSON file: featuresJsonPath
+                                def featureConfig = featuresJson[params.FEATURE_NAME]
+
+                                if (featureConfig && featureConfig.email) {
+                                    echo "Found additional emails in features.json: ${featureConfig.email}"
+                                    def additionalEmails = featureConfig.email.split(',').collect { it.trim() }.findAll { it }
+                                    sendToEmails.addAll(additionalEmails)
+                                }
+                            }
+                        } catch (Exception e) {
+                            echo "Warning: Could not read additional emails from features.json: ${e.getMessage()}"
+                        }
+
+                        // Add ADDITIONAL_EMAIL parameter if provided
+                        if (params.ADDITIONAL_EMAIL?.trim()) {
+                            def extraEmails = params.ADDITIONAL_EMAIL.split(',').collect { it.trim() }.findAll { it }
+                            sendToEmails.addAll(extraEmails)
+                        }
+
+                        // Remove duplicates and create final merged email list
+                        mergedSendTo = sendToEmails.unique().join(',')
+
+                        // Fallback to default if no emails found
+                        if (!mergedSendTo?.trim()) {
+                            mergedSendTo = "yzhengfeng@fortinet.com"
+                        }
+
+                        echo "Merged SEND_TO: ${mergedSendTo}"
                     }
                 }
             }
@@ -399,37 +445,12 @@ def call() {
                     echo "DEBUG: env.PROVISION_COMPLETED = '${env.PROVISION_COMPLETED}'"
                     echo "DEBUG: isProvisioningCompleted = ${isProvisioningCompleted}"
                     echo "DEBUG: computedTestGroups = ${computedTestGroups}"
-
-                    // Merge email recipients: sendTo + any additional emails from features.json
-                    def finalSendTo = sendTo
-                    try {
-                        // Try to read the features.json file for additional email recipients
-                        def featuresJsonPath = '/home/fosqa/jenkins-master/feature-configs/fortistack/features.json'
-                        if (fileExists(featuresJsonPath)) {
-                            def featuresJson = readJSON file: featuresJsonPath
-                            def featureConfig = featuresJson[params.FEATURE_NAME]
-
-                            if (featureConfig && featureConfig.email) {
-                                echo "Found additional emails in features.json: ${featureConfig.email}"
-
-                                // Merge emails: split both, combine, and deduplicate
-                                def sendToEmails = sendTo.split(',').collect { it.trim() }.findAll { it }
-                                def additionalEmails = featureConfig.email.split(',').collect { it.trim() }.findAll { it }
-                                def allEmails = (sendToEmails + additionalEmails).unique()
-                                finalSendTo = allEmails.join(',')
-
-                                echo "Merged email recipients: ${finalSendTo}"
-                            }
-                        }
-                    } catch (Exception e) {
-                        echo "Warning: Could not read additional emails from features.json: ${e.getMessage()}"
-                        echo "Using original sendTo: ${sendTo}"
-                    }
+                    echo "DEBUG: mergedSendTo = ${mergedSendTo}"
 
                     if (isProvisioningCompleted) {
-                        echo "Sending SUCCESS email to: ${finalSendTo}"
+                        echo "Sending SUCCESS email to: ${mergedSendTo}"
                         sendFosqaEmail(
-                            to     : finalSendTo,
+                            to     : mergedSendTo,
                             subject: "Environment Provisioned: ${dispName}",
                             body   : """
                             <h2>Build: ${dispName}</h2>
@@ -442,9 +463,9 @@ def call() {
                             """
                         )
                     } else {
-                        echo "Sending INCOMPLETE email to: ${finalSendTo}"
+                        echo "Sending INCOMPLETE email to: ${mergedSendTo}"
                         sendFosqaEmail(
-                            to     : finalSendTo,
+                            to     : mergedSendTo,
                             subject: "Environment Setup Incomplete: ${dispName}",
                             body   : """
                             <h2>Build: ${dispName}</h2>
@@ -477,28 +498,9 @@ def call() {
 
                     def dispName = currentBuild.displayName ?: "${env.BUILD_NUMBER}"
 
-                    // Merge email recipients for failure case too
-                    def finalSendTo = sendTo
-                    try {
-                        def featuresJsonPath = '/home/fosqa/jenkins-master/feature-configs/fortistack/features.json'
-                        if (fileExists(featuresJsonPath)) {
-                            def featuresJson = readJSON file: featuresJsonPath
-                            def featureConfig = featuresJson[params.FEATURE_NAME]
-
-                            if (featureConfig && featureConfig.email) {
-                                def sendToEmails = sendTo.split(',').collect { it.trim() }.findAll { it }
-                                def additionalEmails = featureConfig.email.split(',').collect { it.trim() }.findAll { it }
-                                def allEmails = (sendToEmails + additionalEmails).unique()
-                                finalSendTo = allEmails.join(',')
-                            }
-                        }
-                    } catch (Exception e) {
-                        echo "Warning: Could not read additional emails from features.json: ${e.getMessage()}"
-                    }
-
-                    echo "Sending FAILURE email to: ${finalSendTo}"
+                    echo "Sending FAILURE email to: ${mergedSendTo}"
                     sendFosqaEmail(
-                        to     : finalSendTo,
+                        to     : mergedSendTo,
                         subject: "PROVISION FAILED: ${dispName}",
                         body   : """
                         <h2>Build: ${dispName}</h2>
