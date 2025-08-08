@@ -161,7 +161,8 @@
       "env.fortistack.wanopt.conf"
     ],
     "test_groups": [
-      "grp.wanopt_linux.tmp"
+      "grp.wanopt.fortistack.crit",
+      "grp.wanopt.fortistack.full"
     ],
     "docker_compose": [
       "docker.wanopt_linux.yml",
@@ -179,7 +180,8 @@
       "env.fortistack.webcache.conf"
     ],
     "test_groups": [
-      "grp.webcache.tmp"
+      "grp.webcache.fortistack.crit",
+      "grp.webcache.fortistack.full"
     ],
     "docker_compose": [
       "docker.webcache_webcache.yml",
@@ -197,7 +199,8 @@
       "env.fortistack.icap.conf"
     ],
     "test_groups": [
-      "grp.icap.fortistack"
+      "grp.icap.fortistack.crit",
+      "grp.icap.fortistack.full"
     ],
     "docker_compose": [
       "docker.icap_icap.yml",
