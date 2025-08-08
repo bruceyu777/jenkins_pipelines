@@ -408,24 +408,20 @@ def call() {
         }
 
         post {
-            always {
-                script {
-                    // Generate node info
-                    try {
-                        sh """
-                            cd /home/fosqa/resources/tools
-                            sudo ./venv/bin/python3 get_node_info.py
-                        """
-                        echo "✅ get_node_info.py succeeded"
-                    } catch (err) {
-                        echo "⚠️ get_node_info.py failed, but pipeline will continue"
-                    }
-                }
-            }
 
             success {
                 script {
-                    // Read node info (same as before...)
+                    def nodeInfo = ""
+                    try {
+                        nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.html').trim()
+                    } catch (e) {
+                        try {
+                            def nodeInfoTxt = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
+                            nodeInfo = "<pre style=\"font-family:monospace; white-space:pre-wrap;\">${nodeInfoTxt}</pre>"
+                        } catch (e2) {
+                            nodeInfo = "<p>Node information not available</p>"
+                        }
+                    }
 
                     def dispName = currentBuild.displayName ?: "${env.BUILD_NUMBER}"
 
