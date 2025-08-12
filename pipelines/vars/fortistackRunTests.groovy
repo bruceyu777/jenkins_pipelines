@@ -154,6 +154,53 @@ def call() {
                                 passwordVariable: 'SVN_PASS'
                             )
                         ]) {
+
+                            echo "=== Step 1: Local Git update ==="
+                            def innerGitCmd = """
+                                sudo -u fosqa bash -c '
+                                  cd /home/fosqa/resources/tools && \
+                                  if [ -n "\$(git status --porcelain)" ]; then \
+                                    git stash push -m "temporary stash"; \
+                                  fi; \
+                                  git pull; \
+                                  if git stash list | grep -q "temporary stash"; then \
+                                    git stash pop; \
+                                  fi
+                                '
+                            """
+                            try {
+                                sh innerGitCmd
+                            } catch (Exception e) {
+                                echo "Local git pull failed: ${e.getMessage()}. Continuing without updating."
+                            }
+
+                            // Step 2: Prepare SVN code directory and update
+                            def baseTestDir = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}"
+                            sh "sudo mkdir -p ${baseTestDir} && sudo chmod -R 777 ${baseTestDir}"
+                            def folderPath = "${baseTestDir}/${params.FEATURE_NAME}"
+                            echo "Checking folder: ${folderPath}"
+                            def folderExists = sh(
+                                script: "if [ -d '${folderPath}' ]; then echo exists; else echo notexists; fi",
+                                returnStdout: true
+                            ).trim()
+                            echo "Folder check result: ${folderExists}"
+
+                            if (folderExists == "notexists") {
+                                runWithRetry(4, [5, 15, 45], """
+                                    cd ${baseTestDir} && \
+                                    sudo svn checkout \
+                                    https://qa-svn.corp.fortinet.com/svn/qa/FOS/${params.TEST_CASE_FOLDER}/${SVN_BRANCH}/${params.FEATURE_NAME} \
+                                    --username "$SVN_USER" --password "$SVN_PASS" --non-interactive
+                                """)
+                            } else {
+                                runWithRetry(4, [5, 15, 45], """
+                                    cd ${folderPath} && \
+                                    sudo svn update --username "$SVN_USER" --password "$SVN_PASS" --non-interactive
+                                """)
+                            }
+                            sh "sudo chmod -R 777 ${baseTestDir}"
+
+
                             // Run tests for each computed test group
                             for (group in computedTestGroups) {
                                 echo "get node info by running get_node_info.py"
