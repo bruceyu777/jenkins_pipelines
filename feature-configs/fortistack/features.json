@@ -218,8 +218,11 @@
       "env.fortistack.webproxy.conf"
     ],
     "test_groups": [
-      "grp.webproxy.crit",
-      "grp.webproxy.full"
+      "grp.webproxy_auth_fortistack.full",
+      "grp.webproxy_basic_fortistack.full",
+      "grp.webproxy_forward_fortistack.full",
+      "grp.webproxy_policy_fortistack.full",
+      "grp.webproxy_topology_fortistack.full"
     ],
     "docker_compose": [
       "docker.webproxy_webproxy.yml",
@@ -237,8 +240,7 @@
       "env.fortistack.ftpproxy.conf"
     ],
     "test_groups": [
-      "grp.ftpproxy.crit",
-      "grp.ftpproxy.full"
+      "grp.ftpproxy_fortistack.full"
     ],
     "docker_compose": [
       "docker.ftpproxy_ftpproxy.yml",
