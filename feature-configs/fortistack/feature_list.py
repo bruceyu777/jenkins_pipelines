@@ -67,7 +67,7 @@ FEATURE_LIST = [
             "grp.antivirus_flow.full",
             "grp.antivirus_flow_ipv6.full",
             "grp.antivirus_ngfw.full",
-            "grp.antivirus_snifint.full",
+            # "grp.antivirus_snifint.full", #Not supported well in AIO test bed
             "grp.antivirus_ha.full",
         ],
         "docker_compose": ["docker.antivirus_proxy.yml", "other"],
@@ -175,6 +175,14 @@ FEATURE_LIST = [
             "grp.dlp_wanopt.full",
         ],
         "docker_compose": ["docker.dlp_nat1.yml", "other"],
+        "email": ["yjiaran@fortinet.com"],
+    },
+    {
+        "FEATURE_NAME": "servicedatabase",
+        "test_case_folder": ["testcase_v1"],
+        "test_config": ["env.servicedatabase_fortistack.conf"],
+        "test_groups": ["grp.servicedatabase.crit"],
+        "docker_compose": ["docker.servicedatabase_servicedatabase.yml", "other"],
         "email": ["yjiaran@fortinet.com"],
     },
 ]

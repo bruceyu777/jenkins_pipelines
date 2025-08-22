@@ -8,7 +8,7 @@ This script:
   - Merges entries sharing the same FEATURE_NAME into a dict-based `features.json`.
   - Optionally filters features by inclusion/exclusion criteria.
   - Optionally filters test groups by type (all/crit/full/tmp).
-  - Parses durations JSON (dict or list) into a queue of (feature, group durations) pairs.
+  - Queries MongoDB for latest test durations or falls back to JSON file if specified.
   - Optionally queries Jenkins for idle agent nodes, or uses a provided node list.
   - Estimates total runtime per feature-entry (defaulting missing groups to 1 hr).
   - Allocates each entry proportionally across nodes.
@@ -17,7 +17,7 @@ This script:
 
 Usage:
   ./load_balancer.py [-a] [-e webfilter,antivirus] [-f dlp,waf] \
-      -l feature_list.py -d test_duration.json \
+      -l feature_list.py \
       -n node1,node2,... -o dispatch.json -g full
 """
 
@@ -29,9 +29,61 @@ import os
 import re
 import sys
 from math import floor
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple, Optional
 
 import requests
+from pymongo import MongoClient
+
+import datetime
+import logging
+import os
+import subprocess
+import sys
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import List, Union
+
+log_level_map = {
+    "notset": logging.NOTSET,
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
+    "critical": logging.CRITICAL,
+    "fatal": logging.FATAL,
+    "warn": logging.WARNING,
+}
+
+
+def setup_logging(log_file=None, log_level="info", max_bytes=5 * 1024 * 1024, backup_count=5):
+    """Initialize logging with RotatingFileHandler."""
+    numeric_level = getattr(logging, log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError(f"Invalid log level: {log_level}")
+
+    logger = logging.getLogger()
+    logger.setLevel(numeric_level)
+
+    formatter = logging.Formatter("[%(asctime)s] %(levelname)s [%(module)s:%(lineno)d]: %(message)s")
+
+    # Stream Handler for console output
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(numeric_level)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    if log_file:
+        log_file = Path(log_file)
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Rotating File Handler for log file
+        file_handler = RotatingFileHandler(log_file, maxBytes=max_bytes, backupCount=backup_count)
+        file_handler.setLevel(numeric_level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    return logger
+
+setup_logging("load_balancer.log")
 
 # =============================================================================
 # CONSTANTS
@@ -54,11 +106,18 @@ DEFAULT_RESERVED_NODES: str = ",".join(
         "node15",  # qi wang
         "node19",  # Zach
         "node20",  # Zach
+        "node26",  # Maryam
         "node27",  # Maryam
-        # "node28", # Maryam
+        # "node28", # Maryam, binding with foc
         "node33",  # Eric son
+        "node39",  # Jiaran
     ]
 )
+
+# MongoDB connection settings
+DEFAULT_MONGO_URI: str = "mongodb://10.96.227.206:27017"
+DEFAULT_MONGO_DB: str = "autolib"
+DEFAULT_MONGO_COLLECTION: str = "results"
 
 # Feature names mapped to dedicated Jenkins nodes
 FEATURE_NODE_STATIC_BINDING: Dict[str, str] = {
@@ -74,6 +133,199 @@ EXCLUDE_FEATURES: List[str] = []
 ORIOLE_SUBMIT_STRATEGY: Dict[str, str] = {
     # "dlp": "succeeded",
 }
+
+
+# =============================================================================
+# MONGODB CLIENT
+# =============================================================================
+
+
+class MongoDBClient:
+    """
+    Simple MongoDB wrapper for querying test results.
+    """
+    def __init__(self, uri: str, database: str, collection: str) -> None:
+        self._client = MongoClient(uri)
+        self._collection = self._client[database][collection]
+
+    def find(self, query: Dict[str, Any]) -> List[Dict[str, Any]]:
+        return list(self._collection.find(query))
+
+    def find_latest_durations(self, release: Optional[str] = None) -> Dict[str, Dict[str, str]]:
+        """
+        Fetch the latest test durations from MongoDB for all features and groups.
+        
+        Args:
+            release: Optional release filter (e.g., "7.6.4")
+            
+        Returns:
+            Dictionary mapping feature names to group duration mappings
+            Format: {feature_name: {group_name: "2 hr 5 min"}}
+        """
+        # Build query
+        query = {}
+        if release:
+            query["release"] = release
+            
+        logging.info(f"MongoDB Query: {query}")
+        
+        # Generate equivalent shell command for debugging
+        if query:
+            # MongoDB shell command with query
+            shell_cmd = f'mongo 10.96.227.206:27017/autolib --eval \'db.results.find({json.dumps(query)}).sort({{"build": -1}}).limit(10).pretty()\''
+        else:
+            # MongoDB shell command without query (all documents)
+            shell_cmd = f'mongo 10.96.227.206:27017/autolib --eval \'db.results.find().sort({{"build": -1}}).limit(10).pretty()\''
+            
+        logging.info(f"Equivalent shell command to test manually:")
+        logging.info(f"  {shell_cmd}")
+        
+        # Alternative mongosh command (newer MongoDB shell)
+        if query:
+            mongosh_cmd = f'mongosh "10.96.227.206:27017/autolib" --eval \'db.results.find({json.dumps(query)}).sort({{"build": -1}}).limit(10)\''
+        else:
+            mongosh_cmd = f'mongosh "10.96.227.206:27017/autolib" --eval \'db.results.find().sort({{"build": -1}}).limit(10)\''
+            
+        logging.info(f"Alternative mongosh command:")
+        logging.info(f"  {mongosh_cmd}")
+        
+        # Get collection stats first
+        try:
+            stats = self._collection.database.command("collStats", self._collection.name)
+            doc_count = stats.get("count", 0)
+            logging.info(f"Collection '{self._collection.name}' contains {doc_count} total documents")
+        except Exception as e:
+            logging.warning(f"Could not get collection stats: {e}")
+            
+        # Check if collection exists
+        collection_names = self._collection.database.list_collection_names()
+        logging.info(f"Available collections in database '{self._collection.database.name}': {collection_names}")
+        
+        if self._collection.name not in collection_names:
+            logging.error(f"Collection '{self._collection.name}' does not exist!")
+            return {}
+            
+        # Get multiple sample documents to understand the schema evolution
+        try:
+            # Check for documents with duration_human field specifically
+            duration_docs = list(self._collection.find({"duration_human": {"$exists": True}}).sort("build", -1).limit(5))
+            logging.info(f"=== DOCUMENTS WITH 'duration_human' FIELD ===")
+            logging.info(f"Found {len(duration_docs)} documents with 'duration_human' field")
+            
+            if duration_docs:
+                for i, doc in enumerate(duration_docs):
+                    logging.info(f"Duration Doc {i+1}:")
+                    logging.info(f"  duration_human: '{doc.get('duration_human', '')}'")
+                    logging.info(f"  Build: {doc.get('build', 'N/A')}, Feature: {doc.get('feature', 'N/A')}, Group: {doc.get('feature_group', 'N/A')}")
+                    
+            # Count documents with and without duration_human field
+            with_duration = self._collection.count_documents({"duration_human": {"$exists": True}})
+            without_duration = self._collection.count_documents({"duration_human": {"$exists": False}})
+            logging.info(f"Documents WITH 'duration_human': {with_duration}")
+            logging.info(f"Documents WITHOUT 'duration_human': {without_duration}")
+            
+        except Exception as e:
+            logging.error(f"Error getting sample documents: {e}")
+            return {}
+            
+        # Modify query to only get documents with duration_human field
+        duration_query = dict(query)  # Copy the original query
+        duration_query["duration_human"] = {"$exists": True, "$ne": ""}
+        
+        logging.info(f"Modified query to include duration_human filter: {duration_query}")
+        
+        # Generate shell command for the modified query
+        shell_cmd_duration = f'mongo 10.96.227.206:27017/autolib --eval \'db.results.find({json.dumps(duration_query)}).sort({{"build": -1}}).limit(10).pretty()\''
+        logging.info(f"Shell command for documents with duration_human:")
+        logging.info(f"  {shell_cmd_duration}")
+            
+        # Get all documents with duration_human field, sorted by build number (latest first)
+        try:
+            logging.info("Executing MongoDB query for documents with duration_human...")
+            cursor = self._collection.find(duration_query).sort("build", -1)
+            docs = list(cursor)
+            logging.info(f"Query with duration_human filter returned {len(docs)} documents")
+        except Exception as e:
+            logging.error(f"Error executing MongoDB query with duration_human filter: {e}")
+            return {}
+        
+        if not docs:
+            logging.warning(f"No duration data found in MongoDB for query: {duration_query}")
+            
+            # Additional debugging: check what data is available
+            if release:
+                logging.info("Checking if the issue is with the release filter...")
+                try:
+                    # Check if there are any documents with duration_human but different release
+                    all_duration_docs = list(self._collection.find({"duration_human": {"$exists": True}}).limit(5))
+                    if all_duration_docs:
+                        releases = set()
+                        for doc in all_duration_docs:
+                            if "release" in doc:
+                                releases.add(doc["release"])
+                        logging.info(f"Available releases in documents with duration_human: {sorted(list(releases))}")
+                    else:
+                        logging.warning("No documents found with duration_human field at all!")
+                except Exception as e:
+                    logging.error(f"Error in release debugging: {e}")
+            
+            return {}
+            
+        # Group by feature and feature_group, keeping only the latest entry
+        feature_durations = {}
+        seen_combinations = set()
+        
+        logging.info("Processing documents to extract durations...")
+        processed_count = 0
+        
+        for doc in docs:
+            feature = doc.get("feature", "")
+            feature_group = doc.get("feature_group", "")
+            duration_human = doc.get("duration_human", "")
+            build = doc.get("build", "")
+            
+            # Debug: log first few documents
+            if processed_count < 5:
+                logging.info(f"Processing Doc {processed_count + 1}:")
+                logging.info(f"  feature='{feature}', feature_group='{feature_group}'")
+                logging.info(f"  duration_human='{duration_human}', build='{build}'")
+            
+            if not feature or not feature_group or not duration_human:
+                if processed_count < 10:  # Only log first 10 to avoid spam
+                    logging.warning(f"Skipping document with missing fields: feature='{feature}', feature_group='{feature_group}', duration_human='{duration_human}'")
+                continue
+                
+            # Create unique key for this feature+group combination
+            combination_key = (feature, feature_group)
+            
+            # Skip if we've already seen this combination (keeping the latest)
+            if combination_key in seen_combinations:
+                continue
+                
+            seen_combinations.add(combination_key)
+            
+            # Initialize feature dict if needed
+            if feature not in feature_durations:
+                feature_durations[feature] = {}
+                
+            # Store the duration
+            feature_durations[feature][feature_group] = duration_human
+            processed_count += 1
+            
+        logging.info(f"Processed {processed_count} documents with valid duration data")
+        logging.info(f"Loaded durations for {len(feature_durations)} features from MongoDB")
+        
+        # Log summary of what was found
+        for feature_name, group_durations in feature_durations.items():
+            logging.info(f"  {feature_name}: {len(group_durations)} groups")
+            # Show a few examples
+            sample_groups = list(group_durations.items())[:3]
+            for group, duration in sample_groups:
+                logging.info(f"    {group}: {duration}")
+            if len(group_durations) > 3:
+                logging.info(f"    ... and {len(group_durations) - 3} more groups")
+            
+        return feature_durations
 
 
 # =============================================================================
@@ -237,9 +489,9 @@ def write_features_dict_to_all_in_one_tools(merged_features: Dict[str, Dict[str,
 # =============================================================================
 
 
-def load_duration_entries(path: str) -> List[Tuple[str, Dict[str, str]]]:
+def load_duration_entries_from_file(path: str) -> List[Tuple[str, Dict[str, str]]]:
     """
-    Load test duration data from JSON file.
+    Load test duration data from JSON file (fallback method).
 
     Args:
         path: Path to the duration JSON file
@@ -284,6 +536,53 @@ def load_duration_entries(path: str) -> List[Tuple[str, Dict[str, str]]]:
 
     logging.info(f"Loaded {len(duration_entries)} duration entries from {path}")
     return duration_entries
+
+
+def get_duration_entries(
+    mongo_client: Optional[MongoDBClient] = None,
+    release: Optional[str] = None,
+    fallback_file: Optional[str] = None
+) -> List[Tuple[str, Dict[str, str]]]:
+    """
+    Get duration entries from MongoDB or fallback to JSON file.
+    
+    Args:
+        mongo_client: MongoDB client instance
+        release: Release version to filter by
+        fallback_file: Path to JSON file as fallback
+        
+    Returns:
+        List of (feature_name, duration_map) pairs
+    """
+    duration_entries = []
+    
+    # Try MongoDB first
+    if mongo_client:
+        try:
+            logging.info("Fetching test durations from MongoDB...")
+            feature_durations = mongo_client.find_latest_durations(release)
+            
+            if feature_durations:
+                duration_entries = list(feature_durations.items())
+                logging.info(f"Successfully loaded {len(duration_entries)} duration entries from MongoDB")
+                return duration_entries
+            else:
+                logging.warning("No duration data found in MongoDB")
+                
+        except Exception as e:
+            logging.error(f"Failed to fetch durations from MongoDB: {e}")
+    
+    # Fallback to JSON file
+    if fallback_file and os.path.exists(fallback_file):
+        logging.info(f"Falling back to duration file: {fallback_file}")
+        try:
+            return load_duration_entries_from_file(fallback_file)
+        except Exception as e:
+            logging.error(f"Failed to load duration file {fallback_file}: {e}")
+    
+    # If both methods fail, return empty list
+    logging.warning("No duration data available - will use default 1hr per group")
+    return []
 
 
 def parse_duration_to_seconds(duration_text: str) -> int:
@@ -595,7 +894,7 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Generate dispatch JSON and update features.json")
     parser.add_argument("-l", "--feature-list", default="feature_list.py", help="Python or JSON feature list")
-    parser.add_argument("-d", "--durations", default="test_duration.json", help="JSON file with test durations")
+    parser.add_argument("-d", "--durations", default=None, help="JSON file with test durations (fallback if MongoDB fails)")
     parser.add_argument("-n", "--nodes", default="node1,node2,node3", help="Comma-separated list of nodes to use")
     parser.add_argument("-a", "--use-jenkins-nodes", action="store_true", help="Query Jenkins for idle nodes instead of using --nodes")
     parser.add_argument("--jenkins-url", default=DEFAULT_JENKINS_URL, help="Jenkins URL for node query")
@@ -614,6 +913,14 @@ def main():
         choices=["all", "crit", "full", "tmp"],
         help="Filter test groups: 'all' (default), 'crit' (only .crit groups), 'full' (only .full groups). Use -g without value for 'all'",
     )
+    
+    # MongoDB arguments
+    mongo_grp = parser.add_argument_group("MongoDB settings")
+    mongo_grp.add_argument("--mongo-uri", default=DEFAULT_MONGO_URI, help="MongoDB connection URI")
+    mongo_grp.add_argument("--mongo-db", default=DEFAULT_MONGO_DB, help="MongoDB database name")
+    mongo_grp.add_argument("--mongo-collection", default=DEFAULT_MONGO_COLLECTION, help="MongoDB collection name")
+    mongo_grp.add_argument("--release", default=None, help="Release version to filter durations (e.g., '7.6.4')")
+    mongo_grp.add_argument("--no-mongo", action="store_true", help="Skip MongoDB and use only JSON file for durations")
 
     args = parser.parse_args()
 
@@ -674,7 +981,22 @@ def main():
     logging.info("LOADING DURATION DATA")
     logging.info("=" * 60)
 
-    duration_entries = load_duration_entries(args.durations)
+    # Initialize MongoDB client
+    mongo_client = None
+    if not args.no_mongo:
+        try:
+            mongo_client = MongoDBClient(args.mongo_uri, args.mongo_db, args.mongo_collection)
+            logging.info(f"Connected to MongoDB: {args.mongo_uri}/{args.mongo_db}/{args.mongo_collection}")
+        except Exception as e:
+            logging.error(f"Failed to connect to MongoDB: {e}")
+            mongo_client = None
+
+    # Get duration entries from MongoDB or file
+    duration_entries = get_duration_entries(
+        mongo_client=mongo_client,
+        release=args.release,
+        fallback_file=args.durations
+    )
 
     # Step 7: Determine available Jenkins nodes
     logging.info("=" * 60)

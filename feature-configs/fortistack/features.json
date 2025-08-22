@@ -124,7 +124,6 @@
       "grp.antivirus_flow.full",
       "grp.antivirus_flow_ipv6.full",
       "grp.antivirus_ngfw.full",
-      "grp.antivirus_snifint.full",
       "grp.antivirus_ha.full"
     ],
     "docker_compose": [
@@ -330,6 +329,24 @@
     ],
     "docker_compose": [
       "docker.dlp_nat1.yml",
+      "other"
+    ],
+    "email": [
+      "yjiaran@fortinet.com"
+    ]
+  },
+  "servicedatabase": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.servicedatabase_fortistack.conf"
+    ],
+    "test_groups": [
+      "grp.servicedatabase.crit"
+    ],
+    "docker_compose": [
+      "docker.servicedatabase_servicedatabase.yml",
       "other"
     ],
     "email": [
