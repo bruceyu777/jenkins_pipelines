@@ -9,6 +9,7 @@ RUN apt-get update && \
       python3-pip \
       sshpass \
       python3-requests \
+      python3-pymongo \
       python3-cryptography && \
     rm -rf /var/lib/apt/lists/*
 
