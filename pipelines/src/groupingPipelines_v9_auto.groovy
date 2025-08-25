@@ -11,8 +11,14 @@ pipeline {
         )
         string(
             name: 'BUILD_NUMBER',
-            defaultValue: '3589',
+            defaultValue: '3596',
             description: 'Enter the build number'
+        )
+        // ADDED: AUTOLIB_BRANCH parameter
+        string(
+            name: 'AUTOLIB_BRANCH',
+            defaultValue: 'v3r10build0007',
+            description: 'Which branch of the autolib_v3 repo to checkout before running tests (e.g., main, v3r10build0007)'
         )
         // Multi-line text parameter for common configuration.
         text(
@@ -40,18 +46,33 @@ pipeline {
         string(
             name: 'LOAD_BALANCER_ARGS',
             defaultValue: '-a',
-            description: 'Arguments to pass to load_balancer.py (default: "-a" to use Jenkins nodes)'
+            description: 'Arguments to pass to load-balancer.py (default: "-a" to use Jenkins nodes)'
         )
         string(
             name: 'TEST_GROUP_TYPE',
             defaultValue: 'full',
             description: 'Type of group to create (default: "full", can be "full","crit","tmp")'
         )
+        string(
+            name: 'FEATURE_FILTER_LIST',
+            defaultValue: '',
+            description: 'Comma-separated list of features to include (e.g., "webfilter,antivirus,dlp"). Leave empty to include all features.'
+        )
+        string(
+            name: 'EMAIL_RECIPIENTS',
+            defaultValue: 'yzhengfeng@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,nzhang@fortinet.com,qxu@fortinet.com',
+            description: 'Comma-separated list of email recipients for the test results report'
+        )
         // Add dry run parameter
         booleanParam(
             name: 'DRY_RUN',
             defaultValue: false,
             description: 'When enabled, only print parameters without triggering downstream jobs'
+        )
+        booleanParam(
+            name: 'FORCE_SEND_TEST_RESULTS',
+            defaultValue: false,
+            description: 'When enabled, send test results report even during dry run'
         )
     }
 
@@ -63,6 +84,15 @@ pipeline {
                     def displayName = "#${currentBuild.number}-r${params.RELEASE}-b${params.BUILD_NUMBER}"
                     if (params.DRY_RUN) {
                         displayName += "-DRY_RUN"
+                    }
+                    // Add AUTOLIB_BRANCH indicator if not using default
+                    if (params.AUTOLIB_BRANCH && params.AUTOLIB_BRANCH != 'main') {
+                        displayName += "-${params.AUTOLIB_BRANCH}"
+                    }
+                    // Add feature filter indicator if specified
+                    if (params.FEATURE_FILTER_LIST?.trim()) {
+                        def featureCount = params.FEATURE_FILTER_LIST.split(',').size()
+                        displayName += "-${featureCount}features"
                     }
                     currentBuild.displayName = displayName
                 }
@@ -76,10 +106,35 @@ pipeline {
             steps {
                 script {
                     echo "Running load_balancer.py to generate dispatch.json"
-                    sh """
+
+                    // Build the Python command arguments
+                    def pythonArgs = "-g ${params.TEST_GROUP_TYPE}"
+
+                    // Add feature filter if specified
+                    if (params.FEATURE_FILTER_LIST?.trim()) {
+                        echo "Applying feature filter: ${params.FEATURE_FILTER_LIST}"
+                        pythonArgs += " -f \"${params.FEATURE_FILTER_LIST}\""
+                    } else {
+                        echo "No feature filtering applied - including all features"
+                    }
+
+                    // Add other load balancer arguments
+                    pythonArgs += " ${params.LOAD_BALANCER_ARGS}"
+
+                    // Use container's system Python with all packages pre-installed
+                    def command = """
                         cd /home/fosqa/jenkins-master/feature-configs/fortistack
-                        python3 load_balancer.py -g ${params.TEST_GROUP_TYPE} ${params.LOAD_BALANCER_ARGS}
-                    """
+
+                        echo "=== USING CONTAINER'S PYTHON WITH PRE-INSTALLED PACKAGES ==="
+                        python3 --version
+                        python3 -c "import requests, pymongo; print('All packages available')"
+
+                        echo "=== RUNNING LOAD BALANCER ==="
+                        python3 load_balancer.py ${pythonArgs}
+                    """.stripIndent().trim()
+
+                    echo "Executing command: ${command}"
+                    sh command
                 }
             }
         }
@@ -91,6 +146,15 @@ pipeline {
                     def dispatchJson = readFile('/home/fosqa/jenkins-master/feature-configs/fortistack/dispatch.json')
                     def individualConfigs = readJSON text: dispatchJson
                     echo "Loaded ${individualConfigs.size()} configurations from dispatch.json"
+
+                    // Log feature filtering summary
+                    if (params.FEATURE_FILTER_LIST?.trim()) {
+                        def requestedFeatures = params.FEATURE_FILTER_LIST.split(',').collect { it.trim() }
+                        def actualFeatures = individualConfigs.collect { it.FEATURE_NAME }.unique().sort()
+                        echo "Feature filter applied:"
+                        echo "  Requested: ${requestedFeatures}"
+                        echo "  Generated: ${actualFeatures}"
+                    }
 
                     // Store for later use
                     env.INDIVIDUAL_CONFIGS_JSON = dispatchJson
@@ -115,6 +179,9 @@ pipeline {
                         // Override BUILD_NUMBER with the standalone parameter.
                         merged.BUILD_NUMBER = params.BUILD_NUMBER
                         merged.RELEASE = params.RELEASE
+
+                        // ADDED: Add AUTOLIB_BRANCH to the merged configuration
+                        merged.AUTOLIB_BRANCH = params.AUTOLIB_BRANCH
 
                         // Normalize TEST_GROUPS to handle different formats
                         def testGroups = individual.TEST_GROUPS
@@ -161,6 +228,25 @@ pipeline {
                         }
                     }
 
+                    // Print feature filtering summary
+                    if (params.FEATURE_FILTER_LIST?.trim()) {
+                        def actualFeatures = individualConfigs.collect { it.FEATURE_NAME }.unique().sort()
+                        echo "==== FEATURE FILTERING SUMMARY ===="
+                        echo "Requested features: ${params.FEATURE_FILTER_LIST}"
+                        echo "Generated features: ${actualFeatures.join(', ')}"
+                        echo "Total features in dispatch: ${actualFeatures.size()}"
+                    } else {
+                        def allFeatures = individualConfigs.collect { it.FEATURE_NAME }.unique().sort()
+                        echo "==== ALL FEATURES INCLUDED ===="
+                        echo "Features: ${allFeatures.join(', ')}"
+                        echo "Total features: ${allFeatures.size()}"
+                    }
+
+                    // Log AUTOLIB_BRANCH configuration
+                    echo "==== AUTOLIB_BRANCH CONFIGURATION ===="
+                    echo "AUTOLIB_BRANCH: ${params.AUTOLIB_BRANCH}"
+                    echo "This will be passed to all downstream jobs"
+
                     // Store for downstream stage
                     env.JOB_CONFIGS = groovy.json.JsonOutput.toJson(jobConfigs)
                 }
@@ -189,6 +275,11 @@ pipeline {
                                 string(name: 'NODE_NAME', value: config.NODE_NAME),
                                 string(name: 'FEATURE_NAME', value: config.FEATURE_NAME)
                             ]
+
+                            // ADDED: Add AUTOLIB_BRANCH parameter to downstream jobs
+                            if (config.containsKey('AUTOLIB_BRANCH')) {
+                                buildParams << string(name: 'AUTOLIB_BRANCH', value: config.AUTOLIB_BRANCH)
+                            }
 
                             // Defensively add optional string parameters only if they exist in config
                             if (config.containsKey('TEST_CASE_FOLDER')) {
@@ -246,6 +337,44 @@ pipeline {
             }
         }
 
+        stage('Send Test Results Report') {
+            when {
+                expression { return !params.DRY_RUN || params.FORCE_SEND_TEST_RESULTS }
+            }
+            steps {
+                script {
+                    echo "=== SENDING TEST RESULTS REPORT ==="
+                    echo "Release: ${params.RELEASE}"
+                    echo "Build: ${params.BUILD_NUMBER}"
+                    echo "Recipients: ${params.EMAIL_RECIPIENTS}"
+                    echo "DRY_RUN: ${params.DRY_RUN}"
+                    echo "FORCE_SEND_TEST_RESULTS: ${params.FORCE_SEND_TEST_RESULTS}"
+
+                    def command = """
+                        cd /home/fosqa/resources/tools
+
+                        echo "=== SENDING AUTOLIB TEST RESULTS EMAIL ==="
+                        echo "=== CHECKING PYTHON ENVIRONMENT ==="
+                        python3 --version
+                        python3 -c "import pandas, openpyxl, pymongo, requests; print('All required packages available')"
+                        echo "=== RUNNING FETCH_AUTOLIB_RESULTS ==="
+                        python3 fetch_autolib_results.py -r ${params.RELEASE} -b ${params.BUILD_NUMBER} -t ${params.EMAIL_RECIPIENTS}
+                    """.stripIndent().trim()
+
+                    echo "Executing command: ${command}"
+
+                    try {
+                        sh command
+                        echo "Test results report sent successfully"
+                    } catch (Exception e) {
+                        echo "Warning: Failed to send test results report: ${e.getMessage()}"
+                        // Don't fail the pipeline if email sending fails
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
+            }
+        }
+
         stage('Dry Run Summary') {
             when {
                 expression { return params.DRY_RUN }
@@ -256,6 +385,20 @@ pipeline {
 
                     echo "=== DRY RUN SUMMARY ==="
                     echo "Would have triggered ${jobConfigs.size()} downstream jobs"
+                    echo "AUTOLIB_BRANCH: ${params.AUTOLIB_BRANCH}"
+                    echo "FORCE_SEND_TEST_RESULTS: ${params.FORCE_SEND_TEST_RESULTS}"
+
+                    if (params.FORCE_SEND_TEST_RESULTS) {
+                        echo "NOTE: Test results report will be sent despite dry run mode"
+                    }
+
+                    if (params.FEATURE_FILTER_LIST?.trim()) {
+                        def actualFeatures = jobConfigs.collect { it.FEATURE_NAME }.unique().sort()
+                        echo "Feature filtering applied:"
+                        echo "  Requested: ${params.FEATURE_FILTER_LIST}"
+                        echo "  Generated: ${actualFeatures.join(', ')}"
+                    }
+
                     echo "Configuration validation complete - NO JOBS WERE TRIGGERED"
 
                     // Create artifact with all configurations for reference
@@ -276,7 +419,22 @@ pipeline {
 
                 // Get information about configurations
                 def individualConfigs = readJSON text: env.INDIVIDUAL_CONFIGS_JSON
-                def buildSummary = "<h3>${dryRunPrefix}Build Summary</h3><ul>"
+                def buildSummary = "<h3>${dryRunPrefix}Build Summary</h3>"
+
+                // ADDED: Include AUTOLIB_BRANCH in the build summary
+                buildSummary += "<p><b>AUTOLIB_BRANCH:</b> ${params.AUTOLIB_BRANCH}</p>"
+
+                // Add email recipients information
+                buildSummary += "<p><b>Test Results Email Recipients:</b> ${params.EMAIL_RECIPIENTS}</p>"
+
+                // Add feature filtering information to summary
+                if (params.FEATURE_FILTER_LIST?.trim()) {
+                    def actualFeatures = individualConfigs.collect { it.FEATURE_NAME }.unique().sort()
+                    buildSummary += "<p><b>Feature Filter Applied:</b> ${params.FEATURE_FILTER_LIST}</p>"
+                    buildSummary += "<p><b>Generated Features:</b> ${actualFeatures.join(', ')}</p>"
+                }
+
+                buildSummary += "<ul>"
 
                 // Group by node
                 def nodeMap = [:]

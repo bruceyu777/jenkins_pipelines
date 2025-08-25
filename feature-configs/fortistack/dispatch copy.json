@@ -1,0 +1,645 @@
+[
+  {
+    "NODE_NAME": "node2",
+    "FEATURE_NAME": "avfortisandbox",
+    "TEST_CASE_FOLDER": "testcase",
+    "TEST_CONFIG_CHOICE": "env.newman.FGT_KVM.avfortisandbox.conf",
+    "TEST_GROUP_CHOICE": "grp.avfortisandbox_fortistack.full",
+    "TEST_GROUPS": [
+      "grp.avfortisandbox_fortistack.full"
+    ],
+    "SUM_DURATION": "3 hr 33 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.avfortisandbox_avfortisandbox.yml",
+    "SEND_TO": "rainxiao@fortinet.com,vlysak@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node3",
+    "FEATURE_NAME": "webfilter",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
+    "TEST_GROUP_CHOICE": "grp.webfilter_basic2.full",
+    "TEST_GROUPS": [
+      "grp.webfilter_basic2.full"
+    ],
+    "SUM_DURATION": "6 hr 56 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml",
+    "SEND_TO": "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node4",
+    "FEATURE_NAME": "webfilter",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
+    "TEST_GROUP_CHOICE": "grp.webfilter_other2.full",
+    "TEST_GROUPS": [
+      "grp.webfilter_other2.full"
+    ],
+    "SUM_DURATION": "6 hr 49 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml",
+    "SEND_TO": "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node6",
+    "FEATURE_NAME": "webfilter",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
+    "TEST_GROUP_CHOICE": "grp.webfilter_other.full",
+    "TEST_GROUPS": [
+      "grp.webfilter_other.full"
+    ],
+    "SUM_DURATION": "6 hr 13 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml",
+    "SEND_TO": "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node7",
+    "FEATURE_NAME": "webfilter",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
+    "TEST_GROUP_CHOICE": "grp.webfilter_basic.full",
+    "TEST_GROUPS": [
+      "grp.webfilter_basic.full"
+    ],
+    "SUM_DURATION": "4 hr 27 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml",
+    "SEND_TO": "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node8",
+    "FEATURE_NAME": "webfilter",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
+    "TEST_GROUP_CHOICE": "grp.webfilter_flow.full",
+    "TEST_GROUPS": [
+      "grp.webfilter_flow.full"
+    ],
+    "SUM_DURATION": "4 hr 23 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml",
+    "SEND_TO": "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node9",
+    "FEATURE_NAME": "webfilter",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.FGTVM64.webfilter_demo.conf",
+    "TEST_GROUP_CHOICE": "grp.webfilter_ha.full",
+    "TEST_GROUPS": [
+      "grp.webfilter_ha.full",
+      "grp.webfilter_onearm.full",
+      "grp.webfilter_peruser.full"
+    ],
+    "SUM_DURATION": "4 hr 1 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webfilter_basic.yml",
+    "SEND_TO": "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node10",
+    "FEATURE_NAME": "avenregres",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.FGTVM64.avenregres_demo.conf",
+    "TEST_GROUP_CHOICE": "grp.avenregres.full",
+    "TEST_GROUPS": [
+      "grp.avenregres.full"
+    ],
+    "SUM_DURATION": "1 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.avenregres_avenregres.yml",
+    "SEND_TO": "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node16",
+    "FEATURE_NAME": "dnsfilter",
+    "TEST_CASE_FOLDER": "testcase",
+    "TEST_CONFIG_CHOICE": "env.FGTVM64_dnsfilter_fortistack.conf",
+    "TEST_GROUP_CHOICE": "grp.dnsfilter.full",
+    "TEST_GROUPS": [
+      "grp.dnsfilter.full"
+    ],
+    "SUM_DURATION": "1 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.dnsfilter_dnsfilter.yml",
+    "SEND_TO": "rainxiao@fortinet.com,vlysak@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node17",
+    "FEATURE_NAME": "threatfeed",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.threatfeed.conf",
+    "TEST_GROUP_CHOICE": "grp.threatfeed.full",
+    "TEST_GROUPS": [
+      "grp.threatfeed.full"
+    ],
+    "SUM_DURATION": "1 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "KVM",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": true,
+    "VMPC_NAMES": "VMPC1,VMPC4",
+    "PROVISION_DOCKER": false,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node18",
+    "FEATURE_NAME": "antivirus",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.antivirus.conf",
+    "TEST_GROUP_CHOICE": "grp.antivirus_flow.full",
+    "TEST_GROUPS": [
+      "grp.antivirus_flow.full"
+    ],
+    "SUM_DURATION": "7 hr 23 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.antivirus_proxy.yml",
+    "SEND_TO": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node21",
+    "FEATURE_NAME": "antivirus",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.antivirus.conf",
+    "TEST_GROUP_CHOICE": "grp.antivirus_misc.full",
+    "TEST_GROUPS": [
+      "grp.antivirus_misc.full"
+    ],
+    "SUM_DURATION": "6 hr 38 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.antivirus_proxy.yml",
+    "SEND_TO": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node22",
+    "FEATURE_NAME": "antivirus",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.antivirus.conf",
+    "TEST_GROUP_CHOICE": "grp.antivirus_webproxy.full",
+    "TEST_GROUPS": [
+      "grp.antivirus_webproxy.full"
+    ],
+    "SUM_DURATION": "4 hr 38 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.antivirus_proxy.yml",
+    "SEND_TO": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node23",
+    "FEATURE_NAME": "antivirus",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.antivirus.conf",
+    "TEST_GROUP_CHOICE": "grp.antivirus_tp.full",
+    "TEST_GROUPS": [
+      "grp.antivirus_tp.full"
+    ],
+    "SUM_DURATION": "4 hr 9 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.antivirus_proxy.yml",
+    "SEND_TO": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node24",
+    "FEATURE_NAME": "antivirus",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.antivirus.conf",
+    "TEST_GROUP_CHOICE": "grp.antivirus_ngfw.full",
+    "TEST_GROUPS": [
+      "grp.antivirus_ngfw.full"
+    ],
+    "SUM_DURATION": "3 hr 43 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.antivirus_proxy.yml",
+    "SEND_TO": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node25",
+    "FEATURE_NAME": "antivirus",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.antivirus.conf",
+    "TEST_GROUP_CHOICE": "grp.antivirus_flow_ipv6.full",
+    "TEST_GROUPS": [
+      "grp.antivirus_flow_ipv6.full",
+      "grp.antivirus_wanopt.full"
+    ],
+    "SUM_DURATION": "4 hr 10 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.antivirus_proxy.yml",
+    "SEND_TO": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node26",
+    "FEATURE_NAME": "antivirus",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.antivirus.conf",
+    "TEST_GROUP_CHOICE": "grp.antivirus_proxy_ipv6.full",
+    "TEST_GROUPS": [
+      "grp.antivirus_proxy_ipv6.full",
+      "grp.antivirus_tp_ipv6.full",
+      "grp.antivirus_sdwan.full"
+    ],
+    "SUM_DURATION": "4 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.antivirus_proxy.yml",
+    "SEND_TO": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node28",
+    "FEATURE_NAME": "foc",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.foc.fortistack.conf",
+    "TEST_GROUP_CHOICE": "grp.foc_gtp.fstack.full",
+    "TEST_GROUPS": [
+      "grp.foc_gtp.fstack.full",
+      "grp.foc_gtp_ha.fstack.full",
+      "grp.foc_gtp_s10.fstack.full",
+      "grp.foc_pfcp.fstack.full"
+    ],
+    "SUM_DURATION": "4 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.foc_gtp.yml",
+    "SEND_TO": "mabbasi@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node29",
+    "FEATURE_NAME": "antivirus",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.antivirus.conf",
+    "TEST_GROUP_CHOICE": "grp.antivirus_snifint.full",
+    "TEST_GROUPS": [
+      "grp.antivirus_snifint.full",
+      "grp.antivirus_proxy.full",
+      "grp.antivirus_ha.full"
+    ],
+    "SUM_DURATION": "3 hr 48 min 59 sec",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.antivirus_proxy.yml",
+    "SEND_TO": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node31",
+    "FEATURE_NAME": "avaimodel",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.avaimodel.conf",
+    "TEST_GROUP_CHOICE": "grp.avaimodel.full",
+    "TEST_GROUPS": [
+      "grp.avaimodel.full"
+    ],
+    "SUM_DURATION": "56 min 20 sec",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.avaimodel_proxy.yml",
+    "SEND_TO": "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node32",
+    "FEATURE_NAME": "wanopt",
+    "TEST_CASE_FOLDER": "testcase",
+    "TEST_CONFIG_CHOICE": "env.fortistack.wanopt.conf",
+    "TEST_GROUP_CHOICE": "grp.wanopt.fortistack.full",
+    "TEST_GROUPS": [
+      "grp.wanopt.fortistack.full"
+    ],
+    "SUM_DURATION": "1 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.wanopt_linux.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node34",
+    "FEATURE_NAME": "webcache",
+    "TEST_CASE_FOLDER": "testcase",
+    "TEST_CONFIG_CHOICE": "env.fortistack.webcache.conf",
+    "TEST_GROUP_CHOICE": "grp.webcache.fortistack.full",
+    "TEST_GROUPS": [
+      "grp.webcache.fortistack.full"
+    ],
+    "SUM_DURATION": "1 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webcache_webcache.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node35",
+    "FEATURE_NAME": "icap",
+    "TEST_CASE_FOLDER": "testcase",
+    "TEST_CONFIG_CHOICE": "env.fortistack.icap.conf",
+    "TEST_GROUP_CHOICE": "grp.icap.fortistack.full",
+    "TEST_GROUPS": [
+      "grp.icap.fortistack.full"
+    ],
+    "SUM_DURATION": "1 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.icap_icap.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node36",
+    "FEATURE_NAME": "webproxy",
+    "TEST_CASE_FOLDER": "testcase",
+    "TEST_CONFIG_CHOICE": "env.fortistack.webproxy.conf",
+    "TEST_GROUP_CHOICE": "grp.webproxy_auth_fortistack.full",
+    "TEST_GROUPS": [
+      "grp.webproxy_auth_fortistack.full",
+      "grp.webproxy_basic_fortistack.full",
+      "grp.webproxy_forward_fortistack.full",
+      "grp.webproxy_policy_fortistack.full",
+      "grp.webproxy_topology_fortistack.full"
+    ],
+    "SUM_DURATION": "5 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.webproxy_webproxy.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com,zachwang@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node37",
+    "FEATURE_NAME": "ftpproxy",
+    "TEST_CASE_FOLDER": "testcase",
+    "TEST_CONFIG_CHOICE": "env.fortistack.ftpproxy.conf",
+    "TEST_GROUP_CHOICE": "grp.ftpproxy_fortistack.full",
+    "TEST_GROUPS": [
+      "grp.ftpproxy_fortistack.full"
+    ],
+    "SUM_DURATION": "1 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.ftpproxy_ftpproxy.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com,zachwang@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node38",
+    "FEATURE_NAME": "sslprofile",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.sslprofile_proxy.conf",
+    "TEST_GROUP_CHOICE": "grp.sslprofile_proxy.full",
+    "TEST_GROUPS": [
+      "grp.sslprofile_proxy.full"
+    ],
+    "SUM_DURATION": "4 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.sslprofile_proxy.yml",
+    "SEND_TO": "YUZHU@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node40",
+    "FEATURE_NAME": "waf",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fstack.waf.conf",
+    "TEST_GROUP_CHOICE": "grp.waf.fstack.full",
+    "TEST_GROUPS": [
+      "grp.waf.fstack.full"
+    ],
+    "SUM_DURATION": "1 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.waf_waf.yml",
+    "SEND_TO": "mabbasi@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node41",
+    "FEATURE_NAME": "sslprofile",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.sslprofile_flow.conf",
+    "TEST_GROUP_CHOICE": "grp.sslprofile_flow.full",
+    "TEST_GROUPS": [
+      "grp.sslprofile_flow.full"
+    ],
+    "SUM_DURATION": "1 hr",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.sslprofile_flow.yml",
+    "SEND_TO": "eson@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node42",
+    "FEATURE_NAME": "dlp",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.dlp.conf",
+    "TEST_GROUP_CHOICE": "grp.dlp_exproxy.full",
+    "TEST_GROUPS": [
+      "grp.dlp_exproxy.full"
+    ],
+    "SUM_DURATION": "8 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.dlp_nat1.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node43",
+    "FEATURE_NAME": "dlp",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.dlp.conf",
+    "TEST_GROUP_CHOICE": "grp.dlp_flowbase.full",
+    "TEST_GROUPS": [
+      "grp.dlp_flowbase.full"
+    ],
+    "SUM_DURATION": "8 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.dlp_nat1.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node44",
+    "FEATURE_NAME": "dlp",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.dlp.conf",
+    "TEST_GROUP_CHOICE": "grp.dlp_nat2.full",
+    "TEST_GROUPS": [
+      "grp.dlp_nat2.full"
+    ],
+    "SUM_DURATION": "7 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.dlp_nat1.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node45",
+    "FEATURE_NAME": "dlp",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.dlp.conf",
+    "TEST_GROUP_CHOICE": "grp.dlp_nat1.full",
+    "TEST_GROUPS": [
+      "grp.dlp_nat1.full"
+    ],
+    "SUM_DURATION": "6 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.dlp_nat1.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node46",
+    "FEATURE_NAME": "dlp",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.dlp.conf",
+    "TEST_GROUP_CHOICE": "grp.dlp_wanopt.full",
+    "TEST_GROUPS": [
+      "grp.dlp_wanopt.full"
+    ],
+    "SUM_DURATION": "4 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.dlp_nat1.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node47",
+    "FEATURE_NAME": "dlp",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.dlp.conf",
+    "TEST_GROUP_CHOICE": "grp.dlp_ha.full",
+    "TEST_GROUPS": [
+      "grp.dlp_ha.full"
+    ],
+    "SUM_DURATION": "3 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.dlp_nat1.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node48",
+    "FEATURE_NAME": "dlp",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.dlp.conf",
+    "TEST_GROUP_CHOICE": "grp.dlp_interface.full",
+    "TEST_GROUPS": [
+      "grp.dlp_interface.full"
+    ],
+    "SUM_DURATION": "1 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.dlp_nat1.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node49",
+    "FEATURE_NAME": "dlp",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.dlp.conf",
+    "TEST_GROUP_CHOICE": "grp.dlp_language.full",
+    "TEST_GROUPS": [
+      "grp.dlp_language.full"
+    ],
+    "SUM_DURATION": "1 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.dlp_nat1.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  {
+    "NODE_NAME": "node50",
+    "FEATURE_NAME": "dlp",
+    "TEST_CASE_FOLDER": "testcase_v1",
+    "TEST_CONFIG_CHOICE": "env.fortistack.dlp.conf",
+    "TEST_GROUP_CHOICE": "grp.dlp_tp.full",
+    "TEST_GROUPS": [
+      "grp.dlp_tp.full"
+    ],
+    "SUM_DURATION": "1 hr 3 min",
+    "DOCKER_COMPOSE_FILE_CHOICE": "docker.dlp_nat1.yml",
+    "SEND_TO": "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com",
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  }
+]

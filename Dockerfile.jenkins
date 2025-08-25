@@ -10,7 +10,10 @@ RUN apt-get update && \
       sshpass \
       python3-requests \
       python3-pymongo \
-      python3-cryptography && \
+      python3-cryptography \
+      python3-pandas \
+      python3-openpyxl \
+      python3-urllib3 && \
     rm -rf /var/lib/apt/lists/*
 
 # Set up SSH known hosts
