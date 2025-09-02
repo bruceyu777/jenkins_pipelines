@@ -261,83 +261,118 @@ pipeline {
                 script {
                     def jobConfigs = readJSON text: env.JOB_CONFIGS
                     def parallelBuilds = [:]
+                    def jobResults = [:]
 
                     jobConfigs.eachWithIndex { config, i ->
                         def branchName = "Run_${i}_${config.FEATURE_NAME}_${config.NODE_NAME}"
                         parallelBuilds[branchName] = {
-                            echo "Triggering fortistack_master_provision_runtest with configuration: ${config}"
+                            try {
+                                echo "Triggering fortistack_master_provision_runtest with configuration: ${config}"
 
-                            // Start with required parameters that are always present
-                            def buildParams = [
-                                string(name: 'PARAMS_JSON', value: groovy.json.JsonOutput.toJson(config.PARAMS_JSON)),
-                                string(name: 'RELEASE', value: config.RELEASE),
-                                string(name: 'BUILD_NUMBER', value: config.BUILD_NUMBER),
-                                string(name: 'NODE_NAME', value: config.NODE_NAME),
-                                string(name: 'FEATURE_NAME', value: config.FEATURE_NAME)
-                            ]
+                                // Start with required parameters that are always present
+                                def buildParams = [
+                                    string(name: 'PARAMS_JSON', value: groovy.json.JsonOutput.toJson(config.PARAMS_JSON)),
+                                    string(name: 'RELEASE', value: config.RELEASE),
+                                    string(name: 'BUILD_NUMBER', value: config.BUILD_NUMBER),
+                                    string(name: 'NODE_NAME', value: config.NODE_NAME),
+                                    string(name: 'FEATURE_NAME', value: config.FEATURE_NAME)
+                                ]
 
-                            // ADDED: Add AUTOLIB_BRANCH parameter to downstream jobs
-                            if (config.containsKey('AUTOLIB_BRANCH')) {
-                                buildParams << string(name: 'AUTOLIB_BRANCH', value: config.AUTOLIB_BRANCH)
-                            }
+                                // ADDED: Add AUTOLIB_BRANCH parameter to downstream jobs
+                                if (config.containsKey('AUTOLIB_BRANCH')) {
+                                    buildParams << string(name: 'AUTOLIB_BRANCH', value: config.AUTOLIB_BRANCH)
+                                }
 
-                            // Defensively add optional string parameters only if they exist in config
-                            if (config.containsKey('TEST_CASE_FOLDER')) {
-                                buildParams << string(name: 'TEST_CASE_FOLDER', value: config.TEST_CASE_FOLDER)
-                            }
-                            if (config.containsKey('TEST_CONFIG_CHOICE')) {
-                                buildParams << string(name: 'TEST_CONFIG_CHOICE', value: config.TEST_CONFIG_CHOICE)
-                            }
-                            if (config.containsKey('TEST_GROUP_CHOICE')) {
-                                buildParams << string(name: 'TEST_GROUP_CHOICE', value: config.TEST_GROUP_CHOICE)
-                            }
-                            if (config.containsKey('TEST_GROUPS')) {
-                                buildParams << string(name: 'TEST_GROUPS', value: config.TEST_GROUPS)
-                            }
-                            if (config.containsKey('DOCKER_COMPOSE_FILE_CHOICE')) {
-                                buildParams << string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: config.DOCKER_COMPOSE_FILE_CHOICE)
-                            }
-                            if (config.containsKey('SEND_TO')) {
-                                buildParams << string(name: 'SEND_TO', value: config.SEND_TO)
-                            }
-                            if (config.containsKey('VMPC_NAMES')) {
-                                buildParams << string(name: 'VMPC_NAMES', value: config.VMPC_NAMES)
-                            }
-                            if (config.containsKey('ORIOLE_SUBMIT_FLAG')) {
-                                buildParams << string(name: 'ORIOLE_SUBMIT_FLAG', value: config.ORIOLE_SUBMIT_FLAG)
-                            }
+                                // Defensively add optional string parameters only if they exist in config
+                                if (config.containsKey('TEST_CASE_FOLDER')) {
+                                    buildParams << string(name: 'TEST_CASE_FOLDER', value: config.TEST_CASE_FOLDER)
+                                }
+                                if (config.containsKey('TEST_CONFIG_CHOICE')) {
+                                    buildParams << string(name: 'TEST_CONFIG_CHOICE', value: config.TEST_CONFIG_CHOICE)
+                                }
+                                if (config.containsKey('TEST_GROUP_CHOICE')) {
+                                    buildParams << string(name: 'TEST_GROUP_CHOICE', value: config.TEST_GROUP_CHOICE)
+                                }
+                                if (config.containsKey('TEST_GROUPS')) {
+                                    buildParams << string(name: 'TEST_GROUPS', value: config.TEST_GROUPS)
+                                }
+                                if (config.containsKey('DOCKER_COMPOSE_FILE_CHOICE')) {
+                                    buildParams << string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: config.DOCKER_COMPOSE_FILE_CHOICE)
+                                }
+                                if (config.containsKey('SEND_TO')) {
+                                    buildParams << string(name: 'SEND_TO', value: config.SEND_TO)
+                                }
+                                if (config.containsKey('VMPC_NAMES')) {
+                                    buildParams << string(name: 'VMPC_NAMES', value: config.VMPC_NAMES)
+                                }
+                                if (config.containsKey('ORIOLE_SUBMIT_FLAG')) {
+                                    buildParams << string(name: 'ORIOLE_SUBMIT_FLAG', value: config.ORIOLE_SUBMIT_FLAG)
+                                }
 
-                            // Defensively add boolean parameters only if they exist in config
-                            if (config.containsKey('FORCE_UPDATE_DOCKER_FILE')) {
-                                buildParams << booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: config.FORCE_UPDATE_DOCKER_FILE)
-                            }
-                            if (config.containsKey('SKIP_PROVISION')) {
-                                buildParams << booleanParam(name: 'SKIP_PROVISION', value: config.SKIP_PROVISION)
-                            }
-                            if (config.containsKey('SKIP_PROVISION_TEST_ENV')) {
-                                buildParams << booleanParam(name: 'SKIP_PROVISION_TEST_ENV', value: config.SKIP_PROVISION_TEST_ENV)
-                            }
-                            if (config.containsKey('SKIP_TEST')) {
-                                buildParams << booleanParam(name: 'SKIP_TEST', value: config.SKIP_TEST)
-                            }
-                            if (config.containsKey('PROVISION_VMPC')) {
-                                buildParams << booleanParam(name: 'PROVISION_VMPC', value: config.PROVISION_VMPC)
-                            }
-                            if (config.containsKey('PROVISION_DOCKER')) {
-                                buildParams << booleanParam(name: 'PROVISION_DOCKER', value: config.PROVISION_DOCKER)
-                            }
+                                // Defensively add boolean parameters only if they exist in config
+                                if (config.containsKey('FORCE_UPDATE_DOCKER_FILE')) {
+                                    buildParams << booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: config.FORCE_UPDATE_DOCKER_FILE)
+                                }
+                                if (config.containsKey('SKIP_PROVISION')) {
+                                    buildParams << booleanParam(name: 'SKIP_PROVISION', value: config.SKIP_PROVISION)
+                                }
+                                if (config.containsKey('SKIP_PROVISION_TEST_ENV')) {
+                                    buildParams << booleanParam(name: 'SKIP_PROVISION_TEST_ENV', value: config.SKIP_PROVISION_TEST_ENV)
+                                }
+                                if (config.containsKey('SKIP_TEST')) {
+                                    buildParams << booleanParam(name: 'SKIP_TEST', value: config.SKIP_TEST)
+                                }
+                                if (config.containsKey('PROVISION_VMPC')) {
+                                    buildParams << booleanParam(name: 'PROVISION_VMPC', value: config.PROVISION_VMPC)
+                                }
+                                if (config.containsKey('PROVISION_DOCKER')) {
+                                    buildParams << booleanParam(name: 'PROVISION_DOCKER', value: config.PROVISION_DOCKER)
+                                }
 
-                            build job: 'fortistack_master_provision_runtest', parameters: buildParams, wait: true
+                                def result = build job: 'fortistack_master_provision_runtest', parameters: buildParams, wait: true
+                                jobResults[branchName] = [status: 'SUCCESS', result: result]
+                                echo "Job ${branchName} completed successfully"
+                            } catch (Exception e) {
+                                jobResults[branchName] = [status: 'FAILED', error: e.getMessage()]
+                                echo "Job ${branchName} failed: ${e.getMessage()}"
+                                // Don't throw the exception - let other jobs continue
+                            }
                         }
                     }
 
                     // Execute all jobs in parallel.
                     parallel parallelBuilds
+
+                    // Summary of results
+                    def successCount = 0
+                    def failureCount = 0
+                    echo "=== DOWNSTREAM JOBS SUMMARY ==="
+                    jobResults.each { jobName, result ->
+                        if (result.status == 'SUCCESS') {
+                            successCount++
+                            echo "✓ ${jobName}: SUCCESS"
+                        } else {
+                            failureCount++
+                            echo "✗ ${jobName}: FAILED - ${result.error}"
+                        }
+                    }
+
+                    echo "Total: ${successCount} succeeded, ${failureCount} failed"
+
+                    // Store results for later stages
+                    env.JOB_RESULTS_SUMMARY = "${successCount} succeeded, ${failureCount} failed"
+
+                    // Set build result to UNSTABLE if there were failures, but don't fail the pipeline
+                    if (failureCount > 0) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo "Pipeline marked as UNSTABLE due to ${failureCount} failed downstream jobs"
+                    }
                 }
             }
         }
 
         stage('Send Test Results Report') {
+            // Always run this stage unless it's a dry run (and FORCE_SEND_TEST_RESULTS is false)
             when {
                 expression { return !params.DRY_RUN || params.FORCE_SEND_TEST_RESULTS }
             }
@@ -349,6 +384,11 @@ pipeline {
                     echo "Recipients: ${params.EMAIL_RECIPIENTS}"
                     echo "DRY_RUN: ${params.DRY_RUN}"
                     echo "FORCE_SEND_TEST_RESULTS: ${params.FORCE_SEND_TEST_RESULTS}"
+
+                    // Include job results summary if available
+                    if (env.JOB_RESULTS_SUMMARY) {
+                        echo "Downstream Jobs Summary: ${env.JOB_RESULTS_SUMMARY}"
+                    }
 
                     def command = """
                         cd /home/fosqa/resources/tools
@@ -368,8 +408,10 @@ pipeline {
                         echo "Test results report sent successfully"
                     } catch (Exception e) {
                         echo "Warning: Failed to send test results report: ${e.getMessage()}"
-                        // Don't fail the pipeline if email sending fails
-                        currentBuild.result = 'UNSTABLE'
+                        // Don't fail the pipeline if email sending fails - just mark as unstable
+                        if (currentBuild.result != 'FAILURE') {
+                            currentBuild.result = 'UNSTABLE'
+                        }
                     }
                 }
             }
@@ -460,6 +502,11 @@ pipeline {
                 }
 
                 buildSummary += "</table>"
+
+                // Add downstream job results summary if available
+                if (env.JOB_RESULTS_SUMMARY) {
+                    buildSummary += "<p><b>Downstream Jobs Results:</b> ${env.JOB_RESULTS_SUMMARY}</p>"
+                }
 
                 if (params.DRY_RUN) {
                     buildSummary += "<p><b>DRY RUN:</b> No downstream jobs were triggered</p>"
