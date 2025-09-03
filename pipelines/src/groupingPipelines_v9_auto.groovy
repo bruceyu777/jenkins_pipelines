@@ -74,6 +74,11 @@ pipeline {
             defaultValue: false,
             description: 'When enabled, send test results report even during dry run'
         )
+        choice(
+            name: 'ORIOLE_SUBMIT_FLAG',
+            choices: ['succeeded', 'all', 'none'],
+            description: 'Only passed test case submissions or all/none'
+        )
     }
 
     stages {
@@ -183,6 +188,9 @@ pipeline {
                         // ADDED: Add AUTOLIB_BRANCH to the merged configuration
                         merged.AUTOLIB_BRANCH = params.AUTOLIB_BRANCH
 
+                        // ADDED: Add ORIOLE_SUBMIT_FLAG to the merged configuration
+                        merged.ORIOLE_SUBMIT_FLAG = params.ORIOLE_SUBMIT_FLAG
+
                         // Normalize TEST_GROUPS to handle different formats
                         def testGroups = individual.TEST_GROUPS
 
@@ -247,6 +255,11 @@ pipeline {
                     echo "AUTOLIB_BRANCH: ${params.AUTOLIB_BRANCH}"
                     echo "This will be passed to all downstream jobs"
 
+                    // Log ORIOLE_SUBMIT_FLAG configuration
+                    echo "==== ORIOLE_SUBMIT_FLAG CONFIGURATION ===="
+                    echo "ORIOLE_SUBMIT_FLAG: ${params.ORIOLE_SUBMIT_FLAG}"
+                    echo "This will be passed to all downstream jobs"
+
                     // Store for downstream stage
                     env.JOB_CONFIGS = groovy.json.JsonOutput.toJson(jobConfigs)
                 }
@@ -283,6 +296,11 @@ pipeline {
                                     buildParams << string(name: 'AUTOLIB_BRANCH', value: config.AUTOLIB_BRANCH)
                                 }
 
+                                // ADDED: Add ORIOLE_SUBMIT_FLAG parameter to downstream jobs
+                                if (config.containsKey('ORIOLE_SUBMIT_FLAG')) {
+                                    buildParams << string(name: 'ORIOLE_SUBMIT_FLAG', value: config.ORIOLE_SUBMIT_FLAG)
+                                }
+
                                 // Defensively add optional string parameters only if they exist in config
                                 if (config.containsKey('TEST_CASE_FOLDER')) {
                                     buildParams << string(name: 'TEST_CASE_FOLDER', value: config.TEST_CASE_FOLDER)
@@ -304,9 +322,6 @@ pipeline {
                                 }
                                 if (config.containsKey('VMPC_NAMES')) {
                                     buildParams << string(name: 'VMPC_NAMES', value: config.VMPC_NAMES)
-                                }
-                                if (config.containsKey('ORIOLE_SUBMIT_FLAG')) {
-                                    buildParams << string(name: 'ORIOLE_SUBMIT_FLAG', value: config.ORIOLE_SUBMIT_FLAG)
                                 }
 
                                 // Defensively add boolean parameters only if they exist in config
@@ -428,6 +443,7 @@ pipeline {
                     echo "=== DRY RUN SUMMARY ==="
                     echo "Would have triggered ${jobConfigs.size()} downstream jobs"
                     echo "AUTOLIB_BRANCH: ${params.AUTOLIB_BRANCH}"
+                    echo "ORIOLE_SUBMIT_FLAG: ${params.ORIOLE_SUBMIT_FLAG}"
                     echo "FORCE_SEND_TEST_RESULTS: ${params.FORCE_SEND_TEST_RESULTS}"
 
                     if (params.FORCE_SEND_TEST_RESULTS) {
@@ -465,6 +481,9 @@ pipeline {
 
                 // ADDED: Include AUTOLIB_BRANCH in the build summary
                 buildSummary += "<p><b>AUTOLIB_BRANCH:</b> ${params.AUTOLIB_BRANCH}</p>"
+
+                // Add ORIOLE_SUBMIT_FLAG information
+                buildSummary += "<p><b>ORIOLE_SUBMIT_FLAG:</b> ${params.ORIOLE_SUBMIT_FLAG}</p>"
 
                 // Add email recipients information
                 buildSummary += "<p><b>Test Results Email Recipients:</b> ${params.EMAIL_RECIPIENTS}</p>"
