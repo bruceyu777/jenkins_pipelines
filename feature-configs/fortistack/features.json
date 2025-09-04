@@ -259,7 +259,10 @@
     ],
     "test_groups": [
       "grp.sslprofile_proxy.crit",
-      "grp.sslprofile_proxy.full",
+      "grp.sslprofile_proxy.sub01.full",
+      "grp.sslprofile_proxy.sub02.full",
+      "grp.sslprofile_proxy.sub03.full",
+      "grp.sslprofile_proxy.sub04.full",
       "grp.sslprofile_flow.crit",
       "grp.sslprofile_flow.full"
     ],
