@@ -14,6 +14,12 @@ pipeline {
             defaultValue: '3587',
             description: 'Enter the build number'
         )
+        // ADDED: AUTOLIB_BRANCH parameter
+        string(
+            name: 'AUTOLIB_BRANCH',
+            defaultValue: 'v3r10build0007',
+            description: 'Which branch of the autolib_v3 repo to checkout before running tests (e.g., main, v3r10build0007)'
+        )
         // Multi-line text parameter for common configuration.
         text(
             name: 'COMMON_CONFIG',
@@ -80,7 +86,12 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
         stage('Set Build Display Name') {
             steps {
             script {
-                currentBuild.displayName = "#${currentBuild.number}-r${params.RELEASE}-b${params.BUILD_NUMBER}"
+                def displayName = "#${currentBuild.number}-r${params.RELEASE}-b${params.BUILD_NUMBER}"
+                // Add AUTOLIB_BRANCH indicator if not using default
+                if (params.AUTOLIB_BRANCH && params.AUTOLIB_BRANCH != 'main') {
+                    displayName += "-${params.AUTOLIB_BRANCH}"
+                }
+                currentBuild.displayName = displayName
             }
             }
         }
@@ -99,6 +110,9 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                         // Override BUILD_NUMBER with the standalone parameter.
                         merged.BUILD_NUMBER = params.BUILD_NUMBER
                         merged.RELEASE = params.RELEASE
+
+                        // ADDED: Add AUTOLIB_BRANCH to the merged configuration
+                        merged.AUTOLIB_BRANCH = params.AUTOLIB_BRANCH
 
                         // Process TEST_GROUPS field:
                         // if (merged.TEST_GROUPS?.trim()) {
@@ -158,26 +172,68 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
                         def branchName = "Run_${i}"
                         parallelBuilds[branchName] = {
                             echo "Triggering fortistack_master_provision_runtest with merged configuration: ${merged}"
-                            build job: 'fortistack_master_provision_runtest', parameters: [
+
+                            // Start with required parameters that are always present
+                            def buildParams = [
                                 string(name: 'PARAMS_JSON', value: groovy.json.JsonOutput.toJson(merged.PARAMS_JSON)),
                                 string(name: 'RELEASE', value: merged.RELEASE),
                                 string(name: 'BUILD_NUMBER', value: merged.BUILD_NUMBER),
                                 string(name: 'NODE_NAME', value: merged.NODE_NAME),
-                                booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: merged.FORCE_UPDATE_DOCKER_FILE),
-                                string(name: 'FEATURE_NAME', value: merged.FEATURE_NAME),
-                                string(name: 'TEST_CASE_FOLDER', value: merged.TEST_CASE_FOLDER),
-                                string(name: 'TEST_CONFIG_CHOICE', value: merged.TEST_CONFIG_CHOICE),
-                                string(name: 'TEST_GROUP_CHOICE', value: merged.TEST_GROUP_CHOICE),
-                                string(name: 'TEST_GROUPS', value: merged.TEST_GROUPS),
-                                string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: merged.DOCKER_COMPOSE_FILE_CHOICE),
-                                string(name: 'SEND_TO', value: merged.SEND_TO),
-                                booleanParam(name: 'SKIP_PROVISION', value: merged.SKIP_PROVISION),
-                                booleanParam(name: 'SKIP_TEST', value: merged.SKIP_TEST),
-                                booleanParam(name: 'PROVISION_VMPC',   value: merged.PROVISION_VMPC),
-                                string(      name: 'VMPC_NAMES',       value: merged.VMPC_NAMES),
-                                booleanParam(name: 'PROVISION_DOCKER', value: merged.PROVISION_DOCKER),
-                                string(      name: 'ORIOLE_SUBMIT_FLAG',       value:  (merged.ORIOLE_SUBMIT_FLAG?.trim() ?: 'succeeded')),
-                            ], wait: true
+                                string(name: 'FEATURE_NAME', value: merged.FEATURE_NAME)
+                            ]
+
+                            // ADDED: Add AUTOLIB_BRANCH parameter to downstream jobs
+                            if (merged.containsKey('AUTOLIB_BRANCH')) {
+                                buildParams << string(name: 'AUTOLIB_BRANCH', value: merged.AUTOLIB_BRANCH)
+                            }
+
+                            // Defensively add optional string parameters only if they exist in config
+                            if (merged.containsKey('TEST_CASE_FOLDER')) {
+                                buildParams << string(name: 'TEST_CASE_FOLDER', value: merged.TEST_CASE_FOLDER)
+                            }
+                            if (merged.containsKey('TEST_CONFIG_CHOICE')) {
+                                buildParams << string(name: 'TEST_CONFIG_CHOICE', value: merged.TEST_CONFIG_CHOICE)
+                            }
+                            if (merged.containsKey('TEST_GROUP_CHOICE')) {
+                                buildParams << string(name: 'TEST_GROUP_CHOICE', value: merged.TEST_GROUP_CHOICE)
+                            }
+                            if (merged.containsKey('TEST_GROUPS')) {
+                                buildParams << string(name: 'TEST_GROUPS', value: merged.TEST_GROUPS)
+                            }
+                            if (merged.containsKey('DOCKER_COMPOSE_FILE_CHOICE')) {
+                                buildParams << string(name: 'DOCKER_COMPOSE_FILE_CHOICE', value: merged.DOCKER_COMPOSE_FILE_CHOICE)
+                            }
+                            if (merged.containsKey('SEND_TO')) {
+                                buildParams << string(name: 'SEND_TO', value: merged.SEND_TO)
+                            }
+                            if (merged.containsKey('VMPC_NAMES')) {
+                                buildParams << string(name: 'VMPC_NAMES', value: merged.VMPC_NAMES)
+                            }
+                            if (merged.containsKey('ORIOLE_SUBMIT_FLAG')) {
+                                buildParams << string(name: 'ORIOLE_SUBMIT_FLAG', value: merged.ORIOLE_SUBMIT_FLAG)
+                            }
+
+                            // Defensively add boolean parameters only if they exist in config
+                            if (merged.containsKey('FORCE_UPDATE_DOCKER_FILE')) {
+                                buildParams << booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: merged.FORCE_UPDATE_DOCKER_FILE)
+                            }
+                            if (merged.containsKey('SKIP_PROVISION')) {
+                                buildParams << booleanParam(name: 'SKIP_PROVISION', value: merged.SKIP_PROVISION)
+                            }
+                            if (merged.containsKey('SKIP_PROVISION_TEST_ENV')) {
+                                buildParams << booleanParam(name: 'SKIP_PROVISION_TEST_ENV', value: merged.SKIP_PROVISION_TEST_ENV)
+                            }
+                            if (merged.containsKey('SKIP_TEST')) {
+                                buildParams << booleanParam(name: 'SKIP_TEST', value: merged.SKIP_TEST)
+                            }
+                            if (merged.containsKey('PROVISION_VMPC')) {
+                                buildParams << booleanParam(name: 'PROVISION_VMPC', value: merged.PROVISION_VMPC)
+                            }
+                            if (merged.containsKey('PROVISION_DOCKER')) {
+                                buildParams << booleanParam(name: 'PROVISION_DOCKER', value: merged.PROVISION_DOCKER)
+                            }
+
+                            build job: 'fortistack_master_provision_runtest', parameters: buildParams, wait: true
                         }
                     }
 
