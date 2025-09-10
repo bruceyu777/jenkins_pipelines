@@ -191,4 +191,12 @@ FEATURE_LIST = [
         "docker_compose": ["docker.servicedatabase_servicedatabase.yml", "other"],
         "email": ["yjiaran@fortinet.com"],
     },
+    {
+        "FEATURE_NAME": "avfortindr",
+        "test_case_folder": ["testcase_v1"],
+        "test_config": ["env.FGT_KVM.avfortindr.conf"],
+        "test_groups": ["grp.avfortindr_fortistack.full"],
+        "docker_compose": ["docker.avfortindr_avfortindr.yml", "other"],
+        "email": ["vlysak@fortinet.com"],
+    },
 ]
