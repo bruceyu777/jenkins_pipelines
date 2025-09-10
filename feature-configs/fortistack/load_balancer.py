@@ -118,6 +118,7 @@ DEFAULT_MONGO_COLLECTION: str = "results"
 FEATURE_NODE_STATIC_BINDING: Dict[str, str] = {
     "foc": "node28",
     "waf": "node40",
+    "avfortindr": "node99",
 }
 
 # Features to exclude from processing (can be overridden via CLI)
