@@ -358,7 +358,7 @@
   },
   "avfortindr": {
     "test_case_folder": [
-      "testcase_v1"
+      "testcase"
     ],
     "test_config": [
       "env.FGT_KVM.avfortindr.conf"

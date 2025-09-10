@@ -116,9 +116,9 @@ DEFAULT_MONGO_COLLECTION: str = "results"
 
 # Feature names mapped to dedicated Jenkins nodes
 FEATURE_NODE_STATIC_BINDING: Dict[str, str] = {
-    "foc": "node28",
+    "foc": "node28",  # binding foc to node28
     "waf": "node40",
-    "avfortindr": "node99",
+    "avfortindr": "node99",  # binding avfortindr to node99
 }
 
 # Features to exclude from processing (can be overridden via CLI)

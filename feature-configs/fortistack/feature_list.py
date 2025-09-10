@@ -193,7 +193,7 @@ FEATURE_LIST = [
     },
     {
         "FEATURE_NAME": "avfortindr",
-        "test_case_folder": ["testcase_v1"],
+        "test_case_folder": ["testcase"],
         "test_config": ["env.FGT_KVM.avfortindr.conf"],
         "test_groups": ["grp.avfortindr_fortistack.full"],
         "docker_compose": ["docker.avfortindr_avfortindr.yml", "other"],
