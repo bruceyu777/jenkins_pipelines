@@ -116,6 +116,7 @@ DEFAULT_MONGO_COLLECTION: str = "results"
 
 # Feature names mapped to dedicated Jenkins nodes
 FEATURE_NODE_STATIC_BINDING: Dict[str, str] = {
+    "avfortisandbox": "node2",  # binding avfortisandbox to node2 https://app.clickup.com/t/86dxg5eem
     "foc": "node28",  # binding foc to node28
     "waf": "node40",
     "avfortindr": "node99",  # binding avfortindr to node99

@@ -199,4 +199,20 @@ FEATURE_LIST = [
         "docker_compose": ["docker.avfortindr_avfortindr.yml", "other"],
         "email": ["vlysak@fortinet.com"],
     },
+    {
+        "FEATURE_NAME": "filefilter",
+        "test_case_folder": ["testcase_v1"],
+        "test_config": ["env.fortistack.filefilter.conf"],
+        "test_groups": ["grp.filefilter.full"],
+        "docker_compose": ["docker.filefilter_filefilter.yml", "other"],
+        "email": ["yshang@fortinet.com"],
+    },
+    {
+        "FEATURE_NAME": "videofilter",
+        "test_case_folder": ["testcase_v1"],
+        "test_config": ["env.fortistack.videofilter.conf"],
+        "test_groups": ["grp.videofilter.full"],
+        "docker_compose": ["docker.videofilter_videofilter.yml", "other"],
+        "email": ["yshang@fortinet.com"],
+    },
 ]
