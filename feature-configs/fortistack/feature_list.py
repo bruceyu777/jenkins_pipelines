@@ -215,4 +215,28 @@ FEATURE_LIST = [
         "docker_compose": ["docker.videofilter_videofilter.yml", "other"],
         "email": ["yshang@fortinet.com"],
     },
+    {
+        "FEATURE_NAME": "ddos",
+        "test_case_folder": ["testcase_v1"],
+        "test_config": ["env.fortistack.ddos.conf"],
+        "test_groups": ["grp.ddos.full", "grp.ddos.crit"],
+        "docker_compose": ["docker.ddos_ddos.yml", "other"],
+        "email": ["ldawei@fortinet.com"],
+    },
+    {
+        "FEATURE_NAME": "voip",
+        "test_case_folder": ["testcase_v1"],
+        "test_config": ["env.fortistack.voip.conf"],
+        "test_groups": ["grp.voip.full", "grp.voip.crit"],
+        "docker_compose": ["docker.voip_voip.yml", "other"],
+        "email": ["ldawei@fortinet.com"],
+    },
+    {
+        "FEATURE_NAME": "protocol-option",
+        "test_case_folder": ["testcase_v1"],
+        "test_config": ["env.fortistack.protocol-option.conf"],
+        "test_groups": ["grp.protocol-option.crit", "grp.protocol-option.full"],
+        "docker_compose": ["docker.protocol-option_protocol-option.yml", "other"],
+        "email": ["eson@fortinet.com"],
+    },
 ]
