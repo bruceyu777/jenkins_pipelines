@@ -422,7 +422,7 @@
       "grp.ddos.crit"
     ],
     "docker_compose": [
-      "docker.ddos_ddos.yml",
+      "docker.ddos_ddos_fortistack.yml",
       "other"
     ],
     "email": [

@@ -106,13 +106,31 @@ Downstream will use TEST_GROUPS if defined and nonempty; otherwise it will fall 
 
                     // Iterate over each individual configuration and merge with common settings.
                     individualConfigs.eachWithIndex { individual, i ->
+                        // Merge configurations: individual configs override common configs
                         def merged = common + individual
-                        // Override BUILD_NUMBER with the standalone parameter.
-                        merged.BUILD_NUMBER = params.BUILD_NUMBER
-                        merged.RELEASE = params.RELEASE
 
-                        // ADDED: Add AUTOLIB_BRANCH to the merged configuration
-                        merged.AUTOLIB_BRANCH = params.AUTOLIB_BRANCH
+                        // Debug: Show which parameters are being overridden
+                        def overrides = []
+                        individual.each { key, value ->
+                            if (common.containsKey(key) && common[key] != value) {
+                                overrides << "${key}: ${common[key]} -> ${value}"
+                            }
+                        }
+                        if (overrides) {
+                            echo "Config #${i} overrides: ${overrides.join(', ')}"
+                        }
+
+                        // Override with standalone parameters only if not specified in individual config
+                        // Individual configs take precedence over pipeline parameters
+                        if (!individual.containsKey('BUILD_NUMBER')) {
+                            merged.BUILD_NUMBER = params.BUILD_NUMBER
+                        }
+                        if (!individual.containsKey('RELEASE')) {
+                            merged.RELEASE = params.RELEASE
+                        }
+                        if (!individual.containsKey('AUTOLIB_BRANCH')) {
+                            merged.AUTOLIB_BRANCH = params.AUTOLIB_BRANCH
+                        }
 
                         // Process TEST_GROUPS field:
                         // if (merged.TEST_GROUPS?.trim()) {

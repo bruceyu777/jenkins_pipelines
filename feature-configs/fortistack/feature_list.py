@@ -220,7 +220,7 @@ FEATURE_LIST = [
         "test_case_folder": ["testcase_v1"],
         "test_config": ["env.fortistack.ddos.conf"],
         "test_groups": ["grp.ddos.full", "grp.ddos.crit"],
-        "docker_compose": ["docker.ddos_ddos.yml", "other"],
+        "docker_compose": ["docker.ddos_ddos_fortistack.yml", "other"],
         "email": ["ldawei@fortinet.com"],
     },
     {
