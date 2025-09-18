@@ -239,4 +239,12 @@ FEATURE_LIST = [
         "docker_compose": ["docker.protocol-option_protocol-option.yml", "other"],
         "email": ["eson@fortinet.com"],
     },
+    {
+        "FEATURE_NAME": "spam",
+        "test_case_folder": ["testcase"],
+        "test_config": ["env.fortistack.spam.conf"],
+        "test_groups": ["grp.spam.crit", "grp.spam_natproxy.full", "grp.spam_natflow.full", "grp.spam_tp.full", "grp.spam_wanopt.full"],
+        "docker_compose": ["docker.spam_spam.yml", "other"],
+        "email": ["halmossawi@fortinet.com"],
+    },
 ]
