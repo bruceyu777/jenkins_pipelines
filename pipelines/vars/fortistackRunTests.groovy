@@ -217,10 +217,41 @@ def call() {
                                 sh """
                                     cd /home/fosqa/${LOCAL_LIB_DIR}
                                     sudo chmod -R 777 .
+
+                                    # Debug: Print environment and group file contents
+                                    ENV_FILE="testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}"
+                                    GROUP_FILE="testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}"
+
+                                    echo "=== DEBUG: Environment File Path ==="
+                                    echo "ENV_FILE: \$ENV_FILE"
+                                    if [ -f "\$ENV_FILE" ]; then
+                                        echo "✅ Environment file exists"
+                                        echo "=== DEBUG: Environment File Contents ==="
+                                        cat "\$ENV_FILE"
+                                        echo "=== END DEBUG: Environment File Contents ==="
+                                    else
+                                        echo "❌ Environment file does not exist!"
+                                        echo "Directory contents:"
+                                        ls -la "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/" || echo "Feature directory does not exist"
+                                    fi
+
+                                    echo "=== DEBUG: Group File Path ==="
+                                    echo "GROUP_FILE: \$GROUP_FILE"
+                                    if [ -f "\$GROUP_FILE" ]; then
+                                        echo "✅ Group file exists"
+                                        echo "=== DEBUG: Group File Contents ==="
+                                        cat "\$GROUP_FILE"
+                                        echo "=== END DEBUG: Group File Contents ==="
+                                    else
+                                        echo "❌ Group file does not exist!"
+                                        echo "Directory contents:"
+                                        ls -la "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/" || echo "Feature directory does not exist"
+                                    fi
+
                                     . /home/fosqa/${LOCAL_LIB_DIR}/venv/bin/activate
                                     python3 autotest.py \
-                                      -e testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE} \
-                                      -g testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group} \
+                                      -e "\$ENV_FILE" \
+                                      -g "\$GROUP_FILE" \
                                       -d -s ${params.ORIOLE_SUBMIT_FLAG}
                                 """
                                 // inject inside a try/catch so failures are non-fatal
