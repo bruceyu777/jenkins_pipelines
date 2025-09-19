@@ -254,30 +254,35 @@ def call() {
                                       -g "\$GROUP_FILE" \
                                       -d -s ${params.ORIOLE_SUBMIT_FLAG}
                                 """
-                                // inject inside a try/catch so failures are non-fatal
+                                // ---- Post-processing: add real timeouts + sudo -n ----
                                 try {
-                                    sh """
-                                        cd /home/fosqa/resources/tools
-                                        sudo /home/fosqa/resources/tools/venv/bin/python3 \
-                                        inject_autolib_result.py \
-                                            -r ${params.RELEASE} \
-                                            -g ${group}
-                                    """
-                                    echo "✅ inject_autolib_result.py succeeded"
+                                timeout(time: 10, unit: 'MINUTES') {
+                                    sh(label: 'inject_autolib_result', script: """
+                                    set -euo pipefail
+                                    cd /home/fosqa/resources/tools
+                                    # -n makes sudo noninteractive; if it ever needs a password, it fails immediately
+                                    sudo -n /home/fosqa/resources/tools/venv/bin/python3 \\
+                                        inject_autolib_result.py -r ${params.RELEASE} -g ${group}
+                                    """)
+                                }
+                                echo "✅ inject_autolib_result.py succeeded"
                                 } catch (err) {
-                                    echo "⚠️ inject_autolib_result.py failed, but pipeline will continue"
+                                echo "⚠️ inject_autolib_result.py failed (timeout or error), continuing: ${err}"
                                 }
 
-                                // update node info by running get_node_info.py
                                 try {
-                                    sh """
-                                        cd /home/fosqa/resources/tools
-                                        sudo ./venv/bin/python3 get_node_info.py --feature ${group} --with-exact-report
-                                    """
-                                    echo "✅ get_node_info.py succeeded"
-                                } catch (err) {
-                                    echo "⚠️ get_node_info.py failed, but pipeline will continue"
+                                timeout(time: 5, unit: 'MINUTES') {
+                                    sh(label: 'get_node_info', script: """
+                                    set -euo pipefail
+                                    cd /home/fosqa/resources/tools
+                                    sudo -n ./venv/bin/python3 get_node_info.py --feature ${group} --with-exact-report
+                                    """)
                                 }
+                                echo "✅ get_node_info.py succeeded"
+                                } catch (err) {
+                                echo "⚠️ get_node_info.py failed (timeout or error), continuing: ${err}"
+                                }
+
                             }
                         }
                     }
