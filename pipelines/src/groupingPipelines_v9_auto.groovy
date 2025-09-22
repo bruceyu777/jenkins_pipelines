@@ -411,7 +411,7 @@ pipeline {
                         echo "=== SENDING AUTOLIB TEST RESULTS EMAIL ==="
                         echo "=== CHECKING PYTHON ENVIRONMENT ==="
                         python3 --version
-                        python3 -c "import pandas, openpyxl, pymongo, requests; print('All required packages available')"
+                        python3 -c "import pandas, openpyxl, pymongo, requests, libvirt; print('All required packages available')"
                         echo "=== RUNNING FETCH_AUTOLIB_RESULTS ==="
                         python3 fetch_autolib_results.py -r ${params.RELEASE} -b ${params.BUILD_NUMBER} -t ${params.EMAIL_RECIPIENTS}
                     """.stripIndent().trim()
