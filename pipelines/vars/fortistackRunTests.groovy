@@ -258,7 +258,7 @@ def call() {
                                 try {
                                 timeout(time: 10, unit: 'MINUTES') {
                                     sh(label: 'inject_autolib_result', script: """
-                                    set -euo pipefail
+                                    set -eu
                                     cd /home/fosqa/resources/tools
                                     # -n makes sudo noninteractive; if it ever needs a password, it fails immediately
                                     sudo -n /home/fosqa/resources/tools/venv/bin/python3 \\
@@ -273,7 +273,7 @@ def call() {
                                 try {
                                 timeout(time: 5, unit: 'MINUTES') {
                                     sh(label: 'get_node_info', script: """
-                                    set -euo pipefail
+                                    set -eu
                                     cd /home/fosqa/resources/tools
                                     sudo -n ./venv/bin/python3 get_node_info.py --feature ${group} --with-exact-report
                                     """)
