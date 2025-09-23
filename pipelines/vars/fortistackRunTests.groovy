@@ -65,7 +65,7 @@ def call() {
     def sendTo = (params.SEND_TO?.trim() ? params.SEND_TO : "yzhengfeng@fortinet.com")
 
     // Existing function that defines your "standard" set of upstream parameters:
-    fortistackMasterParameters(exclude: ['FGT_TYPE','SKIP_PROVISION'])
+    fortistackMasterParameters(exclude: ['FGT_TYPE','SKIP_PROVISION','SKIP_PROVISION_TEST_ENV'])
 
     // Expand any JSON‐style parameters so they become global variables:
     expandParamsJson(params.PARAMS_JSON)
@@ -144,7 +144,23 @@ def call() {
                 }
             }
 
+            stage('Tests Skipped') {
+                when {
+                    expression { return params.SKIP_TEST }
+                }
+                steps {
+                    script {
+                        echo "⚠️ Tests are being skipped due to SKIP_TEST parameter being enabled"
+                        echo "Test groups that would have been executed: ${computedTestGroups}"
+                        currentBuild.description = "Tests skipped - SKIP_TEST enabled"
+                    }
+                }
+            }
+
             stage('Run Tests') {
+                when {
+                    expression { return !params.SKIP_TEST }
+                }
                 steps {
                     script {
                         withCredentials([
@@ -293,6 +309,14 @@ def call() {
         post {
             always {
                 script {
+                    // Check if tests were skipped
+                    if (params.SKIP_TEST) {
+                        echo "Tests were skipped - no results to archive"
+                        currentBuild.result = 'SUCCESS'
+                        currentBuild.description = "Tests skipped - SKIP_TEST enabled"
+                        return
+                    }
+
                     def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
                     sh "rm -rf ${WORKSPACE}/test_results"
                     sh "rm -f ${WORKSPACE}/summary_*.html"
@@ -347,6 +371,23 @@ def call() {
 
             success {
                 script {
+                    // Handle skipped tests case
+                    if (params.SKIP_TEST) {
+                        def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.html').trim()
+                        sendFosqaEmail(
+                            to     : sendTo,
+                            subject: "SUCCESS (TESTS SKIPPED): ${env.BUILD_DISPLAY_NAME}",
+                            body   : """
+                            <p>✅ Job <b>${env.BUILD_DISPLAY_NAME}</b> completed successfully at ${new Date()}.</p>
+                            <p>⚠️ <b>Tests were skipped</b> due to SKIP_TEST parameter being enabled.</p>
+                            <p>Test groups that would have been executed: ${computedTestGroups.join(', ')}</p>
+                            <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                            ${nodeInfo}
+                            """
+                        )
+                        return
+                    }
+
                     def base = "${env.BUILD_URL}artifact/"
                     def summaryLinks = computedTestGroups.collect { group ->
                         def name = getArchiveGroupName(group)
@@ -371,6 +412,22 @@ def call() {
 
             failure {
                 script {
+                    // Handle skipped tests case (though failure is less likely when tests are skipped)
+                    if (params.SKIP_TEST) {
+                        def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.html').trim()
+                        sendFosqaEmail(
+                            to     : sendTo,
+                            subject: "FAILURE (TESTS SKIPPED): ${env.BUILD_DISPLAY_NAME}",
+                            body   : """
+                            <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed even though tests were skipped.</p>
+                            <p>This indicates an issue with the pipeline setup or environment verification.</p>
+                            <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                            ${nodeInfo}
+                            """
+                        )
+                        return
+                    }
+
                     def base = "${env.BUILD_URL}artifact/"
                     def summaryLinks = computedTestGroups.collect { group ->
                         def name = getArchiveGroupName(group)
