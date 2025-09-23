@@ -469,7 +469,7 @@
   },
   "spam": {
     "test_case_folder": [
-      "testcase"
+      "testcase_v1"
     ],
     "test_config": [
       "env.fortistack.spam.conf"

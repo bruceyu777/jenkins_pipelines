@@ -10,6 +10,7 @@ This script:
   - Optionally filters test groups by type (all/crit/full/tmp).
   - Queries MongoDB for latest test durations or falls back to JSON file if specified.
   - Optionally queries Jenkins for idle agent nodes, or uses a provided node list.
+  - Excludes reserved nodes and additional exclude nodes from the node selection.
   - Estimates total runtime per feature-entry (defaulting missing groups to 1 hr).
   - Allocates each entry proportionally across nodes.
   - Splits each entry's test-groups across its allocated nodes using greedy bin-packing.
@@ -18,7 +19,7 @@ This script:
 Usage:
   ./load_balancer.py [-a] [-e webfilter,antivirus] [-f dlp,waf] \
       -l feature_list.py \
-      -n node1,node2,... -o dispatch.json -g full
+      -n node1,node2,... [-x node2,node3] -o dispatch.json -g full
 """
 
 import argparse
@@ -890,6 +891,7 @@ def main():
     parser.add_argument("-l", "--feature-list", default="feature_list.py", help="Python or JSON feature list")
     parser.add_argument("-d", "--durations", default=None, help="JSON file with test durations (fallback if MongoDB fails)")
     parser.add_argument("-n", "--nodes", default="node1,node2,node3", help="Comma-separated list of nodes to use")
+    parser.add_argument("-x", "--exclude-nodes", default="", help="Comma-separated list of additional nodes to exclude (applied after node selection)")
     parser.add_argument("-a", "--use-jenkins-nodes", action="store_true", help="Query Jenkins for idle nodes instead of using --nodes")
     parser.add_argument("--jenkins-url", default=DEFAULT_JENKINS_URL, help="Jenkins URL for node query")
     parser.add_argument("--jenkins-user", default=DEFAULT_JENKINS_USER, help="Jenkins username for API access")
@@ -1004,12 +1006,29 @@ def main():
     logging.info(f"Reserved nodes <{len(reserved_nodes)}>: {reserved_nodes}")
 
     available_nodes = [node for node in all_nodes if node not in reserved_nodes]
+
+    # Remove additionally excluded nodes (applied after initial node selection)
+    exclude_nodes = [node.strip() for node in args.exclude_nodes.split(",") if node.strip()]
+    if exclude_nodes:
+        exclude_nodes.sort(key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
+        logging.info(f"Additional exclude nodes <{len(exclude_nodes)}>: {exclude_nodes}")
+        available_nodes = [node for node in available_nodes if node not in exclude_nodes]
+
+    # Calculate all excluded nodes for reporting
+    set(all_nodes) - set(available_nodes)
     actually_reserved = set(all_nodes) & set(reserved_nodes)
+    actually_excluded_additional = set(all_nodes) & set(exclude_nodes) if exclude_nodes else set()
 
     logging.info(
-        f"Actually excluded nodes <{len(actually_reserved)}>: "
+        f"Actually excluded reserved nodes <{len(actually_reserved)}>: "
         f"{sorted(list(actually_reserved), key=lambda name: int(name[4:]) if name.startswith('node') and name[4:].isdigit() else float('inf'))}"
     )
+
+    if actually_excluded_additional:
+        logging.info(
+            f"Actually excluded additional nodes <{len(actually_excluded_additional)}>: "
+            f"{sorted(list(actually_excluded_additional), key=lambda name: int(name[4:]) if name.startswith('node') and name[4:].isdigit() else float('inf'))}"
+        )
 
     # Sort nodes numerically by their number portion
     available_nodes.sort(key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
