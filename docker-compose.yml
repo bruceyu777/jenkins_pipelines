@@ -3,6 +3,7 @@ services:
     build:
       context: /home/fosqa/jenkins-master
       dockerfile: Dockerfile.jenkins
+      network: host  # Fix for apt-get and pip network issues during build
     container_name: jenkins-master
     restart: unless-stopped
     ports:

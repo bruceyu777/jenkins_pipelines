@@ -14,8 +14,15 @@ RUN apt-get update && \
       python3-pandas \
       python3-openpyxl \
       python3-urllib3 \
-      python3-libvirt && \
+      libvirt-dev \
+      libvirt0 \
+      pkg-config \
+      gcc \
+      python3-dev && \
     rm -rf /var/lib/apt/lists/*
+
+# Install libvirt-python using pip with system packages override
+RUN pip3 install --break-system-packages libvirt-python
 
 # Set up SSH known hosts
 RUN mkdir -p /var/jenkins_home/.ssh && \

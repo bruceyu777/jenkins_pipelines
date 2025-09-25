@@ -107,6 +107,7 @@ DEFAULT_RESERVED_NODES: str = ",".join(
         "node33",  # Eric son
         "node39",  # Jiaran
         "node40",  # Jiaran
+        "node49",  # Dawei for ddos
     ]
 )
 
