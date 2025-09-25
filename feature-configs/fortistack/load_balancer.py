@@ -110,6 +110,7 @@ DEFAULT_RESERVED_NODES: str = ",".join(
         "node49",  # Dawei for ddos
         "node48",  # Rain for debug
         "node47",  # Hayder for spam
+        "node46",  # Dawei for ddos
     ]
 )
 
