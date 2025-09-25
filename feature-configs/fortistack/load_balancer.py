@@ -108,6 +108,7 @@ DEFAULT_RESERVED_NODES: str = ",".join(
         "node39",  # Jiaran
         "node40",  # Jiaran
         "node49",  # Dawei for ddos
+        "node48",  # Rain for debug
     ]
 )
 
