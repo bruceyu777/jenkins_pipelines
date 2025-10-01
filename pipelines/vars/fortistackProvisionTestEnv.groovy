@@ -224,7 +224,7 @@ def call() {
                         echo "Provisioning VMPCs: ${params.VMPC_NAMES}"
                         sh """
                             cd /home/fosqa/resources/tools
-                            sudo make provision_kvm_pc vmpc="${params.VMPC_NAMES}"
+                            sudo make provision_kvm_pc vmpc="${params.VMPC_NAMES} feature=${params.FEATURE_NAME}"
                         """
                     }
                 }
