@@ -273,7 +273,8 @@ def call() {
               string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
               string(name: 'RELEASE', value: params.RELEASE.trim()),
               string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
-              string(name: 'FGT_TYPE', value: params.FGT_TYPE.trim())
+              string(name: 'FGT_TYPE', value: params.FGT_TYPE.trim()),
+              string(name: 'TERMINATE_PREVIOUS', value: 'false')
             ]
             echo "Triggering fortistack_provision_fgts pipeline with parameters: ${provisionParams}"
             build job: 'fortistack_provision_fgts', parameters: provisionParams, wait: true
@@ -352,6 +353,7 @@ def call() {
                 echo "--- Preparing fortistackRunTests for group: ${group} ---"
                 echo "[DEBUG] Passing 'SVN_BRANCH' with value: '${params.SVN_BRANCH}'"
                 def testParams = [
+                    string(name: 'TERMINATE_PREVIOUS', value: 'false'),
                     string(name: 'RELEASE', value: params.RELEASE.trim()),
                     string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
                     string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
