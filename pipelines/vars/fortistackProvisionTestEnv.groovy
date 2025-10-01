@@ -306,24 +306,77 @@ def call() {
                             def baseTestDir = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}"
                             sh "sudo mkdir -p ${baseTestDir} && sudo chmod -R 777 ${baseTestDir}"
                             def folderPath = "${baseTestDir}/${params.FEATURE_NAME}"
+                            def markerFile = "${folderPath}/.test_case_folder_marker"
+
                             echo "Checking folder: ${folderPath}"
+                            echo "TEST_CASE_FOLDER: ${params.TEST_CASE_FOLDER}"
+
                             def folderExists = sh(
                                 script: "if [ -d '${folderPath}' ]; then echo exists; else echo notexists; fi",
                                 returnStdout: true
                             ).trim()
-                            echo "Folder check result: ${folderExists}"
+
+                            def needsCheckout = false
+                            def reason = ""
 
                             if (folderExists == "notexists") {
+                                needsCheckout = true
+                                reason = "Folder does not exist"
+                            } else {
+                                // Check if the marker file exists and contains the current TEST_CASE_FOLDER
+                                def markerExists = sh(
+                                    script: "if [ -f '${markerFile}' ]; then echo exists; else echo notexists; fi",
+                                    returnStdout: true
+                                ).trim()
+
+                                if (markerExists == "notexists") {
+                                    needsCheckout = true
+                                    reason = "Marker file missing - cannot verify source"
+                                } else {
+                                    def storedTestCaseFolder = sh(
+                                        script: "cat '${markerFile}' 2>/dev/null || echo ''",
+                                        returnStdout: true
+                                    ).trim()
+
+                                    echo "Stored TEST_CASE_FOLDER: '${storedTestCaseFolder}'"
+                                    echo "Current TEST_CASE_FOLDER: '${params.TEST_CASE_FOLDER}'"
+
+                                    if (storedTestCaseFolder != params.TEST_CASE_FOLDER) {
+                                        needsCheckout = true
+                                        reason = "TEST_CASE_FOLDER changed from '${storedTestCaseFolder}' to '${params.TEST_CASE_FOLDER}'"
+                                    }
+                                }
+                            }
+
+                            echo "Folder check result: ${folderExists}"
+                            echo "Needs checkout: ${needsCheckout} (${reason})"
+
+                            if (needsCheckout) {
+                                echo "=== Performing fresh SVN checkout ==="
+                                if (folderExists == "exists") {
+                                    echo "Removing existing folder due to: ${reason}"
+                                    sh "sudo rm -rf '${folderPath}'"
+                                }
+
                                 runWithRetry(4, [5, 15, 45], """
                                     cd ${baseTestDir} && \
                                     sudo svn checkout \
                                     https://qa-svn.corp.fortinet.com/svn/qa/FOS/${params.TEST_CASE_FOLDER}/${SVN_BRANCH}/${params.FEATURE_NAME} \
-                                    --username "$SVN_USER" --password "$SVN_PASS" --non-interactive
+                                    --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive
                                 """)
+
+                                // Create marker file to track which TEST_CASE_FOLDER was used
+                                sh """
+                                    echo '${params.TEST_CASE_FOLDER}' | sudo tee '${markerFile}' > /dev/null
+                                    sudo chmod 666 '${markerFile}'
+                                """
+                                echo "✅ Created marker file: ${markerFile} with value: ${params.TEST_CASE_FOLDER}"
+
                             } else {
+                                echo "=== Performing SVN update on existing folder ==="
                                 runWithRetry(4, [5, 15, 45], """
                                     cd ${folderPath} && \
-                                    sudo svn update --username "$SVN_USER" --password "$SVN_PASS" --non-interactive
+                                    sudo svn update --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive
                                 """)
                             }
                             sh "sudo chmod -R 777 ${baseTestDir}"
