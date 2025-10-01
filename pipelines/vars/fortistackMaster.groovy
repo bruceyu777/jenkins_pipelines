@@ -274,7 +274,7 @@ def call() {
               string(name: 'RELEASE', value: params.RELEASE.trim()),
               string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
               string(name: 'FGT_TYPE', value: params.FGT_TYPE.trim()),
-              string(name: 'TERMINATE_PREVIOUS', value: 'false')
+              string(name: 'TERMINATE_PREVIOUS', value: params.TERMINATE_PREVIOUS?.trim() ?: 'false'),
             ]
             echo "Triggering fortistack_provision_fgts pipeline with parameters: ${provisionParams}"
             build job: 'fortistack_provision_fgts', parameters: provisionParams, wait: true
@@ -318,7 +318,7 @@ def call() {
               string(name: 'PARAMS_JSON', value: params.PARAMS_JSON),
               string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG?.trim() ?: 'all'),
               string(name: 'SEND_TO', value: mergedSendTo),
-              string(name: 'TERMINATE_PREVIOUS', value: 'false')
+              string(name: 'TERMINATE_PREVIOUS', value: params.TERMINATE_PREVIOUS?.trim() ?: 'false')
             ]
             echo "Triggering fortistackProvisionTestEnv pipeline with parameters: ${provisionParams}"
             def provisionResult = build job: 'fortistackProvisionTestEnv', parameters: provisionParams, wait: true, propagate: false
@@ -353,7 +353,7 @@ def call() {
                 echo "--- Preparing fortistackRunTests for group: ${group} ---"
                 echo "[DEBUG] Passing 'SVN_BRANCH' with value: '${params.SVN_BRANCH}'"
                 def testParams = [
-                    string(name: 'TERMINATE_PREVIOUS', value: 'false'),
+                    string(name: 'TERMINATE_PREVIOUS', value: params.TERMINATE_PREVIOUS?.trim() ?: 'false'),
                     string(name: 'RELEASE', value: params.RELEASE.trim()),
                     string(name: 'BUILD_NUMBER', value: params.BUILD_NUMBER.trim()),
                     string(name: 'NODE_NAME', value: params.NODE_NAME.trim()),
