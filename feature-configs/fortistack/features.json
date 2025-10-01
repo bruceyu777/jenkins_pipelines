@@ -488,5 +488,26 @@
     "email": [
       "halmossawi@fortinet.com"
     ]
+  },
+  "ztna": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.FGVM.ztna.conf.ems211.fortstack"
+    ],
+    "test_groups": [
+      "grp.ztna.full",
+      "grp.ztna.crit"
+    ],
+    "docker_compose": [
+      "KVM"
+    ],
+    "email": [
+      "yzhengfeng@fortinet.com,wangd@fortinet.com"
+    ],
+    "PROVISION_VMPC": true,
+    "VMPC_NAMES": "VMPC1,VMPC4,VMPC5",
+    "PROVISION_DOCKER": false
   }
 }

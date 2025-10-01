@@ -47,9 +47,9 @@ FEATURE_LIST = [
         "test_groups": ["grp.threatfeed.full"],
         "docker_compose": ["KVM"],
         "email": ["yzhengfeng@fortinet.com,wangd@fortinet.com"],
-        "PROVISION_VMPC": true,
+        "PROVISION_VMPC": True,
         "VMPC_NAMES": "VMPC1,VMPC4",
-        "PROVISION_DOCKER": false,
+        "PROVISION_DOCKER": False,
     },
     {
         "FEATURE_NAME": "antivirus",
@@ -246,5 +246,16 @@ FEATURE_LIST = [
         "test_groups": ["grp.spam.crit", "grp.spam_natproxy.full", "grp.spam_natflow.full", "grp.spam_tp.full", "grp.spam_wanopt.full"],
         "docker_compose": ["docker.spam_spam.yml", "other"],
         "email": ["halmossawi@fortinet.com"],
+    },
+    {
+        "FEATURE_NAME": "ztna",
+        "test_case_folder": ["testcase_v1"],
+        "test_config": ["env.FGVM.ztna.conf.ems211.fortstack"],
+        "test_groups": ["grp.ztna.full", "grp.ztna.crit"],
+        "docker_compose": ["KVM"],
+        "email": ["yzhengfeng@fortinet.com,wangd@fortinet.com"],
+        "PROVISION_VMPC": True,
+        "VMPC_NAMES": "VMPC1,VMPC4,VMPC5",
+        "PROVISION_DOCKER": False,
     },
 ]
