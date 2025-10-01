@@ -210,6 +210,36 @@ def call() {
                 }
             }
 
+            stage('Cleanup VMPC Domains if no VMPCs needed') {
+                when {
+                    expression { return params.PROVISION_VMPC == false }
+                }
+                steps {
+                    script {
+                        echo "PROVISION_VMPC is false - cleaning up existing VMPC domains..."
+
+                        sh """
+                            cd /home/fosqa/resources/tools
+
+                            # Check if any VMPC domains exist (dry run first)
+                            echo "=== Checking for existing VMPC domains ==="
+                            sudo /home/fosqa/resources/tools/venv/bin/python undefine_kvm_domain.py \
+                                --domain-name VMPC \
+                                --dry-run || echo "No VMPC domains found or check failed"
+
+                            # Clean up VMPC domains if any exist
+                            echo "=== Cleaning up VMPC domains ==="
+                            sudo /home/fosqa/resources/tools/venv/bin/python undefine_kvm_domain.py \
+                                --domain-name VMPC || {
+                                echo "⚠️ VMPC cleanup encountered an issue, but continuing..."
+                            }
+
+                            echo "✅ VMPC domain cleanup completed (or no domains found)"
+                        """
+                    }
+                }
+            }
+
             stage('Provision VMPCs') {
                 when {
                     expression { return params.PROVISION_VMPC == true }
