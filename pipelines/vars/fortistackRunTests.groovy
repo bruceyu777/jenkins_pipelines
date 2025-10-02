@@ -190,32 +190,19 @@ def call() {
                                 echo "Local git pull failed: ${e.getMessage()}. Continuing without updating."
                             }
 
-                            // Step 2: Prepare SVN code directory and update
-                            def baseTestDir = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}"
-                            sh "sudo mkdir -p ${baseTestDir} && sudo chmod -R 777 ${baseTestDir}"
-                            def folderPath = "${baseTestDir}/${params.FEATURE_NAME}"
-                            echo "Checking folder: ${folderPath}"
-                            def folderExists = sh(
-                                script: "if [ -d '${folderPath}' ]; then echo exists; else echo notexists; fi",
-                                returnStdout: true
-                            ).trim()
-                            echo "Folder check result: ${folderExists}"
+                            echo "=== Step 2: SVN Checkout/Update ==="
+                            def svnResult = svnUpdate([
+                                LOCAL_LIB_DIR: LOCAL_LIB_DIR,
+                                SVN_BRANCH: SVN_BRANCH,
+                                FEATURE_NAME: params.FEATURE_NAME,
+                                TEST_CASE_FOLDER: params.TEST_CASE_FOLDER,
+                                SVN_USER: env.SVN_USER,
+                                SVN_PASS: env.SVN_PASS
+                            ])
 
-                            if (folderExists == "notexists") {
-                                runWithRetry(4, [5, 15, 45], """
-                                    cd ${baseTestDir} && \
-                                    sudo svn checkout \
-                                    https://qa-svn.corp.fortinet.com/svn/qa/FOS/${params.TEST_CASE_FOLDER}/${SVN_BRANCH}/${params.FEATURE_NAME} \
-                                    --username "$SVN_USER" --password "$SVN_PASS" --non-interactive
-                                """)
-                            } else {
-                                runWithRetry(4, [5, 15, 45], """
-                                    cd ${folderPath} && \
-                                    sudo svn update --username "$SVN_USER" --password "$SVN_PASS" --non-interactive
-                                """)
-                            }
-                            sh "sudo chmod -R 777 ${baseTestDir}"
-
+                            echo "SVN ${svnResult.action} completed"
+                            echo "Folder: ${svnResult.folderPath}"
+                            echo "Reason: ${svnResult.reason}"
 
                             // Run tests for each computed test group
                             for (group in computedTestGroups) {
