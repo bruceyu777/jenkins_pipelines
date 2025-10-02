@@ -85,13 +85,26 @@ def call(Map config = [:]) {
 
         // Step 3: Stash if there are changes
         if (result.localChanges) {
-            if (verbose) echo "💾 Local changes detected, stashing..."
+            if (verbose) echo "💾 Local changes detected, attempting to stash..."
             try {
-                sh """
-                    sudo -u ${user} bash -c 'cd ${repoPath} && git stash push -m "${stashMessage}"'
-                """
-                result.stashed = true
-                if (verbose) echo "✅ Stash created successfully"
+                // Capture stash output to check if anything was actually stashed
+                def stashOutput = sh(
+                    script: """
+                        sudo -u ${user} bash -c 'cd ${repoPath} && git stash push -m "${stashMessage}"'
+                    """,
+                    returnStdout: true
+                ).trim()
+
+                // Check if stash actually saved anything
+                if (stashOutput.contains('No local changes to save')) {
+                    result.stashed = false
+                    result.localChanges = false  // Update: changes weren't stashable
+                    if (verbose) echo "   ℹ️  Changes detected but not stashable (likely untracked files)"
+                    if (verbose) echo "✅ No stashable changes, proceeding with pull"
+                } else {
+                    result.stashed = true
+                    if (verbose) echo "✅ Stash created successfully"
+                }
             } catch (Exception stashErr) {
                 result.message = "Failed to stash changes: ${stashErr.getMessage()}"
                 if (verbose) echo "⚠️  ${result.message}"
@@ -221,7 +234,16 @@ def call(Map config = [:]) {
             echo "║              Git Update Helper - Completed                ║"
             echo "╠════════════════════════════════════════════════════════════╣"
             echo "║ Status:        ✅ SUCCESS                                  ║"
-            echo "║ Local Changes: ${(result.localChanges ? 'Yes (stashed & restored)' : 'No').padRight(35)} ║"
+
+            // Build local changes message
+            def localMsg = 'No'
+            if (result.stashed && result.popped) {
+                localMsg = 'Yes (stashed & restored)'
+            } else if (result.stashed && !result.popped) {
+                localMsg = 'Yes (stashed, not restored!)'
+            }
+
+            echo "║ Local Changes: ${localMsg.padRight(35)} ║"
             echo "║ Remote Updates:${(result.remoteUpdates ? 'Yes (pulled new commits)' : 'No (already up to date)').padRight(35)} ║"
             echo "╚════════════════════════════════════════════════════════════╝"
         }
