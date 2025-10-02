@@ -39,6 +39,7 @@ pipeline {
                 }
             }
         }
+
         stage('Wait until previous build finish') {
             steps {
                 script {

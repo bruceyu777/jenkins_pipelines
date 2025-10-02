@@ -85,6 +85,18 @@ def call() {
         }
 
         stages {
+            stage('GIT Pull') {
+                steps {
+                    script {
+                        echo "=== Local Git Update ==="
+                        gitUpdate(
+                            repoPath: '/home/fosqa/resources/tools',
+                            failOnError: false
+                        )
+                    }
+                }
+            }
+
             stage('Wait until previous build finish') {
                 steps {
                     script {
