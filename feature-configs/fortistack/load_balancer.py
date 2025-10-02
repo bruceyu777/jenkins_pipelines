@@ -107,6 +107,7 @@ DEFAULT_RESERVED_NODES: str = ",".join(
         "node33",  # Eric son
         "node39",  # Jiaran
         "node40",  # Jiaran
+        "node43",  # Qi for ZTNA
         "node49",  # Dawei for ddos
         "node48",  # Rain for debug
         "node47",  # Hayder for spam
@@ -122,6 +123,7 @@ DEFAULT_MONGO_COLLECTION: str = "results"
 # Feature names mapped to dedicated Jenkins nodes
 FEATURE_NODE_STATIC_BINDING: Dict[str, str] = {
     "avfortisandbox": "node2",  # binding avfortisandbox to node2 https://app.clickup.com/t/86dxg5eem
+    "ztna": "node15",  # binding ztna to node15
     "foc": "node28",  # binding foc to node28
     "waf": "node40",
     "avfortindr": "node99",  # binding avfortindr to node99
