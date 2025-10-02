@@ -227,34 +227,32 @@ def call() {
                                     echo "=== Docker provisioning disabled, skipping docker compose file check ==="
                                 }
 
-                                // Define file paths
-                                def envFile = "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}"
-                                def groupFile = "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}"
-                                def featureDir = "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}"
+                                // Define file paths (absolute paths to avoid dir() issues)
+                                def envFile = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}"
+                                def groupFile = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}"
+                                def featureDir = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}"
 
-                                // Use printFile helper for environment file
-                                dir("/home/fosqa/${LOCAL_LIB_DIR}") {
-                                    printFile(
-                                        filePath: envFile,
-                                        fileLabel: "Environment File",
-                                        baseDir: featureDir
-                                    )
+                                // Use printFile helper for environment file (no dir() block needed)
+                                printFile(
+                                    filePath: envFile,
+                                    fileLabel: "Environment File",
+                                    baseDir: featureDir
+                                )
 
-                                    // Use printFile helper for group file
-                                    printFile(
-                                        filePath: groupFile,
-                                        fileLabel: "Group File",
-                                        baseDir: featureDir
-                                    )
-                                }
+                                // Use printFile helper for group file
+                                printFile(
+                                    filePath: groupFile,
+                                    fileLabel: "Group File",
+                                    baseDir: featureDir
+                                )
 
                                 // Run the actual tests
                                 sh """
                                     cd /home/fosqa/${LOCAL_LIB_DIR}
                                     . /home/fosqa/${LOCAL_LIB_DIR}/venv/bin/activate
                                     python3 autotest.py \
-                                      -e "${envFile}" \
-                                      -g "${groupFile}" \
+                                      -e "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}" \
+                                      -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
                                       -d -s ${params.ORIOLE_SUBMIT_FLAG}
                                 """
 
