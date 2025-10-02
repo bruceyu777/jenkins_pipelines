@@ -3,7 +3,7 @@ def call() {
 fortistackMasterParameters(only: ['NODE_NAME','RELEASE','BUILD_NUMBER','FGT_TYPE','TERMINATE_PREVIOUS'])
 
 pipeline {
-    
+
     // Dynamically select the agent based on user input
     agent { label "${params.NODE_NAME}" }
     options {
@@ -18,7 +18,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Check Docker') {
             steps {
                 echo "Checking Docker environment..."
@@ -31,21 +31,11 @@ pipeline {
         stage('GIT Pull') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'LDAP', usernameVariable: 'SVN_USER', passwordVariable: 'SVN_PASS')]) {
-                        // Local Git update
-                        echo "=== Step 1: Local Git update ==="
-                        def innerGitCmd = "sudo -u fosqa bash -c 'cd /home/fosqa/resources/tools && " +
-                                          "if [ -n \"\$(git status --porcelain)\" ]; then git stash push -m \"temporary stash\"; fi; " +
-                                          "git pull; " +
-                                          "if git stash list | grep -q \"temporary stash\"; then git stash pop; fi'"
-                        echo "Executing local git pull command: ${innerGitCmd}"
-                        try {
-                            sh innerGitCmd
-                        } catch (Exception e) {
-                            echo "Local git pull failed: ${e.getMessage()}. Continuing without updating."
-                        }
-
-                    }
+                    echo "=== Local Git Update ==="
+                    gitUpdate(
+                        repoPath: '/home/fosqa/resources/tools',
+                        failOnError: false
+                    )
                 }
             }
         }
@@ -69,7 +59,7 @@ pipeline {
                   cd /home/fosqa/resources/tools
                   . /home/fosqa/resources/tools/venv/bin/activate
                   pip install -r requirements.txt
-      
+
                   sudo pwd
                   hostname
                   sudo make provision_fgt fgt_type='${params.FGT_TYPE}' node=${params.NODE_NAME} release=${params.RELEASE} build=${params.BUILD_NUMBER}
@@ -114,7 +104,7 @@ pipeline {
             <h3>Node Info</h3>
             <pre style="font-family:monospace; white-space:pre-wrap;">${nodeInfo}</pre>
             <p style="color:${isSuccess ? 'green' : 'red'};">
-                ${ isSuccess 
+                ${ isSuccess
                     ? '✅ Build completed successfully!'
                     : "❌ Build failed. See <a href='${env.BUILD_URL}'>console</a>."
                 }

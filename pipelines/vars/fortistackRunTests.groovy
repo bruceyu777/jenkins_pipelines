@@ -172,22 +172,13 @@ def call() {
                         ]) {
 
                             echo "=== Step 1: Local Git update ==="
-                            def innerGitCmd = """
-                                sudo -u fosqa bash -c '
-                                  cd /home/fosqa/resources/tools && \
-                                  if [ -n "\$(git status --porcelain)" ]; then \
-                                    git stash push -m "temporary stash"; \
-                                  fi; \
-                                  git pull; \
-                                  if git stash list | grep -q "temporary stash"; then \
-                                    git stash pop; \
-                                  fi
-                                '
-                            """
-                            try {
-                                sh innerGitCmd
-                            } catch (Exception e) {
-                                echo "Local git pull failed: ${e.getMessage()}. Continuing without updating."
+                            def gitResult = gitUpdate(
+                                repoPath: '/home/fosqa/resources/tools',
+                                failOnError: false
+                            )
+
+                            if (!gitResult.success) {
+                                echo "⚠️ Git update had issues: ${gitResult.message}"
                             }
 
                             echo "=== Step 2: SVN Checkout/Update ==="
