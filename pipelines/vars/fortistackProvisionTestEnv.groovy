@@ -351,30 +351,25 @@ def call() {
                                 sudo rm -f docker_filesys
                                 sudo ln -s /home/fosqa/docker_filesys/${params.FEATURE_NAME} docker_filesys
                             """
+
+                            def composeFile = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE}"
+                            def dockerDir = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker"
+
+                            // Use printFile helper to debug docker compose file
+                            printFile(
+                                filePath: composeFile,
+                                fileLabel: "Docker Compose File",
+                                baseDir: dockerDir
+                            )
+
                             sh """
                                 docker login harbor-robot.corp.fortinet.com -u \$SVN_USER -p \$SVN_PASS
                                 docker ps -aq | xargs -r docker rm -f
                                 cd /home/fosqa/resources/tools
                                 make setup_docker_network_and_cleanup_telnet_ports
 
-                                # Debug: Print docker compose file path and contents
-                                COMPOSE_FILE="/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE}"
-                                echo "=== DEBUG: Docker Compose File Path ==="
-                                echo "Docker compose file: \$COMPOSE_FILE"
-                                echo "=== DEBUG: Checking if file exists ==="
-                                if [ -f "\$COMPOSE_FILE" ]; then
-                                    echo "✅ File exists"
-                                    echo "=== DEBUG: Docker Compose File Contents ==="
-                                    cat "\$COMPOSE_FILE"
-                                    echo "=== END DEBUG: Docker Compose File Contents ==="
-                                else
-                                    echo "❌ File does not exist!"
-                                    echo "Directory contents:"
-                                    ls -la "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/" || echo "Docker directory does not exist"
-                                fi
-
                                 docker compose \
-                                  -f "\$COMPOSE_FILE" \
+                                  -f "${composeFile}" \
                                   up --build -d
                             """
                         }

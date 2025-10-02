@@ -216,76 +216,84 @@ def call() {
                                 } catch (err) {
                                     echo "⚠️ get_node_info.py failed, but pipeline will continue"
                                 }
+
                                 echo "Running tests for test group: ${group}"
+
+                                // Change to the working directory
+                                sh "cd /home/fosqa/${LOCAL_LIB_DIR} && sudo chmod -R 777 ."
+
+                                // Debug: Print docker compose file if using Docker
+                                if (params.PROVISION_DOCKER) {
+                                    def composeFile = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE}"
+                                    def dockerDir = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker"
+
+                                    printFile(
+                                        filePath: composeFile,
+                                        fileLabel: "Docker Compose File",
+                                        baseDir: dockerDir
+                                    )
+                                } else {
+                                    echo "=== Docker provisioning disabled, skipping docker compose file check ==="
+                                }
+
+                                // Define file paths
+                                def envFile = "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}"
+                                def groupFile = "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}"
+                                def featureDir = "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}"
+
+                                // Use printFile helper for environment file
+                                dir("/home/fosqa/${LOCAL_LIB_DIR}") {
+                                    printFile(
+                                        filePath: envFile,
+                                        fileLabel: "Environment File",
+                                        baseDir: featureDir
+                                    )
+
+                                    // Use printFile helper for group file
+                                    printFile(
+                                        filePath: groupFile,
+                                        fileLabel: "Group File",
+                                        baseDir: featureDir
+                                    )
+                                }
+
+                                // Run the actual tests
                                 sh """
                                     cd /home/fosqa/${LOCAL_LIB_DIR}
-                                    sudo chmod -R 777 .
-
-                                    # Debug: Print environment and group file contents
-                                    ENV_FILE="testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}"
-                                    GROUP_FILE="testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}"
-
-                                    echo "=== DEBUG: Environment File Path ==="
-                                    echo "ENV_FILE: \$ENV_FILE"
-                                    if [ -f "\$ENV_FILE" ]; then
-                                        echo "✅ Environment file exists"
-                                        echo "=== DEBUG: Environment File Contents ==="
-                                        cat "\$ENV_FILE"
-                                        echo "=== END DEBUG: Environment File Contents ==="
-                                    else
-                                        echo "❌ Environment file does not exist!"
-                                        echo "Directory contents:"
-                                        ls -la "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/" || echo "Feature directory does not exist"
-                                    fi
-
-                                    echo "=== DEBUG: Group File Path ==="
-                                    echo "GROUP_FILE: \$GROUP_FILE"
-                                    if [ -f "\$GROUP_FILE" ]; then
-                                        echo "✅ Group file exists"
-                                        echo "=== DEBUG: Group File Contents ==="
-                                        cat "\$GROUP_FILE"
-                                        echo "=== END DEBUG: Group File Contents ==="
-                                    else
-                                        echo "❌ Group file does not exist!"
-                                        echo "Directory contents:"
-                                        ls -la "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/" || echo "Feature directory does not exist"
-                                    fi
-
                                     . /home/fosqa/${LOCAL_LIB_DIR}/venv/bin/activate
                                     python3 autotest.py \
-                                      -e "\$ENV_FILE" \
-                                      -g "\$GROUP_FILE" \
+                                      -e "${envFile}" \
+                                      -g "${groupFile}" \
                                       -d -s ${params.ORIOLE_SUBMIT_FLAG}
                                 """
-                                // ---- Post-processing: add real timeouts + sudo -n ----
+
+                                // Post-processing: add real timeouts + sudo -n
                                 try {
-                                timeout(time: 10, unit: 'MINUTES') {
-                                    sh(label: 'inject_autolib_result', script: """
-                                    set -eu
-                                    cd /home/fosqa/resources/tools
-                                    # -n makes sudo noninteractive; if it ever needs a password, it fails immediately
-                                    sudo -n /home/fosqa/resources/tools/venv/bin/python3 \\
-                                        inject_autolib_result.py -r ${params.RELEASE} -g ${group}
-                                    """)
-                                }
-                                echo "✅ inject_autolib_result.py succeeded"
+                                    timeout(time: 10, unit: 'MINUTES') {
+                                        sh(label: 'inject_autolib_result', script: """
+                                        set -eu
+                                        cd /home/fosqa/resources/tools
+                                        sudo -n /home/fosqa/resources/tools/venv/bin/python3 \\
+                                            inject_autolib_result.py -r ${params.RELEASE} -g ${group}
+                                        """)
+                                    }
+                                    echo "✅ inject_autolib_result.py succeeded"
                                 } catch (err) {
-                                echo "⚠️ inject_autolib_result.py failed (timeout or error), continuing: ${err}"
+                                    echo "⚠️ inject_autolib_result.py failed (timeout or error), continuing: ${err}"
                                 }
 
                                 try {
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    sh(label: 'get_node_info', script: """
-                                    set -eu
-                                    cd /home/fosqa/resources/tools
-                                    sudo -n ./venv/bin/python3 get_node_info.py --feature ${group} --with-exact-report
-                                    """)
-                                }
-                                echo "✅ get_node_info.py succeeded"
+                                    timeout(time: 5, unit: 'MINUTES') {
+                                        sh(label: 'get_node_info', script: """
+                                        set -eu
+                                        cd /home/fosqa/resources/tools
+                                        sudo -n ./venv/bin/python3 get_node_info.py --feature ${group} --with-exact-report
+                                        """)
+                                    }
+                                    echo "✅ get_node_info.py succeeded"
                                 } catch (err) {
-                                echo "⚠️ get_node_info.py failed (timeout or error), continuing: ${err}"
+                                    echo "⚠️ get_node_info.py failed (timeout or error), continuing: ${err}"
                                 }
-
                             }
                         }
                     }
