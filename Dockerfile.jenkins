@@ -18,15 +18,20 @@ RUN apt-get update && \
       libvirt0 \
       pkg-config \
       gcc \
-      python3-dev && \
+      python3-dev \
+      openssh-client \
+      iproute2 \
+      iputils-ping \
+      net-tools && \
     rm -rf /var/lib/apt/lists/*
 
 # Install libvirt-python using pip with system packages override
 RUN pip3 install --break-system-packages libvirt-python
 
-# Set up SSH known hosts
+# Set up SSH known hosts and config
 RUN mkdir -p /var/jenkins_home/.ssh && \
     ssh-keyscan github.com >> /var/jenkins_home/.ssh/known_hosts && \
-    chown -R jenkins:jenkins /var/jenkins_home/.ssh
+    chown -R jenkins:jenkins /var/jenkins_home/.ssh && \
+    chmod 700 /var/jenkins_home/.ssh
 
 USER jenkins

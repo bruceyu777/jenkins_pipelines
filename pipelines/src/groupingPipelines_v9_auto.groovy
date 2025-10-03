@@ -1,26 +1,38 @@
 pipeline {
-    // Run the master pipeline on the master node to avoid deadlock.
     agent { label 'master' }
 
     parameters {
-        // Standalone BUILD_NUMBER parameter.
         string(
             name: 'RELEASE',
-            defaultValue: '7.6.4',  // Default release number.
+            defaultValue: '7.6.5',
             description: 'Enter the release number, with 3 digits, like 7.6.4, or 8.0.0'
         )
         string(
             name: 'BUILD_NUMBER',
-            defaultValue: '3596',
+            defaultValue: '3619',
             description: 'Enter the build number'
         )
-        // ADDED: AUTOLIB_BRANCH parameter
+        string(
+            name: 'BUILD_KEYWORD',
+            defaultValue: 'KVM',
+            description: 'Build keyword for image type (e.g., KVM, DOCKER, VMWARE, etc.)'
+        )
         string(
             name: 'AUTOLIB_BRANCH',
             defaultValue: 'v3r10build0007',
-            description: 'Which branch of the autolib_v3 repo to checkout before running tests (e.g., main, v3r10build0007)'
+            description: 'Which branch of the autolib_v3 repo to checkout before running tests'
         )
-        // Multi-line text parameter for common configuration.
+        // NEW: Add SCHEDULE parameter
+        booleanParam(
+            name: 'SCHEDULE',
+            defaultValue: false,
+            description: 'Enable to wait for build readiness before starting tests. Pipeline will poll every 2 minutes.'
+        )
+        string(
+            name: 'SCHEDULE_TIMEOUT_MINUTES',
+            defaultValue: '1200',
+            description: 'Maximum time (in minutes) to wait for build readiness when SCHEDULE is enabled'
+        )
         text(
             name: 'COMMON_CONFIG',
             defaultValue: '''{
@@ -35,9 +47,8 @@ pipeline {
   "SKIP_PROVISION": false,
   "SKIP_TEST": false
 }''',
-            description: 'Common configuration parameters as JSON (PARAMS_JSON is now a JSON object)'
+            description: 'Common configuration parameters as JSON'
         )
-        // Remove INDIVIDUAL_CONFIGS as it will be automatically generated
         booleanParam(
             name: 'REGENERATE_DISPATCH',
             defaultValue: true,
@@ -46,7 +57,7 @@ pipeline {
         string(
             name: 'LOAD_BALANCER_ARGS',
             defaultValue: '-a',
-            description: 'Arguments to pass to load-balancer.py (default: "-a" to use Jenkins nodes)'
+            description: 'Arguments to pass to load-balancer.py'
         )
         string(
             name: 'TEST_GROUP_TYPE',
@@ -56,14 +67,13 @@ pipeline {
         string(
             name: 'FEATURE_FILTER_LIST',
             defaultValue: '',
-            description: 'Comma-separated list of features to include (e.g., "webfilter,antivirus,dlp"). Leave empty to include all features.'
+            description: 'Comma-separated list of features to include. Leave empty to include all features.'
         )
         string(
             name: 'EMAIL_RECIPIENTS',
             defaultValue: 'yzhengfeng@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,nzhang@fortinet.com,qxu@fortinet.com',
             description: 'Comma-separated list of email recipients for the test results report'
         )
-        // Add dry run parameter
         booleanParam(
             name: 'DRY_RUN',
             defaultValue: false,
@@ -85,21 +95,137 @@ pipeline {
         stage('Set Build Display Name') {
             steps {
                 script {
-                    // Add DRY RUN indicator to the display name
                     def displayName = "#${currentBuild.number}-r${params.RELEASE}-b${params.BUILD_NUMBER}"
                     if (params.DRY_RUN) {
                         displayName += "-DRY_RUN"
                     }
-                    // Add AUTOLIB_BRANCH indicator if not using default
+                    if (params.SCHEDULE) {
+                        displayName += "-SCHEDULED"
+                    }
                     if (params.AUTOLIB_BRANCH && params.AUTOLIB_BRANCH != 'main') {
                         displayName += "-${params.AUTOLIB_BRANCH}"
                     }
-                    // Add feature filter indicator if specified
                     if (params.FEATURE_FILTER_LIST?.trim()) {
                         def featureCount = params.FEATURE_FILTER_LIST.split(',').size()
                         displayName += "-${featureCount}features"
                     }
                     currentBuild.displayName = displayName
+                }
+            }
+        }
+
+        // NEW STAGE: Wait for Build Readiness
+        stage('Wait for Build Readiness') {
+            when {
+                expression { return params.SCHEDULE }
+            }
+            steps {
+                script {
+                    echo "=== WAITING FOR BUILD READINESS ==="
+                    echo "Project: FortiOS"
+                    echo "Release: ${params.RELEASE}"
+                    echo "Build: ${params.BUILD_NUMBER}"
+                    echo "Build Keyword: ${params.BUILD_KEYWORD}"
+                    echo "Timeout: ${params.SCHEDULE_TIMEOUT_MINUTES} minutes"
+                    echo "Poll interval: 2 minutes"
+
+                    def timeoutMinutes = params.SCHEDULE_TIMEOUT_MINUTES.toInteger()
+                    def pollIntervalSeconds = 120
+                    def maxAttempts = (timeoutMinutes * 60) / pollIntervalSeconds
+                    def attempt = 0
+                    def buildReady = false
+                    def startTime = System.currentTimeMillis()
+
+                    while (attempt < maxAttempts && !buildReady) {
+                        attempt++
+                        def elapsedMinutes = (System.currentTimeMillis() - startTime) / 60000
+
+                        echo "=== Attempt ${attempt}/${maxAttempts.intValue()} (${String.format('%.1f', elapsedMinutes)} minutes elapsed) ==="
+
+                        try {
+                            def checkResult = sh(
+                                script: """
+                                    cd /home/fosqa/jenkins-master/pipelines/tools
+                                    python3 check_build_ready.py \
+                                        --release ${params.RELEASE} \
+                                        --build ${params.BUILD_NUMBER} \
+                                        --build-keyword ${params.BUILD_KEYWORD} \
+                                        --project FortiOS \
+                                        --json-output
+                                """,
+                                returnStatus: true
+                            )
+
+                            if (checkResult == 0) {
+                                echo "✅ Build ${params.BUILD_NUMBER} (${params.BUILD_KEYWORD}) is READY!"
+                                buildReady = true
+
+                                echo "=== Triggering rsync on Docker host via SSH ==="
+                                try {
+                                    // Use Jenkins credentials for SSH authentication
+                                    withCredentials([usernamePassword(
+                                        credentialsId: 'CdnSshCredential',
+                                        usernameVariable: 'SSH_USER',
+                                        passwordVariable: 'SSH_PASS'
+                                    )]) {
+                                        def rsyncOutput = sh(
+                                            script: '''
+                                                # Use sshpass to provide password for SSH
+                                                export SSHPASS="$SSH_PASS"
+                                                sshpass -e ssh \
+                                                    -o StrictHostKeyChecking=no \
+                                                    -o UserKnownHostsFile=/dev/null \
+                                                    -o ConnectTimeout=10 \
+                                                    ${SSH_USER}@192.168.99.1 \
+                                                    "echo '$SSH_PASS' | sudo -S /home/fosqa/tools/sync_fos_images.sh ''' + params.RELEASE + ''' ''' + params.BUILD_NUMBER + ''' ''' + params.BUILD_KEYWORD + '''"
+                                            ''',
+                                            returnStdout: true
+                                        ).trim()
+
+                                        echo "Rsync output:"
+                                        echo rsyncOutput
+                                        echo "✅ Rsync completed successfully"
+                                    }
+
+                                } catch (Exception rsyncErr) {
+                                    echo "⚠️ Rsync failed: ${rsyncErr.getMessage()}"
+                                    echo "Build is ready, continuing despite rsync issue..."
+                                }
+
+                            } else {
+                                echo "⏳ Build ${params.BUILD_NUMBER} (${params.BUILD_KEYWORD}) is not ready yet..."
+
+                                if (attempt < maxAttempts) {
+                                    echo "⏰ Waiting ${pollIntervalSeconds} seconds before next check..."
+                                    sleep time: pollIntervalSeconds, unit: 'SECONDS'
+                                }
+                            }
+
+                        } catch (Exception e) {
+                            echo "⚠️ Error checking build readiness: ${e.getMessage()}"
+
+                            if (attempt < maxAttempts) {
+                                echo "⏰ Will retry in ${pollIntervalSeconds} seconds..."
+                                sleep time: pollIntervalSeconds, unit: 'SECONDS'
+                            }
+                        }
+                    }
+
+                    if (!buildReady) {
+                        def totalWaitTime = String.format('%.1f', (System.currentTimeMillis() - startTime) / 60000)
+                        echo "❌ Build ${params.BUILD_NUMBER} (${params.BUILD_KEYWORD}) did not become ready within ${timeoutMinutes} minutes (waited ${totalWaitTime} minutes)"
+
+                        // Store failure information for email notification
+                        env.BUILD_READY_TIMEOUT = 'true'
+                        env.BUILD_WAIT_TIME = totalWaitTime
+
+                        // Set build result and stop pipeline
+                        currentBuild.result = 'ABORTED'
+                        error "Build readiness timeout: Build ${params.BUILD_NUMBER} (${params.BUILD_KEYWORD}) not ready after ${totalWaitTime} minutes"
+                    }
+
+                    echo "=== Build readiness check completed successfully ==="
+                    echo "✅ Proceeding with pipeline execution..."
                 }
             }
         }
@@ -112,10 +238,8 @@ pipeline {
                 script {
                     echo "Running load_balancer.py to generate dispatch.json"
 
-                    // Build the Python command arguments
                     def pythonArgs = "-g ${params.TEST_GROUP_TYPE}"
 
-                    // Add feature filter if specified
                     if (params.FEATURE_FILTER_LIST?.trim()) {
                         echo "Applying feature filter: ${params.FEATURE_FILTER_LIST}"
                         pythonArgs += " -f \"${params.FEATURE_FILTER_LIST}\""
@@ -123,10 +247,8 @@ pipeline {
                         echo "No feature filtering applied - including all features"
                     }
 
-                    // Add other load balancer arguments
                     pythonArgs += " ${params.LOAD_BALANCER_ARGS}"
 
-                    // Use container's system Python with all packages pre-installed
                     def command = """
                         cd /home/fosqa/jenkins-master/feature-configs/fortistack
 
@@ -152,7 +274,6 @@ pipeline {
                     def individualConfigs = readJSON text: dispatchJson
                     echo "Loaded ${individualConfigs.size()} configurations from dispatch.json"
 
-                    // Log feature filtering summary
                     if (params.FEATURE_FILTER_LIST?.trim()) {
                         def requestedFeatures = params.FEATURE_FILTER_LIST.split(',').collect { it.trim() }
                         def actualFeatures = individualConfigs.collect { it.FEATURE_NAME }.unique().sort()
@@ -161,7 +282,6 @@ pipeline {
                         echo "  Generated: ${actualFeatures}"
                     }
 
-                    // Store for later use
                     env.INDIVIDUAL_CONFIGS_JSON = dispatchJson
                 }
             }
@@ -472,32 +592,81 @@ pipeline {
             script {
                 echo "Upstream pipeline completed."
 
-                // Determine if this was a dry run
                 def dryRunPrefix = params.DRY_RUN ? "[DRY RUN] " : ""
+                def schedulePrefix = params.SCHEDULE ? "[SCHEDULED] " : ""
 
-                // Get information about configurations
+                // Check if pipeline was aborted due to build readiness timeout
+                if (env.BUILD_READY_TIMEOUT == 'true') {
+                    echo "=== SENDING BUILD READINESS TIMEOUT NOTIFICATION ==="
+
+                    def timeoutSummary = """
+                        <h3 style="color: red;">❌ Build Readiness Timeout</h3>
+                        <p><b>Status:</b> <span style="color: red;">ABORTED - Build Not Ready</span></p>
+                        <p><b>Release:</b> ${params.RELEASE}</p>
+                        <p><b>Build:</b> ${params.BUILD_NUMBER}</p>
+                        <p><b>Build Keyword:</b> ${params.BUILD_KEYWORD}</p>
+                        <p><b>Timeout Duration:</b> ${params.SCHEDULE_TIMEOUT_MINUTES} minutes</p>
+                        <p><b>Actual Wait Time:</b> ${env.BUILD_WAIT_TIME} minutes</p>
+                        <p><b>Pipeline URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                        <hr>
+                        <p><b>Details:</b></p>
+                        <ul>
+                            <li>The build was not available on the Image Server within the specified timeout period.</li>
+                            <li>The pipeline has been aborted and no tests were executed.</li>
+                            <li>Please verify the build status on the Image Server: <a href="http://172.18.52.254:8090">http://172.18.52.254:8090</a></li>
+                            <li>You may need to manually trigger the pipeline once the build is ready.</li>
+                        </ul>
+                        <hr>
+                        <p><b>Next Steps:</b></p>
+                        <ol>
+                            <li>Check if build ${params.BUILD_NUMBER} (${params.BUILD_KEYWORD}) exists on the Image Server</li>
+                            <li>Verify the build process completed successfully</li>
+                            <li>Re-run this pipeline once the build is available</li>
+                        </ol>
+                    """
+
+                    def commonConfig = readJSON text: params.COMMON_CONFIG
+                    def notifyTo = commonConfig.PARAMS_JSON.send_to ?: "yzhengfeng@fortinet.com"
+
+                    emailext (
+                        subject: "❌ [TIMEOUT] ${schedulePrefix}Build Not Ready: ${params.RELEASE}-${params.BUILD_NUMBER} (${params.BUILD_KEYWORD})",
+                        body: timeoutSummary,
+                        to: notifyTo,
+                        mimeType: 'text/html'
+                    )
+
+                    echo "✅ Timeout notification email sent"
+                    return  // Exit early, don't send normal summary
+                }
+
+                // Normal pipeline completion email (only sent if build was ready)
                 def individualConfigs = readJSON text: env.INDIVIDUAL_CONFIGS_JSON
-                def buildSummary = "<h3>${dryRunPrefix}Build Summary</h3>"
+                def buildSummary = "<h3>${schedulePrefix}${dryRunPrefix}Build Summary</h3>"
 
-                // ADDED: Include AUTOLIB_BRANCH in the build summary
+                // Add schedule information if enabled
+                if (params.SCHEDULE) {
+                    buildSummary += "<p><b>SCHEDULED BUILD:</b> Pipeline waited for build readiness</p>"
+                    buildSummary += "<p><b>Schedule Timeout:</b> ${params.SCHEDULE_TIMEOUT_MINUTES} minutes</p>"
+                    if (env.BUILD_WAIT_TIME) {
+                        buildSummary += "<p><b>Actual Wait Time:</b> ${env.BUILD_WAIT_TIME} minutes</p>"
+                    }
+                }
+
+                buildSummary += "<p><b>Release:</b> ${params.RELEASE}</p>"
+                buildSummary += "<p><b>Build:</b> ${params.BUILD_NUMBER}</p>"
                 buildSummary += "<p><b>AUTOLIB_BRANCH:</b> ${params.AUTOLIB_BRANCH}</p>"
-
-                // Add ORIOLE_SUBMIT_FLAG information
                 buildSummary += "<p><b>ORIOLE_SUBMIT_FLAG:</b> ${params.ORIOLE_SUBMIT_FLAG}</p>"
-
-                // Add email recipients information
                 buildSummary += "<p><b>Test Results Email Recipients:</b> ${params.EMAIL_RECIPIENTS}</p>"
 
-                // Add feature filtering information to summary
                 if (params.FEATURE_FILTER_LIST?.trim()) {
                     def actualFeatures = individualConfigs.collect { it.FEATURE_NAME }.unique().sort()
                     buildSummary += "<p><b>Feature Filter Applied:</b> ${params.FEATURE_FILTER_LIST}</p>"
                     buildSummary += "<p><b>Generated Features:</b> ${actualFeatures.join(', ')}</p>"
                 }
 
-                buildSummary += "<ul>"
+                buildSummary += "<table border='1' style='border-collapse: collapse; width: 100%;'>"
+                buildSummary += "<tr><th>Node</th><th>Features</th><th>Test Groups</th></tr>"
 
-                // Group by node
                 def nodeMap = [:]
                 individualConfigs.each { config ->
                     def nodeName = config.NODE_NAME
@@ -506,10 +675,6 @@ pipeline {
                     }
                     nodeMap[nodeName] << config
                 }
-
-                // Build summary table
-                buildSummary += "<table border='1' style='border-collapse: collapse; width: 100%;'>"
-                buildSummary += "<tr><th>Node</th><th>Features</th><th>Test Groups</th></tr>"
 
                 nodeMap.each { node, configs ->
                     def featuresStr = configs.collect { it.FEATURE_NAME }.join(", ")
@@ -522,7 +687,6 @@ pipeline {
 
                 buildSummary += "</table>"
 
-                // Add downstream job results summary if available
                 if (env.JOB_RESULTS_SUMMARY) {
                     buildSummary += "<p><b>Downstream Jobs Results:</b> ${env.JOB_RESULTS_SUMMARY}</p>"
                 }
@@ -531,15 +695,13 @@ pipeline {
                     buildSummary += "<p><b>DRY RUN:</b> No downstream jobs were triggered</p>"
                 }
 
-                // Determine addresses for notification
                 def commonConfig = readJSON text: params.COMMON_CONFIG
                 def notifyTo = commonConfig.PARAMS_JSON.send_to ?: "yzhengfeng@fortinet.com"
 
-                // Send notification email
                 emailext (
-                    subject: "${dryRunPrefix}Fortistack Group Pipeline: ${currentBuild.fullDisplayName}",
+                    subject: "${schedulePrefix}${dryRunPrefix}Fortistack Group Pipeline: ${currentBuild.fullDisplayName}",
                     body: """
-                    <p>${dryRunPrefix}Fortistack group pipeline has completed.</p>
+                    <p>${schedulePrefix}${dryRunPrefix}Fortistack group pipeline has completed.</p>
                     <p><b>Status:</b> ${currentBuild.result ?: 'SUCCESS'}</p>
                     <p><b>Pipeline URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                     ${buildSummary}

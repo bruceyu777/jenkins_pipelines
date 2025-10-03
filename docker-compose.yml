@@ -33,6 +33,8 @@ services:
       - /home/fosqa/known_hosts:/var/jenkins_home/.ssh/known_hosts:ro
     networks:
       - custom_network
+    extra_hosts:
+      - "dockerhost:192.168.99.1"  # Add host entry for easier SSH
 
 volumes:
   jenkins_data:
@@ -41,5 +43,7 @@ networks:
   custom_network:
     driver: bridge
     ipam:
+      driver: default
       config:
         - subnet: 192.168.99.0/24
+          gateway: 192.168.99.1
