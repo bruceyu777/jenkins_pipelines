@@ -105,6 +105,7 @@ DEFAULT_RESERVED_NODES: str = ",".join(
         "node27",  # Maryam
         # "node28", # Maryam, binding with foc
         "node33",  # Eric son
+        "node35",  # Yang Shang
         "node39",  # Jiaran
         "node40",  # Jiaran
         "node43",  # Qi for ZTNA
