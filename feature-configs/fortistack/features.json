@@ -441,7 +441,7 @@
       "grp.voip.crit"
     ],
     "docker_compose": [
-      "docker.voip_voip.yml",
+      "docker.voip_voip_fortistack.yml",
       "other"
     ],
     "email": [

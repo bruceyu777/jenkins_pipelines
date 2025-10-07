@@ -228,7 +228,7 @@ FEATURE_LIST = [
         "test_case_folder": ["testcase_v1"],
         "test_config": ["env.fortistack.voip.conf"],
         "test_groups": ["grp.voip.full", "grp.voip.crit"],
-        "docker_compose": ["docker.voip_voip.yml", "other"],
+        "docker_compose": ["docker.voip_voip_fortistack.yml", "other"],
         "email": ["ldawei@fortinet.com"],
     },
     {
