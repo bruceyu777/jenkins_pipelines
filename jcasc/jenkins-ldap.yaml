@@ -1,0 +1,41 @@
+jenkins:
+  securityRealm:
+    # Combine LDAP with local database for fallback admin
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          name: "Local Admin"
+          password: "${JENKINS_ADMIN_PASSWORD:-ftnt123!}"
+
+  authorizationStrategy:
+    globalMatrix:
+      permissions:
+        # Anonymous read access
+        - "Overall/Read:anonymous"
+        - "Job/Read:anonymous"
+
+        # Local admin - full access
+        - "Overall/Administer:admin"
+
+        # Authenticated users - build/read access
+        - "Overall/Read:authenticated"
+        - "Job/Build:authenticated"
+        - "Job/Read:authenticated"
+        - "Job/Workspace:authenticated"
+
+# LDAP Configuration (to be added after testing)
+# Uncomment when ready to enable LDAP
+# unclassified:
+#   ldap:
+#     configurations:
+#       - server: "ldap://fac-dev.corp.fortinet.com:389"
+#         rootDN: "dc=fortinet,dc=com"
+#         managerDN: "CN=jenkins-service,OU=ServiceAccounts,DC=fortinet,DC=com"
+#         managerPasswordSecret: "${LDAP_BIND_PASSWORD}"
+#         userSearchBase: "OU=Users"
+#         userSearch: "sAMAccountName={0}"
+#         groupSearchBase: "OU=Groups"
+#         groupSearchFilter: "member={0}"
+#         displayNameAttributeName: "displayName"
+#         mailAddressAttributeName: "mail"
