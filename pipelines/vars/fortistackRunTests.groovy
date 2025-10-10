@@ -144,6 +144,19 @@ def call() {
                 }
             }
 
+            stage('Wait until previous build finish') {
+                steps {
+                    script {
+                        echo "Waiting for previous builds to finish..."
+                        sh """
+                            cd /home/fosqa/resources/tools
+                            . /home/fosqa/resources/tools/venv/bin/activate
+                            sudo -E PYTHONUNBUFFERED=1 stdbuf -oL -eL ./venv/bin/python3 -u wait_until_aio_pipeline_not_running.py --terminate ${params.TERMINATE_PREVIOUS}
+                        """
+                    }
+                }
+            }
+
             stage('Tests Skipped') {
                 when {
                     expression { return params.SKIP_TEST }
