@@ -32,7 +32,9 @@ import sys
 from logging.handlers import RotatingFileHandler
 from math import floor
 from pathlib import Path
+from pprint import pformat
 from typing import Any, Dict, List, Optional, Set, Tuple
+from urllib.parse import urljoin, urlparse
 
 import requests
 from pymongo import MongoClient
@@ -78,7 +80,7 @@ def setup_logging(log_file=None, log_level="info", max_bytes=5 * 1024 * 1024, ba
     return logger
 
 
-setup_logging("load_balancer.log")
+logger = setup_logging("load_balancer.log")
 
 # =============================================================================
 # CONSTANTS
@@ -105,6 +107,7 @@ DEFAULT_RESERVED_NODES: str = ",".join(
         "node27",  # Maryam
         # "node28", # Maryam, binding with foc
         "node33",  # Eric son
+        "node34",  # Yang Shang
         "node35",  # Yang Shang
         "node39",  # Jiaran
         "node40",  # Jiaran
@@ -405,73 +408,160 @@ def load_feature_list(path: str) -> List[Dict[str, Any]]:
             raise ValueError(f"Feature list {path} must be .py or JSON dict/list")
 
     logging.info(f"Loaded {len(feature_entries)} entries from {path}")
+    logger.info(f"Feature entries: {pformat(feature_entries, sort_dicts=False)}")
     return feature_entries
 
 
 def merge_features(entries: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     """
     Merge entries with the same FEATURE_NAME into a single configuration.
-    This handles cases where multiple entries define different aspects of the same feature.
-
-    Args:
-        entries: List of feature entries to merge
-
-    Returns:
-        Dictionary mapping feature names to merged configurations
+    Normalize API snake_case keys to expected UPPERCASE keys for features.json.
+    Shape email as a one-element list with a single comma-separated string.
     """
-    merged_features = {}
+    merged_features: Dict[str, Dict[str, Any]] = {}
 
-    for entry in entries:
-        feature_name = entry["FEATURE_NAME"]
-        config = {k: v for k, v in entry.items() if k != "FEATURE_NAME"}
+    # Map API snake_case to expected UPPERCASE keys in features.json
+    key_map = {
+        "provision_vmpc": "PROVISION_VMPC",
+        "vmpc_names": "VMPC_NAMES",
+        "provision_docker": "PROVISION_DOCKER",
+        "oriole_submit_flag": "ORIOLE_SUBMIT_FLAG",
+        # ignore: enabled, extra_data, id, created_at, updated_at
+    }
+
+    list_fields = ["test_case_folder", "test_config", "test_groups", "docker_compose"]
+    scalar_fields_upper = ["PROVISION_VMPC", "PROVISION_DOCKER", "VMPC_NAMES", "ORIOLE_SUBMIT_FLAG"]
+
+    def normalize_entry(raw: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+        """Normalize a raw entry from file or API to a consistent dict."""
+        entry = dict(raw)
+
+        # Ensure FEATURE_NAME is present
+        if "FEATURE_NAME" not in entry or not entry.get("FEATURE_NAME"):
+            for k in ("feature_name", "feature", "name"):
+                if k in entry and entry[k]:
+                    entry["FEATURE_NAME"] = entry[k]
+                    break
+        feature_name = entry.get("FEATURE_NAME")
+        if not feature_name:
+            return "", {}
+
+        # Start normalized config
+        cfg: Dict[str, Any] = {}
+
+        # Copy list fields as-is if present
+        for f in list_fields:
+            v = entry.get(f)
+            if v is not None:
+                # Ensure list
+                if isinstance(v, list):
+                    cfg[f] = v
+                else:
+                    cfg[f] = [v]
+
+        # Normalize email into a set of addresses (flatten strings/lists)
+        emails_set: Set[str] = set()
+        raw_email = entry.get("email")
+        if raw_email:
+            if isinstance(raw_email, list):
+                for item in raw_email:
+                    if isinstance(item, str):
+                        for addr in item.split(","):
+                            addr = addr.strip()
+                            if addr:
+                                emails_set.add(addr)
+            elif isinstance(raw_email, str):
+                for addr in raw_email.split(","):
+                    addr = addr.strip()
+                    if addr:
+                        emails_set.add(addr)
+
+        # Add admin emails
+        if emails_set:
+            emails_set |= ADMIN_EMAILS
+
+        # Store as one-element list with comma-separated string (if any)
+        if emails_set:
+            cfg["email"] = [",".join(sorted(emails_set))]
+
+        # Map API snake_case to UPPERCASE scalar keys
+        for src, dst in key_map.items():
+            if src in entry and entry[src] is not None:
+                cfg[dst] = entry[src]
+
+        # Accept already UPPERCASE scalar fields
+        for sf in scalar_fields_upper:
+            if sf in entry and entry[sf] is not None:
+                cfg[sf] = entry[sf]
+
+        # Ensure default ORIOLE_SUBMIT_FLAG if missing
+        if "ORIOLE_SUBMIT_FLAG" not in cfg:
+            cfg["ORIOLE_SUBMIT_FLAG"] = "all"
+
+        return feature_name, cfg
+
+    for raw in entries:
+        feature_name, config = normalize_entry(raw)
+        if not feature_name:
+            continue
 
         if feature_name not in merged_features:
             merged_features[feature_name] = dict(config)
             continue
 
-        base_config = merged_features[feature_name]
+        base = merged_features[feature_name]
 
-        # Merge list fields with deduplication
-        list_fields = ["test_case_folder", "test_config", "test_groups", "docker_compose", "email"]
-        for list_field in list_fields:
-            if list_field in config:
-                # Ensure both are lists
-                current_values = base_config.get(list_field, [])
-                if not isinstance(current_values, list):
-                    current_values = [current_values]
+        # Merge list fields with deduplication (preserve order)
+        for f in list_fields:
+            if f in config:
+                base_list = base.get(f, [])
+                if not isinstance(base_list, list):
+                    base_list = [base_list]
+                new_list = config.get(f, [])
+                if not isinstance(new_list, list):
+                    new_list = [new_list]
+                combined = base_list + new_list
+                deduped: List[Any] = []
+                seen: Set[Any] = set()
+                for val in combined:
+                    key = json.dumps(val, sort_keys=True) if isinstance(val, (dict, list)) else val
+                    if key not in seen:
+                        seen.add(key)
+                        deduped.append(val)
+                base[f] = deduped
 
-                new_values = config[list_field]
-                if not isinstance(new_values, list):
-                    new_values = [new_values]
+        # Merge email sets and re-shape to one-element list
+        if "email" in config:
+            current = base.get("email", [])
+            current_set: Set[str] = set()
+            if isinstance(current, list) and current:
+                if isinstance(current[0], str):
+                    for addr in current[0].split(","):
+                        addr = addr.strip()
+                        if addr:
+                            current_set.add(addr)
 
-                # Combine and deduplicate while preserving order
-                combined_values = current_values + new_values
-                unique_values = []
-                seen_values = set()
+            new_set: Set[str] = set()
+            for item in config.get("email", []):
+                if isinstance(item, str):
+                    for addr in item.split(","):
+                        addr = addr.strip()
+                        if addr:
+                            new_set.add(addr)
 
-                for value in combined_values:
-                    if value not in seen_values:
-                        unique_values.append(value)
-                        seen_values.add(value)
+            all_emails = (current_set | new_set | ADMIN_EMAILS) if (current_set or new_set) else set()
+            if all_emails:
+                base["email"] = [",".join(sorted(all_emails))]
 
-                base_config[list_field] = unique_values
+        # Overwrite scalar fields with latest occurrence
+        for sf in scalar_fields_upper:
+            if sf in config:
+                base[sf] = config[sf]
 
-                # Special handling for email: convert to comma-separated string
-                if list_field == "email":
-                    email_addresses = set()
-                    for email_entry in unique_values:
-                        if email_entry and isinstance(email_entry, str):
-                            email_addresses.update(addr.strip() for addr in email_entry.split(",") if addr.strip())
-
-                    # Add admin emails and convert to sorted string
-                    all_emails = sorted(email_addresses | ADMIN_EMAILS)
-                    base_config["email"] = ",".join(all_emails)
-
-        # Copy scalar fields directly (these override previous values)
-        scalar_fields = ["PROVISION_VMPC", "PROVISION_DOCKER", "VMPC_NAMES", "ORIOLE_SUBMIT_FLAG"]
-        for scalar_field in scalar_fields:
-            if scalar_field in config:
-                base_config[scalar_field] = config[scalar_field]
+    # Also ensure default ORIOLE_SUBMIT_FLAG after merge
+    for _, base in merged_features.items():
+        if "ORIOLE_SUBMIT_FLAG" not in base:
+            base["ORIOLE_SUBMIT_FLAG"] = "all"
 
     return merged_features
 
@@ -832,20 +922,11 @@ def filter_test_groups_by_choice(test_groups: List[str], group_choice: str) -> L
 def create_dispatch_entry(entry: Dict[str, Any], node_name: str, groups: List[str], total_seconds: int, duration_entries: List[Tuple[str, Dict[str, str]]]) -> Dict[str, Any]:
     """
     Create a single dispatch entry for a feature on a specific node.
-
-    Args:
-        entry: Feature entry from the feature list
-        node_name: Target Jenkins node name
-        groups: Test groups assigned to this node
-        total_seconds: Total estimated duration for these groups
-        duration_entries: Duration data for ORIOLE submission strategy lookup
-
-    Returns:
-        Dispatch entry dictionary
+    Accept both UPPERCASE (features.json style) and snake_case (API style) keys.
     """
     feature_name = entry["FEATURE_NAME"]
 
-    # Extract feature configuration
+    # Extract feature configuration (list fields are already normalized in entries)
     test_folder = entry.get("test_case_folder", [None])[0]
     test_config = entry.get("test_config", [None])[0]
     docker_compose = entry.get("docker_compose", [None])[0]
@@ -864,8 +945,16 @@ def create_dispatch_entry(entry: Dict[str, Any], node_name: str, groups: List[st
     else:
         all_emails = ",".join(sorted(ADMIN_EMAILS))
 
-    # Get submission strategy: first check global override, then entry, default to 'all'
-    submit_flag = ORIOLE_SUBMIT_STRATEGY.get(feature_name, entry.get("ORIOLE_SUBMIT_FLAG", "all"))
+    # Submission strategy: global override > entry UPPERCASE > entry snake_case > default
+    submit_flag = ORIOLE_SUBMIT_STRATEGY.get(
+        feature_name,
+        entry.get("ORIOLE_SUBMIT_FLAG", entry.get("oriole_submit_flag", "all")),
+    )
+
+    # Read provisioning fields: prefer UPPERCASE (from features.json), fallback to snake_case (from API)
+    provision_vmpc = entry.get("PROVISION_VMPC", entry.get("provision_vmpc", False))
+    vmpc_names = entry.get("VMPC_NAMES", entry.get("vmpc_names", ""))
+    provision_docker = entry.get("PROVISION_DOCKER", entry.get("provision_docker", True))
 
     return {
         "NODE_NAME": node_name,
@@ -877,9 +966,9 @@ def create_dispatch_entry(entry: Dict[str, Any], node_name: str, groups: List[st
         "SUM_DURATION": format_seconds_to_duration(total_seconds),
         "DOCKER_COMPOSE_FILE_CHOICE": docker_compose,
         "SEND_TO": all_emails,
-        "PROVISION_VMPC": entry.get("PROVISION_VMPC", False),
-        "VMPC_NAMES": entry.get("VMPC_NAMES", ""),
-        "PROVISION_DOCKER": entry.get("PROVISION_DOCKER", True),
+        "PROVISION_VMPC": provision_vmpc,
+        "VMPC_NAMES": vmpc_names,
+        "PROVISION_DOCKER": provision_docker,
         "ORIOLE_SUBMIT_FLAG": submit_flag,
     }
 
@@ -887,6 +976,137 @@ def create_dispatch_entry(entry: Dict[str, Any], node_name: str, groups: List[st
 # =============================================================================
 # MAIN ENTRY POINT
 # =============================================================================
+
+
+def _build_api_session() -> requests.Session:
+    s = requests.Session()
+    s.headers.update({"Accept": "application/json"})
+    s.timeout = 30
+    return s
+
+
+def authenticate_api(api_base: str, username: str | None, password: str | None, token: str | None) -> requests.Session:
+    """
+    Build an authenticated session. Tries, in order:
+    1) Bearer token (if provided)
+    2) FastAPI OAuth2 password flow: POST {base}/token (form), expects access_token
+    3) FastAPI /auth/login (json), expects access_token or token
+    4) HTTP Basic (fallback), validated by probing the features endpoint (caller validates)
+    """
+    session = _build_api_session()
+    # Bearer token
+    if token:
+        session.headers["Authorization"] = f"Bearer {token}"
+        return session
+
+    # Need username/password for the flows below
+    if not (username and password):
+        return session  # anonymous; caller will try and fallback if 401
+
+    # Try OAuth2 password token endpoint
+    try:
+        token_url = urljoin(api_base.rstrip("/") + "/", "token")
+        resp = session.post(
+            token_url,
+            data={"username": username, "password": password, "grant_type": "password"},
+        )
+        if resp.ok:
+            data = resp.json()
+            access_token = data.get("access_token") or data.get("token")
+            token_type = data.get("token_type", "bearer")
+            if access_token:
+                session.headers["Authorization"] = f"{token_type.capitalize()} {access_token}"
+                return session
+    except Exception:
+        pass
+
+    # Try /auth/login (common FastAPI pattern)
+    try:
+        login_url = urljoin(api_base.rstrip("/") + "/", "auth/login")
+        resp = session.post(login_url, json={"username": username, "password": password})
+        if resp.ok:
+            data = {}
+            try:
+                data = resp.json()
+            except Exception:
+                data = {}
+            access_token = data.get("access_token") or data.get("token")
+            token_type = data.get("token_type", "bearer")
+            if access_token:
+                session.headers["Authorization"] = f"{token_type.capitalize()} {access_token}"
+                return session
+            # If session cookie auth, just keep cookies in the session
+            if resp.cookies:
+                return session
+    except Exception:
+        pass
+
+    # Fallback to HTTP Basic
+    session.auth = (username, password)
+    return session
+
+
+def load_features_from_api(session: requests.Session, api_url: str) -> List[Dict[str, Any]]:
+    """
+    Load features from the DB API. Accepts:
+    - A plain list of dicts
+    - A paginated object with 'items'/'results'/'data'
+    - A dict mapping {feature_name: config}
+    Normalizes to a list of dict entries with FEATURE_NAME.
+    """
+    logging.info(f"Fetching features from API: {api_url}")
+    resp = session.get(api_url)
+    # If unauthorized, raise for caller to fallback
+    if resp.status_code in (401, 403):
+        raise requests.HTTPError(f"Unauthorized (status {resp.status_code}) for {api_url}")
+    resp.raise_for_status()
+    payload = resp.json()
+
+    feature_entries: List[Dict[str, Any]] = []
+
+    # Case 1: list of dicts
+    if isinstance(payload, list):
+        items = payload
+    # Case 2: paginated dict
+    elif isinstance(payload, dict):
+        items = payload.get("items") or payload.get("results") or payload.get("data")
+        if items is None:
+            # Case 3: dict mapping name->config
+            if all(isinstance(v, (dict, list, str, int, float, bool, type(None))) for v in payload.values()):
+                feature_entries = []
+                for feature_name, config in payload.items():
+                    entry = {"FEATURE_NAME": feature_name}
+                    if isinstance(config, dict):
+                        entry.update(config)
+                    feature_entries.append(entry)
+                logging.info(f"Loaded {len(feature_entries)} features from dict-map API")
+                return feature_entries
+            items = []
+    else:
+        raise ValueError("API response is neither list nor dict")
+
+    if not isinstance(items, list):
+        raise ValueError("API 'items' is not a list")
+
+    # Normalize FEATURE_NAME
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            logging.warning(f"Skipping non-dict entry at index {i}: {type(item)}")
+            continue
+        entry = dict(item)
+        if "FEATURE_NAME" not in entry or not entry.get("FEATURE_NAME"):
+            for key in ("FEATURE_NAME", "feature_name", "feature", "name"):
+                if key in item and item[key]:
+                    entry["FEATURE_NAME"] = item[key]
+                    break
+        if "FEATURE_NAME" not in entry or not entry.get("FEATURE_NAME"):
+            logging.warning(f"Skipping entry missing FEATURE_NAME: keys={list(item.keys())}")
+            continue
+        feature_entries.append(entry)
+
+    logging.info(f"Loaded {len(feature_entries)} features from API")
+    logging.info(f"Feature entries: {pformat(feature_entries, sort_dicts=False)}")
+    return feature_entries
 
 
 def main():
@@ -925,15 +1145,44 @@ def main():
     mongo_grp.add_argument("--release", default=None, help="Release version to filter durations (e.g., '7.6.4')")
     mongo_grp.add_argument("--no-mongo", action="store_true", help="Skip MongoDB and use only JSON file for durations")
 
+    # API auth/config args
+    parser.add_argument(
+        "--api-url",
+        default="http://10.96.227.206:8000/features/?page=1&page_size=1000",
+        help="DB API endpoint returning a list/paginated list of feature dicts",
+    )
+    parser.add_argument(
+        "--no-api",
+        action="store_true",
+        help="Disable API and load features from file only",
+    )
+    parser.add_argument("--api-user", default=os.getenv("FS_API_USER", "admin"), help="API username (env: FS_API_USER)")
+    parser.add_argument("--api-pass", default=os.getenv("FS_API_PASS", "ftnt123!"), help="API password (env: FS_API_PASS)")
+    parser.add_argument("--api-token", default=os.getenv("FS_API_TOKEN", ""), help="API bearer token (env: FS_API_TOKEN)")
+
     args = parser.parse_args()
 
-    # Step 1: Load and process feature list
     logging.info("=" * 60)
     logging.info("LOADING AND PROCESSING FEATURE LIST")
     logging.info("=" * 60)
 
-    feature_entries = load_feature_list(args.feature_list)
+    feature_entries: List[Dict[str, Any]] = []
 
+    if not args.no_api:
+        try:
+            # Derive API base from api-url for auth endpoints
+            parsed = urlparse(args.api_url)
+            api_base = f"{parsed.scheme}://{parsed.netloc}/"
+            session = authenticate_api(api_base, args.api_user or None, args.api_pass or None, args.api_token or None)
+
+            # Probe with API call; if it fails (401/403/network), we fallback
+            feature_entries = load_features_from_api(session, args.api_url)
+        except Exception as e:
+            logging.warning(f"API load failed, falling back to file '{args.feature_list}': {e}")
+
+    if not feature_entries:
+        feature_entries = load_feature_list(args.feature_list)
+        logging.info(f"Loaded features from file: {args.feature_list}")
     # Step 2: Generate complete features.json (before filtering)
     merged_features = merge_features(feature_entries)
     write_features_dict(merged_features)
