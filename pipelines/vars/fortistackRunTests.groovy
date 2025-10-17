@@ -259,17 +259,24 @@ def call() {
                                     baseDir: featureDir
                                 )
 
-                                // Run the actual tests
-                                sh """
-                                    cd /home/fosqa/${LOCAL_LIB_DIR}
-                                    . /home/fosqa/${LOCAL_LIB_DIR}/venv/bin/activate
-                                    python3 autotest.py \
-                                      -e "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}" \
-                                      -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
-                                      -d -s ${params.ORIOLE_SUBMIT_FLAG}
-                                """
+                                // Run the actual tests but ensure post-processing always runs
+                                def testErr = null
+                                try {
+                                    sh """
+                                        cd /home/fosqa/${LOCAL_LIB_DIR}
+                                        . /home/fosqa/${LOCAL_LIB_DIR}/venv/bin/activate
+                                        set -euxo pipefail
+                                        python3 autotest.py \
+                                          -e "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}" \
+                                          -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
+                                          -d -s ${params.ORIOLE_SUBMIT_FLAG}
+                                    """
+                                } catch (err) {
+                                    echo "❌ autotest.py failed for group '${group}': ${err}"
+                                    testErr = err
+                                }
 
-                                // Post-processing: add real timeouts + sudo -n
+                                // Post-processing: always run, even if tests failed
                                 try {
                                     timeout(time: 10, unit: 'MINUTES') {
                                         sh(label: 'inject_autolib_result', script: """
@@ -295,6 +302,11 @@ def call() {
                                     echo "✅ get_node_info.py succeeded"
                                 } catch (err) {
                                     echo "⚠️ get_node_info.py failed (timeout or error), continuing: ${err}"
+                                }
+
+                                // If tests failed, now fail the stage after post-processing
+                                if (testErr) {
+                                    error "Failing stage after post-processing. Original error: ${testErr}"
                                 }
                             }
                         }
