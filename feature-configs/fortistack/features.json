@@ -1,4 +1,147 @@
 {
+  "casb": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.casb.conf"
+    ],
+    "test_groups": [
+      "grp.casb.crit",
+      "grp.casb.full",
+      "grp.casb_signatures.full"
+    ],
+    "docker_compose": [
+      "docker.casb_casb.yml"
+    ],
+    "email": [
+      "halmossawi@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "ssh": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.ssh.conf"
+    ],
+    "test_groups": [
+      "grp.ssh.crit",
+      "grp.ssh.full"
+    ],
+    "docker_compose": [
+      "docker.ssh_ssh.yml"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,yuzhu@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "sslprofile": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.sslprofile_flow.conf",
+      "env.fortistack.sslprofile_proxy.conf"
+    ],
+    "test_groups": [
+      "grp.sslprofile_flow.crit",
+      "grp.sslprofile_flow.full",
+      "grp.sslprofile_proxy.crit",
+      "grp.sslprofile_proxy.sub01.full",
+      "grp.sslprofile_proxy.sub02.full",
+      "grp.sslprofile_proxy.sub03.full",
+      "grp.sslprofile_proxy.sub04.full"
+    ],
+    "docker_compose": [
+      "docker.sslprofile_flow.yml",
+      "other",
+      "docker.sslprofile_proxy.yml"
+    ],
+    "email": [
+      "YUZHU@fortinet.com,eson@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "ztna": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.FGVM.ztna.conf.ems211.fortstack"
+    ],
+    "test_groups": [
+      "grp.ztna.full",
+      "grp.ztna.crit"
+    ],
+    "docker_compose": [
+      "KVM"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": true,
+    "VMPC_NAMES": "VMPC1,VMPC4,VMPC5",
+    "PROVISION_DOCKER": false,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "foc": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.foc.fortistack.conf"
+    ],
+    "test_groups": [
+      "grp.foc_gtp.fstack.full",
+      "grp.foc_gtp_ha.fstack.full",
+      "grp.foc_gtp_s10.fstack.full",
+      "grp.foc_pfcp.fstack.full"
+    ],
+    "docker_compose": [
+      "docker.foc_gtp.yml",
+      "other"
+    ],
+    "email": [
+      "mabbasi@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "threatfeed": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.threatfeed.conf"
+    ],
+    "test_groups": [
+      "grp.threatfeed.full"
+    ],
+    "docker_compose": [
+      "KVM"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": true,
+    "VMPC_NAMES": "VMPC1,VMPC4",
+    "PROVISION_DOCKER": false,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
   "avfortisandbox": {
     "test_case_folder": [
       "testcase",
@@ -16,94 +159,386 @@
       "other"
     ],
     "email": [
-      "yzhengfeng@fortinet.com,vlysak@fortinet.com"
-    ]
+      "rainxiao@fortinet.com,vlysak@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
   },
-  "webfilter": {
-    "test_case_folder": [
-      "testcase_v1",
-      "testcase"
-    ],
-    "test_config": [
-      "env.FGTVM64.webfilter_demo.conf"
-    ],
-    "test_groups": [
-      "grp.webfilter_basic.full",
-      "grp.webfilter_basic2.full",
-      "grp.webfilter_ha.full",
-      "grp.webfilter_flow.full",
-      "grp.webfilter_peruser.full",
-      "grp.webfilter_onearm.full",
-      "grp.webfilter_other.full",
-      "grp.webfilter_other2.full"
-    ],
-    "docker_compose": [
-      "docker.webfilter_basic.yml",
-      "other"
-    ],
-    "email": [
-      "hchuanjian@fortinet.com"
-    ]
-  },
-  "avenregres": {
-    "test_case_folder": [
-      "testcase_v1",
-      "testcase"
-    ],
-    "test_config": [
-      "env.FGTVM64.avenregres_demo.conf"
-    ],
-    "test_groups": [
-      "grp.avenregres.full"
-    ],
-    "docker_compose": [
-      "docker.avenregres_avenregres.yml",
-      "other"
-    ],
-    "email": [
-      "hchuanjian@fortinet.com"
-    ]
-  },
-  "dnsfilter": {
-    "test_case_folder": [
-      "testcase",
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.FGTVM64_dnsfilter_fortistack.conf"
-    ],
-    "test_groups": [
-      "grp.dnsfilter_fortistack.crit",
-      "grp.dnsfilter.crit",
-      "grp.dnsfilter.full"
-    ],
-    "docker_compose": [
-      "docker.dnsfilter_dnsfilter.yml",
-      "other"
-    ],
-    "email": [
-      "vlysak@fortinet.com"
-    ]
-  },
-  "threatfeed": {
+  "spam": {
     "test_case_folder": [
       "testcase_v1"
     ],
     "test_config": [
-      "env.fortistack.threatfeed.conf"
+      "env.fortistack.spam.conf"
     ],
     "test_groups": [
-      "grp.threatfeed.full"
+      "grp.spam.crit",
+      "grp.spam_natproxy.full",
+      "grp.spam_natflow.full",
+      "grp.spam_tp.full",
+      "grp.spam_wanopt.full"
     ],
     "docker_compose": [
-      "KVM"
+      "docker.spam_spam.yml",
+      "other"
     ],
     "email": [
-      "yzhengfeng@fortinet.com,wangd@fortinet.com"
+      "halmossawi@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
     ],
-    "PROVISION_VMPC": true,
-    "VMPC_NAMES": "VMPC1,VMPC4",
-    "PROVISION_DOCKER": false
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "protocol-option": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.protocol-option.conf"
+    ],
+    "test_groups": [
+      "grp.protocol-option.crit",
+      "grp.protocol-option.full"
+    ],
+    "docker_compose": [
+      "docker.protocol-option_protocol-option.yml",
+      "other"
+    ],
+    "email": [
+      "eson@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "voip": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.voip.conf"
+    ],
+    "test_groups": [
+      "grp.voip.full",
+      "grp.voip.crit"
+    ],
+    "docker_compose": [
+      "docker.voip_voip_fortistack.yml",
+      "other"
+    ],
+    "email": [
+      "ldawei@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "ddos": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.ddos.conf"
+    ],
+    "test_groups": [
+      "grp.ddos.full",
+      "grp.ddos.crit"
+    ],
+    "docker_compose": [
+      "docker.ddos_ddos_fortistack.yml",
+      "other"
+    ],
+    "email": [
+      "ldawei@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "videofilter": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.videofilter.conf"
+    ],
+    "test_groups": [
+      "grp.videofilter.full"
+    ],
+    "docker_compose": [
+      "docker.videofilter_videofilter.yml",
+      "other"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,yshang@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "filefilter": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.filefilter.conf"
+    ],
+    "test_groups": [
+      "grp.filefilter.full"
+    ],
+    "docker_compose": [
+      "docker.filefilter_filefilter.yml",
+      "other"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,yshang@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "avfortindr": {
+    "test_case_folder": [
+      "testcase"
+    ],
+    "test_config": [
+      "env.FGT_KVM.avfortindr.conf"
+    ],
+    "test_groups": [
+      "grp.avfortindr_fortistack.full"
+    ],
+    "docker_compose": [
+      "docker.avfortindr_avfortindr.yml",
+      "other"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,vlysak@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "servicedatabase": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.servicedatabase_fortistack.conf"
+    ],
+    "test_groups": [
+      "grp.servicedatabase.crit"
+    ],
+    "docker_compose": [
+      "docker.servicedatabase_servicedatabase.yml",
+      "other"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "dlp": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.dlp.conf"
+    ],
+    "test_groups": [
+      "grp.dlp_exproxy.full",
+      "grp.dlp_flowbase.full",
+      "grp.dlp_ha.full",
+      "grp.dlp_interface.full",
+      "grp.dlp_language.full",
+      "grp.dlp_nat1.full",
+      "grp.dlp_nat2.full",
+      "grp.dlp_tp.full",
+      "grp.dlp_wanopt.full"
+    ],
+    "docker_compose": [
+      "docker.dlp_nat1.yml",
+      "other"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,yjiaran@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "waf": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fstack.waf.conf"
+    ],
+    "test_groups": [
+      "grp.waf.fstack.full"
+    ],
+    "docker_compose": [
+      "docker.waf_waf.yml",
+      "other"
+    ],
+    "email": [
+      "mabbasi@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "ftpproxy": {
+    "test_case_folder": [
+      "testcase"
+    ],
+    "test_config": [
+      "env.fortistack.ftpproxy.conf"
+    ],
+    "test_groups": [
+      "grp.ftpproxy_fortistack.full"
+    ],
+    "docker_compose": [
+      "docker.ftpproxy_ftpproxy.yml",
+      "other"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com,zachwang@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "webproxy": {
+    "test_case_folder": [
+      "testcase"
+    ],
+    "test_config": [
+      "env.fortistack.webproxy.conf"
+    ],
+    "test_groups": [
+      "grp.webproxy_auth_fortistack.full",
+      "grp.webproxy_basic_fortistack.full",
+      "grp.webproxy_forward_fortistack.full",
+      "grp.webproxy_policy_fortistack.full",
+      "grp.webproxy_topology_fortistack.full"
+    ],
+    "docker_compose": [
+      "docker.webproxy_webproxy.yml",
+      "other"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com,zachwang@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "icap": {
+    "test_case_folder": [
+      "testcase"
+    ],
+    "test_config": [
+      "env.fortistack.icap.conf"
+    ],
+    "test_groups": [
+      "grp.icap.fortistack.crit",
+      "grp.icap.fortistack.full"
+    ],
+    "docker_compose": [
+      "docker.icap_icap.yml",
+      "other"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "webcache": {
+    "test_case_folder": [
+      "testcase"
+    ],
+    "test_config": [
+      "env.fortistack.webcache.conf"
+    ],
+    "test_groups": [
+      "grp.webcache.fortistack.crit",
+      "grp.webcache.fortistack.full"
+    ],
+    "docker_compose": [
+      "docker.webcache_webcache.yml",
+      "other"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "wanopt": {
+    "test_case_folder": [
+      "testcase"
+    ],
+    "test_config": [
+      "env.fortistack.wanopt.conf"
+    ],
+    "test_groups": [
+      "grp.wanopt.fortistack.crit",
+      "grp.wanopt.fortistack.full"
+    ],
+    "docker_compose": [
+      "docker.wanopt_linux.yml",
+      "other"
+    ],
+    "email": [
+      "rainxiao@fortinet.com,wangd@fortinet.com,wangt@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
+  },
+  "avaimodel": {
+    "test_case_folder": [
+      "testcase_v1"
+    ],
+    "test_config": [
+      "env.fortistack.avaimodel.conf"
+    ],
+    "test_groups": [
+      "grp.avaimodel.full"
+    ],
+    "docker_compose": [
+      "docker.avaimodel_proxy.yml",
+      "other"
+    ],
+    "email": [
+      "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
   },
   "antivirus": {
     "test_case_folder": [
@@ -131,383 +566,89 @@
       "other"
     ],
     "email": [
-      "lluo@fortinet.com"
-    ]
+      "lluo@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
   },
-  "avaimodel": {
+  "dnsfilter": {
     "test_case_folder": [
+      "testcase",
       "testcase_v1"
     ],
     "test_config": [
-      "env.fortistack.avaimodel.conf"
+      "env.FGTVM64_dnsfilter_fortistack.conf"
     ],
     "test_groups": [
-      "grp.avaimodel.full"
+      "grp.dnsfilter_fortistack.crit",
+      "grp.dnsfilter.crit",
+      "grp.dnsfilter.full"
     ],
     "docker_compose": [
-      "docker.avaimodel_proxy.yml",
+      "docker.dnsfilter_dnsfilter.yml",
       "other"
     ],
     "email": [
-      "lluo@fortinet.com"
-    ]
+      "rainxiao@fortinet.com,vlysak@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
   },
-  "wanopt": {
+  "avenregres": {
     "test_case_folder": [
+      "testcase_v1",
       "testcase"
     ],
     "test_config": [
-      "env.fortistack.wanopt.conf"
+      "env.FGTVM64.avenregres_demo.conf"
     ],
     "test_groups": [
-      "grp.wanopt.fortistack.crit",
-      "grp.wanopt.fortistack.full"
+      "grp.avenregres.full"
     ],
     "docker_compose": [
-      "docker.wanopt_linux.yml",
+      "docker.avenregres_avenregres.yml",
       "other"
     ],
     "email": [
-      "wangt@fortinet.com"
-    ]
+      "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
   },
-  "webcache": {
+  "webfilter": {
     "test_case_folder": [
+      "testcase_v1",
       "testcase"
     ],
     "test_config": [
-      "env.fortistack.webcache.conf"
+      "env.FGTVM64.webfilter_demo.conf"
     ],
     "test_groups": [
-      "grp.webcache.fortistack.crit",
-      "grp.webcache.fortistack.full"
+      "grp.webfilter_basic.full",
+      "grp.webfilter_basic2.full",
+      "grp.webfilter_ha.full",
+      "grp.webfilter_flow.full",
+      "grp.webfilter_peruser.full",
+      "grp.webfilter_onearm.full",
+      "grp.webfilter_other.full",
+      "grp.webfilter_other2.full"
     ],
     "docker_compose": [
-      "docker.webcache_webcache.yml",
+      "docker.webfilter_basic.yml",
       "other"
     ],
     "email": [
-      "wangt@fortinet.com"
-    ]
-  },
-  "icap": {
-    "test_case_folder": [
-      "testcase"
-    ],
-    "test_config": [
-      "env.fortistack.icap.conf"
-    ],
-    "test_groups": [
-      "grp.icap.fortistack.crit",
-      "grp.icap.fortistack.full"
-    ],
-    "docker_compose": [
-      "docker.icap_icap.yml",
-      "other"
-    ],
-    "email": [
-      "wangt@fortinet.com"
-    ]
-  },
-  "webproxy": {
-    "test_case_folder": [
-      "testcase"
-    ],
-    "test_config": [
-      "env.fortistack.webproxy.conf"
-    ],
-    "test_groups": [
-      "grp.webproxy_auth_fortistack.full",
-      "grp.webproxy_basic_fortistack.full",
-      "grp.webproxy_forward_fortistack.full",
-      "grp.webproxy_policy_fortistack.full",
-      "grp.webproxy_topology_fortistack.full"
-    ],
-    "docker_compose": [
-      "docker.webproxy_webproxy.yml",
-      "other"
-    ],
-    "email": [
-      "zachwang@fortinet.com"
-    ]
-  },
-  "ftpproxy": {
-    "test_case_folder": [
-      "testcase"
-    ],
-    "test_config": [
-      "env.fortistack.ftpproxy.conf"
-    ],
-    "test_groups": [
-      "grp.ftpproxy_fortistack.full"
-    ],
-    "docker_compose": [
-      "docker.ftpproxy_ftpproxy.yml",
-      "other"
-    ],
-    "email": [
-      "zachwang@fortinet.com"
-    ]
-  },
-  "sslprofile": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.fortistack.sslprofile_proxy.conf",
-      "env.fortistack.sslprofile_flow.conf"
-    ],
-    "test_groups": [
-      "grp.sslprofile_proxy.crit",
-      "grp.sslprofile_proxy.sub01.full",
-      "grp.sslprofile_proxy.sub02.full",
-      "grp.sslprofile_proxy.sub03.full",
-      "grp.sslprofile_proxy.sub04.full",
-      "grp.sslprofile_flow.crit",
-      "grp.sslprofile_flow.full"
-    ],
-    "docker_compose": [
-      "docker.sslprofile_proxy.yml",
-      "other",
-      "docker.sslprofile_flow.yml"
-    ],
-    "email": "YUZHU@fortinet.com,eson@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
-  },
-  "foc": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.foc.fortistack.conf"
-    ],
-    "test_groups": [
-      "grp.foc_gtp.fstack.full",
-      "grp.foc_gtp_ha.fstack.full",
-      "grp.foc_gtp_s10.fstack.full",
-      "grp.foc_pfcp.fstack.full"
-    ],
-    "docker_compose": [
-      "docker.foc_gtp.yml",
-      "other"
-    ],
-    "email": [
-      "wangt@fortinet.com,mabbasi@fortinet.com"
-    ]
-  },
-  "waf": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.fstack.waf.conf"
-    ],
-    "test_groups": [
-      "grp.waf.fstack.full"
-    ],
-    "docker_compose": [
-      "docker.waf_waf.yml",
-      "other"
-    ],
-    "email": [
-      "mabbasi@fortinet.com"
-    ]
-  },
-  "dlp": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.fortistack.dlp.conf"
-    ],
-    "test_groups": [
-      "grp.dlp_exproxy.full",
-      "grp.dlp_flowbase.full",
-      "grp.dlp_ha.full",
-      "grp.dlp_interface.full",
-      "grp.dlp_language.full",
-      "grp.dlp_nat1.full",
-      "grp.dlp_nat2.full",
-      "grp.dlp_tp.full",
-      "grp.dlp_wanopt.full"
-    ],
-    "docker_compose": [
-      "docker.dlp_nat1.yml",
-      "other"
-    ],
-    "email": [
-      "yjiaran@fortinet.com"
-    ]
-  },
-  "servicedatabase": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.servicedatabase_fortistack.conf"
-    ],
-    "test_groups": [
-      "grp.servicedatabase.crit"
-    ],
-    "docker_compose": [
-      "docker.servicedatabase_servicedatabase.yml",
-      "other"
-    ],
-    "email": [
-      "yjiaran@fortinet.com"
-    ]
-  },
-  "avfortindr": {
-    "test_case_folder": [
-      "testcase"
-    ],
-    "test_config": [
-      "env.FGT_KVM.avfortindr.conf"
-    ],
-    "test_groups": [
-      "grp.avfortindr_fortistack.full"
-    ],
-    "docker_compose": [
-      "docker.avfortindr_avfortindr.yml",
-      "other"
-    ],
-    "email": [
-      "vlysak@fortinet.com"
-    ]
-  },
-  "filefilter": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.fortistack.filefilter.conf"
-    ],
-    "test_groups": [
-      "grp.filefilter.full"
-    ],
-    "docker_compose": [
-      "docker.filefilter_filefilter.yml",
-      "other"
-    ],
-    "email": [
-      "yshang@fortinet.com"
-    ]
-  },
-  "videofilter": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.fortistack.videofilter.conf"
-    ],
-    "test_groups": [
-      "grp.videofilter.full"
-    ],
-    "docker_compose": [
-      "docker.videofilter_videofilter.yml",
-      "other"
-    ],
-    "email": [
-      "yshang@fortinet.com"
-    ]
-  },
-  "ddos": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.fortistack.ddos.conf"
-    ],
-    "test_groups": [
-      "grp.ddos.full",
-      "grp.ddos.crit"
-    ],
-    "docker_compose": [
-      "docker.ddos_ddos_fortistack.yml",
-      "other"
-    ],
-    "email": [
-      "ldawei@fortinet.com"
-    ]
-  },
-  "voip": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.fortistack.voip.conf"
-    ],
-    "test_groups": [
-      "grp.voip.full",
-      "grp.voip.crit"
-    ],
-    "docker_compose": [
-      "docker.voip_voip_fortistack.yml",
-      "other"
-    ],
-    "email": [
-      "ldawei@fortinet.com"
-    ]
-  },
-  "protocol-option": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.fortistack.protocol-option.conf"
-    ],
-    "test_groups": [
-      "grp.protocol-option.crit",
-      "grp.protocol-option.full"
-    ],
-    "docker_compose": [
-      "docker.protocol-option_protocol-option.yml",
-      "other"
-    ],
-    "email": [
-      "eson@fortinet.com"
-    ]
-  },
-  "spam": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.fortistack.spam.conf"
-    ],
-    "test_groups": [
-      "grp.spam.crit",
-      "grp.spam_natproxy.full",
-      "grp.spam_natflow.full",
-      "grp.spam_tp.full",
-      "grp.spam_wanopt.full"
-    ],
-    "docker_compose": [
-      "docker.spam_spam.yml",
-      "other"
-    ],
-    "email": [
-      "halmossawi@fortinet.com"
-    ]
-  },
-  "ztna": {
-    "test_case_folder": [
-      "testcase_v1"
-    ],
-    "test_config": [
-      "env.FGVM.ztna.conf.ems211.fortstack"
-    ],
-    "test_groups": [
-      "grp.ztna.full",
-      "grp.ztna.crit"
-    ],
-    "docker_compose": [
-      "KVM"
-    ],
-    "email": [
-      "yzhengfeng@fortinet.com,wangd@fortinet.com"
-    ],
-    "PROVISION_VMPC": true,
-    "VMPC_NAMES": "VMPC1,VMPC4,VMPC5",
-    "PROVISION_DOCKER": false
+      "hchuanjian@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,yzhengfeng@fortinet.com"
+    ],
+    "PROVISION_VMPC": false,
+    "VMPC_NAMES": "",
+    "PROVISION_DOCKER": true,
+    "ORIOLE_SUBMIT_FLAG": "all"
   }
 }

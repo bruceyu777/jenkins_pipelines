@@ -1,0 +1,54 @@
+jenkins:
+  securityRealm:
+    saml:
+      # Use local IdP metadata file (now in same directory as this config)
+      idpMetadataConfiguration:
+        period: 0  # Don't auto-refresh from URL
+        xml: ${readFile:/var/jenkins_home/casc_configs/idp-metadata.xml}
+
+      # Service Provider (Jenkins) configuration
+      displayNameAttributeName: "displayName"
+      emailAttributeName: "mail"
+      groupsAttributeName: "memberOf"
+      usernameAttributeName: "uid"
+      usernameCaseConversion: "none"
+
+      # SAML binding method
+      binding: "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+
+      # Encryption settings (using your existing jenkins.jks)
+      encryptionData:
+        keystorePath: "/var/jenkins_home/jenkins.jks"
+        keystorePassword: "${JENKINS_KEYSTORE_PASSWORD:-changeit}"
+        privateKeyAlias: "jenkins"
+        privateKeyPassword: "${JENKINS_KEYSTORE_PASSWORD:-changeit}"
+
+      # Advanced settings
+      maximumAuthenticationLifetime: 86400  # 24 hours
+      advancedConfiguration:
+        forceAuthn: false
+        spEntityId: "https://releaseqa-stackjenkins.corp.fortinet.com"
+
+  # Keep local admin as fallback (IMPORTANT!)
+  authorizationStrategy:
+    globalMatrix:
+      permissions:
+        # Local admin - MUST USE YOUR ACTUAL ADMIN USERNAME
+        - "Overall/Administer:fosqa"
+
+        # Anonymous read access (optional)
+        - "Overall/Read:anonymous"
+        - "Job/Read:anonymous"
+
+        # Authenticated users (SAML)
+        - "Overall/Read:authenticated"
+        - "Job/Build:authenticated"
+        - "Job/Cancel:authenticated"
+        - "Job/Read:authenticated"
+        - "Job/Workspace:authenticated"
+        - "View/Read:authenticated"
+
+unclassified:
+  location:
+    url: "https://releaseqa-stackjenkins.corp.fortinet.com"
+    adminAddress: "yzhengfeng@fortinet.com"

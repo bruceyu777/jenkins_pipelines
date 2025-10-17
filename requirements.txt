@@ -12,6 +12,7 @@ platformdirs
 pre_commit
 pylint
 pymongo
+python-ldap
 PyYAML
 requests
 tomlkit

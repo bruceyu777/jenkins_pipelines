@@ -3,7 +3,7 @@ services:
     build:
       context: /home/fosqa/jenkins-master
       dockerfile: Dockerfile.jenkins
-      network: host  # Fix for apt-get and pip network issues during build
+      network: host
     container_name: jenkins-master
     restart: unless-stopped
     ports:
@@ -11,7 +11,6 @@ services:
       - "50000:50000"
       - "443:8443"
     environment:
-      # map-style; preserves it as one variable
       JAVA_OPTS: >-
         -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true
         -Duser.timezone=America/Vancouver
@@ -22,19 +21,24 @@ services:
         --httpsPort=8443
         --httpsKeyStore=/var/jenkins_home/jenkins.jks
         --httpsKeyStorePassword=changeit
+      # DISABLED: JCasC configuration (will configure SAML manually)
+      # CASC_JENKINS_CONFIG: /var/jenkins_home/casc_configs/jenkins-saml.yaml
+      JENKINS_KEYSTORE_PASSWORD: changeit
     volumes:
       - jenkins_data:/var/jenkins_home
-      # - /home/fosqa/jenkins-master/QA_All_In_Certificate_2025_passUpdated.p12:/var/jenkins_home/jenkins.p12:ro
       - /home/fosqa/jenkins-master/jenkins.jks:/var/jenkins_home/jenkins.jks:ro
-      # - /home/fosqa/jenkins-master/init.groovy.d:/var/jenkins_home/init.groovy.d:ro
       - /home/fosqa/jenkins-master:/home/fosqa/jenkins-master
       - /home/fosqa/resources/tools:/home/fosqa/resources/tools
       - /home/fosqa/jenkins-master/feature-configs:/var/jenkins_home/feature-configs:ro
       - /home/fosqa/known_hosts:/var/jenkins_home/.ssh/known_hosts:ro
+      # Mount init.groovy.d for local admin creation
+      - /home/fosqa/jenkins-master/init.groovy.d:/var/jenkins_home/init.groovy.d:ro
+      # Keep jcasc directory mounted (we'll use idp-metadata.xml file from here)
+      - /home/fosqa/jenkins-master/jcasc:/var/jenkins_home/casc_configs:ro
     networks:
       - custom_network
     extra_hosts:
-      - "dockerhost:192.168.99.1"  # Add host entry for easier SSH
+      - "dockerhost:192.168.99.1"
 
 volumes:
   jenkins_data:
