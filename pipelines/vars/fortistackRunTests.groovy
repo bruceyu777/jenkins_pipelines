@@ -263,13 +263,15 @@ def call() {
                                 def testErr = null
                                 try {
                                     sh """
-                                        cd /home/fosqa/${LOCAL_LIB_DIR}
-                                        . /home/fosqa/${LOCAL_LIB_DIR}/venv/bin/activate
-                                        set -euxo pipefail
-                                        python3 autotest.py \
-                                          -e "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}" \
-                                          -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
-                                          -d -s ${params.ORIOLE_SUBMIT_FLAG}
+                                        bash -euo pipefail -c '
+                                          cd /home/fosqa/${LOCAL_LIB_DIR}
+                                          source /home/fosqa/${LOCAL_LIB_DIR}/venv/bin/activate
+                                          set -x
+                                          python3 autotest.py \
+                                            -e "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}" \
+                                            -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
+                                            -d -s ${params.ORIOLE_SUBMIT_FLAG}
+                                        '
                                     """
                                 } catch (err) {
                                     echo "❌ autotest.py failed for group '${group}': ${err}"
