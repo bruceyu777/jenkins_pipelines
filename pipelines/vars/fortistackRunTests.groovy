@@ -335,12 +335,14 @@ def call() {
                     def archivedFolders = []
                     for (group in computedTestGroups) {
                         def archiveGroup = getArchiveGroupName(group)
+                        // Search for folders matching the pattern: *--group--{archiveGroup}*
+                        // This will match both exact matches and folders with additional suffixes
                         def folder = sh(
                             returnStdout: true,
                             script: """
                                 find ${outputsDir} \
                                     -mindepth 2 -maxdepth 2 -type d \
-                                    -name "*--group--${archiveGroup}" \
+                                    -name "*--group--${archiveGroup}*" \
                                     -printf '%T@ %p\\n' \
                                   | sort -nr \
                                   | head -1 \
@@ -355,7 +357,18 @@ def call() {
                             archivedFolders << folder
                             sh "mkdir -p ${WORKSPACE}/test_results/${archiveGroup}"
                             sh "cp -r ${folder} ${WORKSPACE}/test_results/${archiveGroup}/"
-                            sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
+
+                            // Check if summary.html exists before copying
+                            def summaryExists = sh(
+                                returnStatus: true,
+                                script: "test -f ${folder}/summary/summary.html"
+                            ) == 0
+
+                            if (summaryExists) {
+                                sh "cp ${folder}/summary/summary.html ${WORKSPACE}/summary_${archiveGroup}.html"
+                            } else {
+                                echo "Warning: summary.html not found in ${folder}/summary/"
+                            }
                         }
                     }
 
