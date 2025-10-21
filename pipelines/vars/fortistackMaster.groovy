@@ -402,15 +402,14 @@ def call() {
                 def outputsDir = "/home/fosqa/${LOCAL_LIB_DIR}/outputs"
                 // Clean up previous archiving work.
                 sh "hostname"
-                sh "ip add"
                 sh "rm -f ${WORKSPACE}/summary_*.html"
 
                 // Debug: list all directories under outputsDir
-                def listAll = sh(
-                  returnStdout: true,
-                  script: "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d"
-                ).trim()
-                echo "All directories under ${outputsDir}:\n${listAll}"
+                // def listAll = sh(
+                //   returnStdout: true,
+                //   script: "find '${outputsDir}' -mindepth 2 -maxdepth 2 -type d"
+                // ).trim()
+                // echo "All directories under ${outputsDir}:\n${listAll}"
 
                 def archivedFolders = []
                 for (group in computedTestGroups) {
