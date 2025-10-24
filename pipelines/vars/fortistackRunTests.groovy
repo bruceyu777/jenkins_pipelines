@@ -270,16 +270,15 @@ def call() {
 
                                     echo "🚀 Starting autotest.py in background (resilient to agent disconnections)"
 
-                                    // Start the process in background with nohup and create a polling script
+                                    // Start the process in background with nohup
                                     sh(script: """
                                         cd ${workDir}
 
                                         # Clean up any previous run files
                                         rm -f '${pidFile}' '${logFile}' '${exitCodeFile}'
 
-                                        # Start autotest.py in background
-                                        # Output goes to both console (via tee) and log file
-                                        bash -c '
+                                        # Start autotest.py in background with nohup
+                                        nohup bash -c '
                                           source ${workDir}/venv/bin/activate
                                           set -x
                                           python3 autotest.py \
@@ -287,7 +286,7 @@ def call() {
                                             -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
                                             -d -s ${params.ORIOLE_SUBMIT_FLAG}
                                           echo \$? > "${exitCodeFile}"
-                                        ' 2>&1 | tee '${logFile}' &
+                                        ' > '${logFile}' 2>&1 &
 
                                         # Save the background process PID
                                         PID=\$!
@@ -295,10 +294,43 @@ def call() {
                                         echo ""
                                         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                                         echo "✅ Started autotest.py with PID: \$PID"
-                                        echo "   Output is streaming below (and saved to log file)"
                                         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+                                        # Wait a moment for log file to be created
+                                        sleep 2
+                                    """, label: 'Start autotest.py in background')
+
+                                    // Now tail the log file to show output in real-time
+                                    sh(script: """
                                         echo ""
-                                    """, label: 'Start autotest.py with live output')
+                                        echo "📺 Streaming autotest.py output (saved to ${logFile})..."
+                                        echo ""
+
+                                        # Tail the log file and continue until process completes
+                                        tail -f '${logFile}' 2>/dev/null &
+                                        TAIL_PID=\$!
+
+                                        # Monitor until exit file appears or process dies
+                                        while [ ! -f '${exitCodeFile}' ]; do
+                                            if [ -f '${pidFile}' ]; then
+                                                PID=\$(cat '${pidFile}')
+                                                if ! ps -p \$PID > /dev/null 2>&1; then
+                                                    # Process finished, wait a bit for final output
+                                                    sleep 3
+                                                    break
+                                                fi
+                                            fi
+                                            sleep 5
+                                        done
+
+                                        # Stop tailing
+                                        kill \$TAIL_PID 2>/dev/null || true
+
+                                        echo ""
+                                        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                                        echo "✅ autotest.py output stream ended"
+                                        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                                    """, label: 'Stream autotest.py output')
 
                                     // Create a silent polling script that only outputs progress periodically
                                     def pollScript = """
