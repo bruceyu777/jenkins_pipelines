@@ -260,19 +260,143 @@ def call() {
                                 )
 
                                 // Run the actual tests but ensure post-processing always runs
+                                // Use nohup + background execution to survive agent disconnections
                                 def testErr = null
                                 try {
+                                    def workDir = "/home/fosqa/${LOCAL_LIB_DIR}"
+                                    def pidFile = "${workDir}/autotest_${group.replaceAll('[^a-zA-Z0-9]', '_')}.pid"
+                                    def logFile = "${workDir}/autotest_${group.replaceAll('[^a-zA-Z0-9]', '_')}.log"
+                                    def exitCodeFile = "${workDir}/autotest_${group.replaceAll('[^a-zA-Z0-9]', '_')}.exit"
+                                    
+                                    echo "🚀 Starting autotest.py in background with nohup (survives disconnections)"
+                                    echo "   PID file: ${pidFile}"
+                                    echo "   Log file: ${logFile}"
+                                    echo "   Exit code file: ${exitCodeFile}"
+                                    
+                                    // Start the process in background with nohup
                                     sh """
-                                        bash -euo pipefail -c '
-                                          cd /home/fosqa/${LOCAL_LIB_DIR}
-                                          source /home/fosqa/${LOCAL_LIB_DIR}/venv/bin/activate
+                                        cd ${workDir}
+                                        
+                                        # Clean up any previous run files
+                                        rm -f '${pidFile}' '${logFile}' '${exitCodeFile}'
+                                        
+                                        # Start autotest.py with nohup (immune to SIGHUP)
+                                        nohup bash -c '
+                                          source ${workDir}/venv/bin/activate
                                           set -x
                                           python3 autotest.py \
                                             -e "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}" \
                                             -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
                                             -d -s ${params.ORIOLE_SUBMIT_FLAG}
-                                        '
+                                          echo \$? > "${exitCodeFile}"
+                                        ' > '${logFile}' 2>&1 &
+                                        
+                                        # Save the background process PID
+                                        echo \$! > '${pidFile}'
+                                        
+                                        echo "Started autotest.py with PID: \$(cat '${pidFile}')"
                                     """
+                                    
+                                    // Poll for completion with timeout (2 hours max)
+                                    def maxWaitSeconds = 7200  // 2 hours
+                                    def pollIntervalSeconds = 10
+                                    def elapsedSeconds = 0
+                                    def processCompleted = false
+                                    
+                                    echo "⏳ Polling for autotest.py completion (max ${maxWaitSeconds/60} minutes)..."
+                                    
+                                    while (elapsedSeconds < maxWaitSeconds && !processCompleted) {
+                                        sleep(time: pollIntervalSeconds, unit: 'SECONDS')
+                                        elapsedSeconds += pollIntervalSeconds
+                                        
+                                        // Check if exit code file exists (process completed)
+                                        def exitFileExists = sh(
+                                            returnStatus: true,
+                                            script: "test -f '${exitCodeFile}'"
+                                        ) == 0
+                                        
+                                        if (exitFileExists) {
+                                            processCompleted = true
+                                            echo "✅ Process completed after ${elapsedSeconds} seconds"
+                                            break
+                                        }
+                                        
+                                        // Check if process is still running
+                                        def pidExists = sh(
+                                            returnStatus: true,
+                                            script: "test -f '${pidFile}'"
+                                        ) == 0
+                                        
+                                        if (pidExists) {
+                                            def pid = sh(
+                                                returnStdout: true,
+                                                script: "cat '${pidFile}' 2>/dev/null || echo ''"
+                                            ).trim()
+                                            
+                                            if (pid) {
+                                                def processRunning = sh(
+                                                    returnStatus: true,
+                                                    script: "ps -p ${pid} > /dev/null 2>&1"
+                                                ) == 0
+                                                
+                                                if (processRunning) {
+                                                    if (elapsedSeconds % 60 == 0) {
+                                                        echo "⏱️  Still running... elapsed: ${elapsedSeconds}s (${elapsedSeconds/60} min), PID: ${pid}"
+                                                        // Show last few lines of log
+                                                        sh "tail -n 5 '${logFile}' || true"
+                                                    }
+                                                } else {
+                                                    echo "⚠️  Process ${pid} is no longer running but exit file not found"
+                                                    echo "   This might indicate the process was killed unexpectedly"
+                                                    // Wait a bit more for exit file to appear
+                                                    sleep(time: 5, unit: 'SECONDS')
+                                                    exitFileExists = sh(
+                                                        returnStatus: true,
+                                                        script: "test -f '${exitCodeFile}'"
+                                                    ) == 0
+                                                    if (exitFileExists) {
+                                                        processCompleted = true
+                                                        break
+                                                    } else {
+                                                        error "Process terminated without creating exit code file"
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            echo "⚠️  PID file disappeared, checking exit code file..."
+                                        }
+                                    }
+                                    
+                                    if (!processCompleted) {
+                                        echo "❌ Timeout waiting for autotest.py to complete after ${maxWaitSeconds} seconds"
+                                        // Try to kill the process
+                                        sh """
+                                            if [ -f '${pidFile}' ]; then
+                                                PID=\$(cat '${pidFile}')
+                                                if ps -p \$PID > /dev/null 2>&1; then
+                                                    echo "Killing process \$PID due to timeout"
+                                                    kill -9 \$PID || true
+                                                fi
+                                            fi
+                                        """
+                                        error "autotest.py timed out after ${maxWaitSeconds/60} minutes"
+                                    }
+                                    
+                                    // Check exit code
+                                    def exitCode = sh(
+                                        returnStdout: true,
+                                        script: "cat '${exitCodeFile}' 2>/dev/null || echo '999'"
+                                    ).trim().toInteger()
+                                    
+                                    echo "📄 Final log output:"
+                                    sh "tail -n 50 '${logFile}' || true"
+                                    
+                                    if (exitCode != 0) {
+                                        error "autotest.py failed with exit code: ${exitCode}"
+                                    }
+                                    
+                                    echo "✅ autotest.py completed successfully"
+                                    
                                 } catch (err) {
                                     echo "❌ autotest.py failed for group '${group}': ${err}"
                                     testErr = err
