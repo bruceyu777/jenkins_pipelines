@@ -277,12 +277,9 @@ def call() {
                                         # Clean up any previous run files
                                         rm -f '${pidFile}' '${logFile}' '${exitCodeFile}'
 
-                                        # Create a named pipe for real-time output
-                                        mkfifo ${workDir}/autotest_pipe_\$\$ 2>/dev/null || true
-
-                                        # Start autotest.py with nohup (immune to SIGHUP)
-                                        # Output goes to both console (via tee to stdout) and log file
-                                        (
+                                        # Start autotest.py in background
+                                        # Output goes to both console (via tee) and log file
+                                        bash -c '
                                           source ${workDir}/venv/bin/activate
                                           set -x
                                           python3 autotest.py \
@@ -290,7 +287,7 @@ def call() {
                                             -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
                                             -d -s ${params.ORIOLE_SUBMIT_FLAG}
                                           echo \$? > "${exitCodeFile}"
-                                        ) 2>&1 | tee '${logFile}' &
+                                        ' 2>&1 | tee '${logFile}' &
 
                                         # Save the background process PID
                                         PID=\$!
