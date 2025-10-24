@@ -273,12 +273,16 @@ def call() {
                                     // Start the process in background with nohup and create a polling script
                                     sh(script: """
                                         cd ${workDir}
-                                        
+
                                         # Clean up any previous run files
                                         rm -f '${pidFile}' '${logFile}' '${exitCodeFile}'
-                                        
+
+                                        # Create a named pipe for real-time output
+                                        mkfifo ${workDir}/autotest_pipe_\$\$ 2>/dev/null || true
+
                                         # Start autotest.py with nohup (immune to SIGHUP)
-                                        nohup bash -c '
+                                        # Output goes to both console (via tee to stdout) and log file
+                                        (
                                           source ${workDir}/venv/bin/activate
                                           set -x
                                           python3 autotest.py \
@@ -286,41 +290,47 @@ def call() {
                                             -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
                                             -d -s ${params.ORIOLE_SUBMIT_FLAG}
                                           echo \$? > "${exitCodeFile}"
-                                        ' > '${logFile}' 2>&1 &
-                                        
+                                        ) 2>&1 | tee '${logFile}' &
+
                                         # Save the background process PID
                                         PID=\$!
                                         echo \$PID > '${pidFile}'
-                                        echo "Started autotest.py with PID: \$PID"
-                                    """, label: 'Start autotest.py')
+                                        echo ""
+                                        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                                        echo "✅ Started autotest.py with PID: \$PID"
+                                        echo "   Output is streaming below (and saved to log file)"
+                                        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                                        echo ""
+                                    """, label: 'Start autotest.py with live output')
 
                                     // Create a silent polling script that only outputs progress periodically
                                     def pollScript = """
                                         #!/bin/bash
                                         set -euo pipefail
-                                        
+
                                         PID_FILE='${pidFile}'
                                         EXIT_FILE='${exitCodeFile}'
                                         LOG_FILE='${logFile}'
                                         MAX_WAIT_SECONDS=7200  # 2 hours
                                         POLL_INTERVAL=10
-                                        PROGRESS_INTERVAL=60
-                                        
+                                        PROGRESS_INTERVAL=300  # 5 minutes
+
                                         elapsed=0
                                         last_progress=0
-                                        
-                                        echo "⏳ Monitoring autotest.py (max \$((MAX_WAIT_SECONDS/60)) minutes, progress every \$((PROGRESS_INTERVAL/60)) min)..."
-                                        
+
                                         while [ \$elapsed -lt \$MAX_WAIT_SECONDS ]; do
                                             sleep \$POLL_INTERVAL
                                             elapsed=\$((elapsed + POLL_INTERVAL))
-                                            
+
                                             # Check if process completed
                                             if [ -f "\$EXIT_FILE" ]; then
+                                                echo ""
+                                                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                                                 echo "✅ Process completed after \$elapsed seconds (\$((elapsed/60)) minutes)"
+                                                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                                                 exit 0
                                             fi
-                                            
+
                                             # Check if process still running
                                             if [ -f "\$PID_FILE" ]; then
                                                 PID=\$(cat "\$PID_FILE")
@@ -328,28 +338,28 @@ def call() {
                                                     # Process died, wait a moment for exit file
                                                     sleep 5
                                                     if [ -f "\$EXIT_FILE" ]; then
-                                                        echo "✅ Process completed after \$elapsed seconds"
+                                                        echo ""
+                                                        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                                                        echo "✅ Process completed after \$elapsed seconds (\$((elapsed/60)) minutes)"
+                                                        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                                                         exit 0
                                                     else
+                                                        echo ""
                                                         echo "❌ Process \$PID terminated without creating exit code file"
                                                         exit 1
                                                     fi
                                                 fi
-                                                
-                                                # Show progress periodically
+
+                                                # Show simple progress periodically (every 5 minutes)
                                                 if [ \$((elapsed - last_progress)) -ge \$PROGRESS_INTERVAL ]; then
-                                                    echo ""
-                                                    echo "⏱️  Still running... elapsed: \${elapsed}s (\$((elapsed/60)) min), PID: \$PID"
-                                                    echo "━━━━━━━━━━━━━━━━━━━━ Last 3 lines of log ━━━━━━━━━━━━━━━━━━━━"
-                                                    tail -n 3 "\$LOG_FILE" 2>/dev/null || echo "(log not available yet)"
-                                                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                                                    echo ""
+                                                    echo "⏱️  Still running... \$((elapsed/60)) minutes elapsed (PID: \$PID)"
                                                     last_progress=\$elapsed
                                                 fi
                                             fi
                                         done
-                                        
+
                                         # Timeout
+                                        echo ""
                                         echo "❌ Timeout after \$MAX_WAIT_SECONDS seconds"
                                         if [ -f "\$PID_FILE" ]; then
                                             PID=\$(cat "\$PID_FILE")
@@ -360,17 +370,17 @@ def call() {
                                         fi
                                         exit 2
                                     """
-                                    
+
                                     // Write polling script and execute it
                                     writeFile file: "${workDir}/poll_autotest.sh", text: pollScript
-                                    
-                                    // Run the polling script (this will be quiet except for periodic updates)
+
+                                    // Run the polling script (silent monitoring in background)
                                     def pollResult = sh(
                                         script: "bash ${workDir}/poll_autotest.sh",
                                         returnStatus: true,
-                                        label: 'Monitor autotest.py progress'
+                                        label: 'Silent monitoring (progress every 5 min)'
                                     )
-                                    
+
                                     // Check the poll result
                                     if (pollResult == 2) {
                                         error "autotest.py timed out after 120 minutes"
