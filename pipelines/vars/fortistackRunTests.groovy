@@ -302,6 +302,7 @@ def call() {
 
                                     // Now tail the log file to show output in real-time
                                     sh(script: """
+                                        set +x  # Disable command echoing for monitoring loop
                                         echo ""
                                         echo "📺 Streaming autotest.py output (saved to ${logFile})..."
                                         echo ""
@@ -310,10 +311,10 @@ def call() {
                                         tail -f '${logFile}' 2>/dev/null &
                                         TAIL_PID=\$!
 
-                                        # Monitor until exit file appears or process dies
+                                        # Monitor silently until exit file appears or process dies
                                         while [ ! -f '${exitCodeFile}' ]; do
                                             if [ -f '${pidFile}' ]; then
-                                                PID=\$(cat '${pidFile}')
+                                                PID=\$(cat '${pidFile}' 2>/dev/null)
                                                 if ! ps -p \$PID > /dev/null 2>&1; then
                                                     # Process finished, wait a bit for final output
                                                     sleep 3
