@@ -24,6 +24,7 @@ pipeline {
         timestamps()
         timeout(time: 10, unit: 'MINUTES')
         disableConcurrentBuilds()
+        buildName("#${BUILD_NUMBER} - ${NODE_NAME}")
     }
 
     stages {
