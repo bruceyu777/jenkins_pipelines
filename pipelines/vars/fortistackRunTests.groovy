@@ -287,7 +287,7 @@ def call() {
                                             -d -s ${params.ORIOLE_SUBMIT_FLAG} \
                                             -r ${params.RELEASE} \
                                             -b ${params.BUILD_NUMBER} \
-                                            --non-strict
+                                            --non_strict
                                           echo \$? > "${exitCodeFile}"
                                         ' > '${logFile}' 2>&1 &
 

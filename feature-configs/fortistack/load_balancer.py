@@ -94,28 +94,28 @@ DEFAULT_JENKINS_TOKEN: str = "110dec5c2d2974a67968074deafccc1414"
 DEFAULT_RESERVED_NODES: str = ",".join(
     [
         "Built-In Node",
-        "node1",  # pipeline try
-        "node5",  # Zhu Yu
-        "node11",  # volod
-        "node12",  # Leo Luo
-        "node13",  # tao wang
-        "node14",  # andrew huang
-        "node15",  # qi wang
-        "node19",  # Zach
-        "node20",  # Zach
-        "node26",  # Maryam
-        "node27",  # Maryam
-        # "node28", # Maryam, binding with foc
-        "node33",  # Eric son
-        "node34",  # Yang Shang
-        "node35",  # Yang Shang
-        "node39",  # Jiaran
-        "node40",  # Jiaran
-        "node43",  # Qi for ZTNA
-        "node49",  # Dawei for ddos
+        # "node1",  # pipeline try
+        # "node5",  # Zhu Yu
+        # "node11",  # volod
+        # "node12",  # Leo Luo
+        # "node13",  # tao wang
+        # "node14",  # andrew huang
+        # "node15",  # qi wang
+        # "node19",  # Zach
+        # "node20",  # Zach
+        # "node26",  # Maryam
+        # "node27",  # Maryam
+        # # "node28", # Maryam, binding with foc
+        # "node33",  # Eric son
+        # "node34",  # Yang Shang
+        # "node35",  # Yang Shang
+        # "node39",  # Jiaran
+        # "node40",  # Jiaran
+        # "node43",  # Qi for ZTNA
+        # "node49",  # Dawei for ddos
         "node48",  # Rain for debug
-        "node47",  # Hayder for spam
-        "node46",  # Dawei for ddos
+        # "node47",  # Hayder for spam
+        # "node46",  # Dawei for ddos
     ]
 )
 
@@ -127,7 +127,7 @@ DEFAULT_MONGO_COLLECTION: str = "results"
 # Feature names mapped to dedicated Jenkins nodes
 FEATURE_NODE_STATIC_BINDING: Dict[str, str] = {
     "avfortisandbox": "node2",  # binding avfortisandbox to node2 https://app.clickup.com/t/86dxg5eem
-    "ztna": "node15",  # binding ztna to node15
+    "ztna": "node15",  # binding ztna to node15, vmpc1 forticlient has to be fixed, uuid is fixed
     "foc": "node28",  # binding foc to node28
     "waf": "node40",
     "avfortindr": "node99",  # binding avfortindr to node99
@@ -535,11 +535,13 @@ def merge_features(entries: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
             current = base.get("email", [])
             current_set: Set[str] = set()
             if isinstance(current, list) and current:
-                if isinstance(current[0], str):
-                    for addr in current[0].split(","):
-                        addr = addr.strip()
-                        if addr:
-                            current_set.add(addr)
+                # FIX: Process ALL elements in the list, not just current[0]
+                for item in current:
+                    if isinstance(item, str):
+                        for addr in item.split(","):
+                            addr = addr.strip()
+                            if addr:
+                                current_set.add(addr)
 
             new_set: Set[str] = set()
             for item in config.get("email", []):
@@ -934,8 +936,8 @@ def create_dispatch_entry(entry: Dict[str, Any], node_name: str, groups: List[st
 
     # Handle email recipients (can be string or list)
     if isinstance(email_recipients, list) and email_recipients:
-        email_str = email_recipients[0]
-    else:
+        email_str = ",".join(email_recipients)
+    else:  #
         email_str = email_recipients
 
     # Create email list with admin addresses
