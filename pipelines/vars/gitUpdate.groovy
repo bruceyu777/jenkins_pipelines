@@ -48,10 +48,10 @@ def call(Map config = [:]) {
 
     if (verbose) {
         echo "╔════════════════════════════════════════════════════════════╗"
-        echo "║              Git Update Helper - Starting                 ║"
+        echo "║              Git Update Helper - Starting                  "
         echo "╠════════════════════════════════════════════════════════════╣"
-        echo "║ Repository: ${repoPath.padRight(41)} ║"
-        echo "║ User:       ${user.padRight(41)} ║"
+        echo "║ Repository: ${repoPath.padRight(41)} "
+        echo "║ User:       ${user.padRight(41)} "
         echo "╚════════════════════════════════════════════════════════════╝"
     }
 
@@ -231,9 +231,9 @@ def call(Map config = [:]) {
 
         if (verbose) {
             echo "╔════════════════════════════════════════════════════════════╗"
-            echo "║              Git Update Helper - Completed                ║"
+            echo "║              Git Update Helper - Completed                "
             echo "╠════════════════════════════════════════════════════════════╣"
-            echo "║ Status:        ✅ SUCCESS                                  ║"
+            echo "║ Status:        ✅ SUCCESS                                  "
 
             // Build local changes message
             def localMsg = 'No'
@@ -243,8 +243,8 @@ def call(Map config = [:]) {
                 localMsg = 'Yes (stashed, not restored!)'
             }
 
-            echo "║ Local Changes: ${localMsg.padRight(35)} ║"
-            echo "║ Remote Updates:${(result.remoteUpdates ? 'Yes (pulled new commits)' : 'No (already up to date)').padRight(35)} ║"
+            echo "║ Local Changes: ${localMsg.padRight(35)} "
+            echo "║ Remote Updates:${(result.remoteUpdates ? 'Yes (pulled new commits)' : 'No (already up to date)').padRight(35)} "
             echo "╚════════════════════════════════════════════════════════════╝"
         }
 
