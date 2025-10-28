@@ -24,7 +24,6 @@ pipeline {
         timestamps()
         timeout(time: 10, unit: 'MINUTES')
         disableConcurrentBuilds()
-        buildName("#${BUILD_NUMBER} - ${NODE_NAME}")
     }
 
     stages {
@@ -33,6 +32,10 @@ pipeline {
 
             steps {
                 script {
+                    // Set build display name
+                    currentBuild.displayName = "#${BUILD_NUMBER} - ${params.NODE_NAME}"
+                    currentBuild.description = "Terminate autotest processes on ${params.NODE_NAME}"
+
                     echo "=" * 80
                     echo "🛑 TERMINATE AUTOTEST PROCESSES"
                     echo "=" * 80
