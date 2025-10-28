@@ -284,7 +284,10 @@ def call() {
                                           python3 autotest.py \
                                             -e "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}" \
                                             -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
-                                            -d -s ${params.ORIOLE_SUBMIT_FLAG} --non-strict
+                                            -d -s ${params.ORIOLE_SUBMIT_FLAG} \
+                                            -r ${params.RELEASE} \
+                                            -b ${params.BUILD_NUMBER} \
+                                            --non-strict
                                           echo \$? > "${exitCodeFile}"
                                         ' > '${logFile}' 2>&1 &
 
