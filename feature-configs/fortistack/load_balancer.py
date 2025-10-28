@@ -160,7 +160,7 @@ class MongoDBClient:
     def find(self, query: Dict[str, Any]) -> List[Dict[str, Any]]:
         return list(self._collection.find(query))
 
-    def find_latest_durations(self, release: Optional[str] = None) -> Dict[str, Dict[str, str]]:
+    def find_latest_durations(self, release: Optional[str] = None) -> Tuple[Dict[str, Dict[str, str]], Dict[str, Dict[str, Any]]]:
         """
         Fetch the latest test durations from MongoDB for all features and groups.
 
@@ -168,8 +168,11 @@ class MongoDBClient:
             release: Optional release filter (e.g., "7.6.4")
 
         Returns:
-            Dictionary mapping feature names to group duration mappings
-            Format: {feature_name: {group_name: "2 hr 5 min"}}
+            Tuple of:
+            - Dictionary mapping feature names to group duration mappings
+              Format: {feature_name: {group_name: "2 hr 5 min"}}
+            - Dictionary mapping (feature, group) to metadata
+              Format: {(feature, group): {"release": "7.6.4", "build": 12345, "timestamp": "2025-10-28"}}
         """
         # Build query
         query = {}
@@ -212,7 +215,7 @@ class MongoDBClient:
 
         if self._collection.name not in collection_names:
             logging.error(f"Collection '{self._collection.name}' does not exist!")
-            return {}
+            return {}, {}
 
         # Get multiple sample documents to understand the schema evolution
         try:
@@ -235,7 +238,7 @@ class MongoDBClient:
 
         except Exception as e:
             logging.error(f"Error getting sample documents: {e}")
-            return {}
+            return {}, {}
 
         # Modify query to only get documents with duration_human field
         duration_query = dict(query)  # Copy the original query
@@ -256,32 +259,15 @@ class MongoDBClient:
             logging.info(f"Query with duration_human filter returned {len(docs)} documents")
         except Exception as e:
             logging.error(f"Error executing MongoDB query with duration_human filter: {e}")
-            return {}
+            return {}, {}
 
         if not docs:
             logging.warning(f"No duration data found in MongoDB for query: {duration_query}")
-
-            # Additional debugging: check what data is available
-            if release:
-                logging.info("Checking if the issue is with the release filter...")
-                try:
-                    # Check if there are any documents with duration_human but different release
-                    all_duration_docs = list(self._collection.find({"duration_human": {"$exists": True}}).limit(5))
-                    if all_duration_docs:
-                        releases = set()
-                        for doc in all_duration_docs:
-                            if "release" in doc:
-                                releases.add(doc["release"])
-                        logging.info(f"Available releases in documents with duration_human: {sorted(list(releases))}")
-                    else:
-                        logging.warning("No documents found with duration_human field at all!")
-                except Exception as e:
-                    logging.error(f"Error in release debugging: {e}")
-
-            return {}
+            return {}, {}
 
         # Group by feature and feature_group, keeping only the latest entry
         feature_durations = {}
+        duration_metadata = {}  # NEW: Store metadata for each (feature, group) pair
         seen_combinations = set()
 
         logging.info("Processing documents to extract durations...")
@@ -292,15 +278,18 @@ class MongoDBClient:
             feature_group = doc.get("feature_group", "")
             duration_human = doc.get("duration_human", "")
             build = doc.get("build", "")
+            release_ver = doc.get("release", "")
+            timestamp = doc.get("timestamp", "") or doc.get("created_at", "") or doc.get("date", "")
 
             # Debug: log first few documents
             if processed_count < 5:
                 logging.info(f"Processing Doc {processed_count + 1}:")
                 logging.info(f"  feature='{feature}', feature_group='{feature_group}'")
                 logging.info(f"  duration_human='{duration_human}', build='{build}'")
+                logging.info(f"  release='{release_ver}', timestamp='{timestamp}'")
 
             if not feature or not feature_group or not duration_human:
-                if processed_count < 10:  # Only log first 10 to avoid spam
+                if processed_count < 10:
                     logging.warning(f"Skipping document with missing fields: feature='{feature}', feature_group='{feature_group}', duration_human='{duration_human}'")
                 continue
 
@@ -319,6 +308,10 @@ class MongoDBClient:
 
             # Store the duration
             feature_durations[feature][feature_group] = duration_human
+
+            # Store metadata
+            duration_metadata[combination_key] = {"release": release_ver, "build": build, "timestamp": timestamp}
+
             processed_count += 1
 
         logging.info(f"Processed {processed_count} documents with valid duration data")
@@ -334,7 +327,7 @@ class MongoDBClient:
             if len(group_durations) > 3:
                 logging.info(f"    ... and {len(group_durations) - 3} more groups")
 
-        return feature_durations
+        return feature_durations, duration_metadata
 
 
 # =============================================================================
@@ -636,6 +629,111 @@ def load_duration_entries_from_file(path: str) -> List[Tuple[str, Dict[str, str]
     return duration_entries
 
 
+def log_duration_summary_table(feature_durations: Dict[str, Dict[str, str]], duration_metadata: Dict[Tuple[str, str], Dict[str, Any]] = None) -> None:
+    """
+    Log a summary table of all test group durations sorted by duration (descending).
+
+    Args:
+        feature_durations: Dictionary mapping feature names to group duration mappings
+        duration_metadata: Optional dictionary mapping (feature, group) to metadata (release, build, timestamp)
+    """
+    if not feature_durations:
+        logging.info("No duration data to display")
+        return
+
+    # Flatten all groups with their durations and metadata
+    all_groups = []
+
+    for feature_name, group_durations in feature_durations.items():
+        for group_name, duration_str in group_durations.items():
+            seconds = parse_duration_to_seconds(duration_str)
+
+            # Get metadata if available
+            metadata = {}
+            if duration_metadata:
+                metadata = duration_metadata.get((feature_name, group_name), {})
+
+            all_groups.append(
+                {
+                    "feature": feature_name,
+                    "group": group_name,
+                    "duration_str": duration_str,
+                    "seconds": seconds,
+                    "release": metadata.get("release", "N/A"),
+                    "build": metadata.get("build", "N/A"),
+                    "timestamp": metadata.get("timestamp", "N/A"),
+                }
+            )
+
+    # Sort by duration (descending)
+    all_groups.sort(key=lambda x: x["seconds"], reverse=True)
+
+    # Calculate column widths
+    max_feature_len = max(len(g["feature"]) for g in all_groups) if all_groups else 10
+    max_feature_len = max(max_feature_len, len("FEATURE"))
+
+    max_group_len = max(len(g["group"]) for g in all_groups) if all_groups else 10
+    max_group_len = max(max_group_len, len("GROUP"))
+
+    max_release_len = max(len(str(g["release"])) for g in all_groups) if all_groups else 8
+    max_release_len = max(max_release_len, len("RELEASE"))
+
+    max_build_len = max(len(str(g["build"])) for g in all_groups) if all_groups else 6
+    max_build_len = max(max_build_len, len("BUILD"))
+
+    # Build the table as a list of lines
+    table_lines = []
+    table_lines.append("")
+    table_lines.append("=" * 150)
+    table_lines.append("DURATION SUMMARY TABLE - ALL GROUPS (Sorted by Duration - Descending)")
+    table_lines.append("=" * 150)
+
+    header = (
+        f"{'FEATURE':<{max_feature_len}}  "
+        f"{'GROUP':<{max_group_len}}  "
+        f"{'DURATION':<20}  "
+        f"{'SECONDS':>10}  "
+        f"{'RELEASE':<{max_release_len}}  "
+        f"{'BUILD':<{max_build_len}}  "
+        f"{'TIMESTAMP':<20}"
+    )
+    table_lines.append(header)
+    table_lines.append("-" * 150)
+
+    # Add each group row
+    for item in all_groups:
+        # Format timestamp (truncate if too long)
+        timestamp_str = str(item["timestamp"])[:20] if item["timestamp"] != "N/A" else "N/A"
+
+        row = (
+            f"{item['feature']:<{max_feature_len}}  "
+            f"{item['group']:<{max_group_len}}  "
+            f"{item['duration_str']:<20}  "
+            f"{item['seconds']:>10}  "
+            f"{str(item['release']):<{max_release_len}}  "
+            f"{str(item['build']):<{max_build_len}}  "
+            f"{timestamp_str:<20}"
+        )
+        table_lines.append(row)
+
+    # Add summary footer
+    total_groups = len(all_groups)
+    total_features = len(feature_durations)
+    total_time = sum(g["seconds"] for g in all_groups)
+
+    table_lines.append("-" * 150)
+    table_lines.append(
+        f"{'TOTAL':<{max_feature_len}}  " f"{total_groups} groups" f"{'':>{max_group_len - 9}}  " f"{format_seconds_to_duration(total_time):<20}  " f"{total_time:>10}"
+    )
+    table_lines.append("=" * 150)
+    table_lines.append(f"Features: {total_features} | " f"Groups: {total_groups} | " f"Total Time: {format_seconds_to_duration(total_time)}")
+    table_lines.append("=" * 150)
+    table_lines.append("")
+
+    # Log the entire table as a single multi-line message
+    logging.info("\n" + "\n".join(table_lines))
+
+
 def get_duration_entries(mongo_client: Optional[MongoDBClient] = None, release: Optional[str] = None, fallback_file: Optional[str] = None) -> List[Tuple[str, Dict[str, str]]]:
     """
     Get duration entries from MongoDB or fallback to JSON file.
@@ -649,16 +747,36 @@ def get_duration_entries(mongo_client: Optional[MongoDBClient] = None, release: 
         List of (feature_name, duration_map) pairs
     """
     duration_entries = []
+    duration_metadata = {}
 
     # Try MongoDB first
     if mongo_client:
         try:
             logging.info("Fetching test durations from MongoDB...")
-            feature_durations = mongo_client.find_latest_durations(release)
+            feature_durations, duration_metadata = mongo_client.find_latest_durations(release)
 
             if feature_durations:
                 duration_entries = list(feature_durations.items())
                 logging.info(f"Successfully loaded {len(duration_entries)} duration entries from MongoDB")
+
+                # Log detailed breakdown for each feature
+                total_groups = sum(len(groups) for groups in feature_durations.values())
+                logging.info(f"Total groups across all features: {total_groups}")
+                logging.info("")
+
+                for feature_name, group_durations in feature_durations.items():
+                    logging.info(f"  {feature_name}: {len(group_durations)} groups")
+                    # Show a few examples with metadata
+                    sample_groups = list(group_durations.items())[:3]
+                    for group, duration in sample_groups:
+                        metadata = duration_metadata.get((feature_name, group), {})
+                        logging.info(f"    {group}: {duration} (release: {metadata.get('release', 'N/A')}, build: {metadata.get('build', 'N/A')})")
+                    if len(group_durations) > 3:
+                        logging.info(f"    ... and {len(group_durations) - 3} more groups")
+
+                # Display duration summary table at GROUP level with metadata
+                log_duration_summary_table(feature_durations, duration_metadata)
+
                 return duration_entries
             else:
                 logging.warning("No duration data found in MongoDB")
@@ -670,7 +788,14 @@ def get_duration_entries(mongo_client: Optional[MongoDBClient] = None, release: 
     if fallback_file and os.path.exists(fallback_file):
         logging.info(f"Falling back to duration file: {fallback_file}")
         try:
-            return load_duration_entries_from_file(fallback_file)
+            duration_entries = load_duration_entries_from_file(fallback_file)
+
+            if duration_entries:
+                # Convert to dict format for table display (no metadata from file)
+                feature_durations_dict = dict(duration_entries)
+                log_duration_summary_table(feature_durations_dict, None)
+
+            return duration_entries
         except Exception as e:
             logging.error(f"Failed to load duration file {fallback_file}: {e}")
 
