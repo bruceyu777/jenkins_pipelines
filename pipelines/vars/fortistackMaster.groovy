@@ -140,7 +140,7 @@ def call() {
   pipeline {
     agent { label 'master' }
     options {
-      buildDiscarder(logRotator(numToKeepStr: '100'))
+      buildDiscarder(logRotator(daysToKeepStr: '14'))
     }
     environment {
         TZ = 'America/Vancouver'
