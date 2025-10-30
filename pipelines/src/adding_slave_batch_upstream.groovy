@@ -12,7 +12,7 @@ pipeline {
     )
     string(
       name: 'JENKINS_URL',
-      defaultValue: 'http://10.96.227.206:8080',
+      defaultValue: 'https://releaseqa-stackjenkins.corp.fortinet.com',
       description: 'Jenkins Master URL'
     )
     booleanParam(
