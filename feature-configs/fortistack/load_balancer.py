@@ -116,6 +116,7 @@ DEFAULT_RESERVED_NODES: str = ",".join(
         "node48",  # Rain for debug
         # "node47",  # Hayder for spam
         # "node46",  # Dawei for ddos
+        "node24",
     ]
 )
 
@@ -1486,22 +1487,29 @@ def main():
     for entry, node_count in static_features:
         feature_name = entry["FEATURE_NAME"]
         static_node = FEATURE_NODE_STATIC_BINDING[feature_name]
+
+        # Prevent multiple features from being statically bound to the same node
+        if static_node in used_nodes:
+            logging.error(f"Configuration Error: Node '{static_node}' is statically bound to multiple features. Aborting.")
+            sys.exit(1)
+
         used_nodes.add(static_node)  # Mark node as used
 
-        # Get durations and distribute groups across allocated nodes
+        # For statically bound features, ALL groups must run on the ONE node.
+        # Combine all test groups into a single dispatch entry.
+        all_groups = entry.get("test_groups", [])
+        if not all_groups:
+            logging.warning(f"Skipping static feature '{feature_name}' as it has no test groups.")
+            continue
+
+        # Calculate total duration for all groups
         duration_map = next((dur_map for name, dur_map in duration_entries if name == feature_name), {})
-        group_durations = {group: parse_duration_to_seconds(duration_map.get(group, "1 hr")) for group in entry.get("test_groups", [])}
-        distributed_groups = distribute_groups_across_nodes(group_durations, node_count)
+        total_seconds = sum(parse_duration_to_seconds(duration_map.get(group, "10 hr")) for group in all_groups)
 
-        # Create dispatch entry for each node's group set
-        for groups, total_seconds in distributed_groups:
-            # Skip entries with no test groups
-            if not groups:
-                logging.warning(f"Skipping empty group assignment for {feature_name} - " f"not enough test groups for allocated nodes")
-                continue
-
-            dispatch_entry = create_dispatch_entry(entry, static_node, groups, total_seconds, duration_entries)
-            dispatch_entries.append(dispatch_entry)
+        # Create a single dispatch entry for the static node
+        logging.info(f"Feature '{feature_name}' is statically bound to '{static_node}'. Combining all {len(all_groups)} groups into one dispatch.")
+        dispatch_entry = create_dispatch_entry(entry, static_node, all_groups, total_seconds, duration_entries)
+        dispatch_entries.append(dispatch_entry)
 
     # Process dynamic features using remaining available nodes
     remaining_nodes = [node for node in available_nodes if node not in used_nodes]
