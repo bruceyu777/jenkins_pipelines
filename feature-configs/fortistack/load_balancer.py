@@ -125,7 +125,7 @@ DEFAULT_MONGO_URI: str = "mongodb://10.96.227.206:27017"
 DEFAULT_MONGO_DB: str = "autolib"
 DEFAULT_MONGO_COLLECTION: str = "results"
 
-# Feature names mapped to dedicated Jenkins nodes
+# Feature names mapped to dedicated Jenkins nodes, if multi nodes, separate by colon
 FEATURE_NODE_STATIC_BINDING: Dict[str, str] = {
     "avfortisandbox": "node2",  # binding avfortisandbox to node2 https://app.clickup.com/t/86dxg5eem
     "ztna": "node15",  # binding ztna to node15, vmpc1 forticlient has to be fixed, uuid is fixed
@@ -1483,33 +1483,43 @@ def main():
         else:
             dynamic_features.append((entry, node_count))
 
+    logging.info(f"Found {len(static_features)} features with static node bindings to process.")
+    logging.info(f"Found {len(dynamic_features)} features with dynamic node allocation.")
+
     # Process static bindings first
     for entry, node_count in static_features:
         feature_name = entry["FEATURE_NAME"]
-        static_node = FEATURE_NODE_STATIC_BINDING[feature_name]
+        nodes_str = FEATURE_NODE_STATIC_BINDING[feature_name]
+        static_nodes = sorted([node.strip() for node in nodes_str.split(",") if node.strip()])
 
-        # Prevent multiple features from being statically bound to the same node
-        if static_node in used_nodes:
-            logging.error(f"Configuration Error: Node '{static_node}' is statically bound to multiple features. Aborting.")
-            sys.exit(1)
+        # Check for conflicts and mark nodes as used
+        for node in static_nodes:
+            if node in used_nodes:
+                logging.error(f"Configuration Error: Node '{node}' is used in multiple static bindings. Aborting.")
+                sys.exit(1)
+            used_nodes.add(node)
 
-        used_nodes.add(static_node)  # Mark node as used
-
-        # For statically bound features, ALL groups must run on the ONE node.
-        # Combine all test groups into a single dispatch entry.
+        # Get all test groups for the feature
         all_groups = entry.get("test_groups", [])
         if not all_groups:
             logging.warning(f"Skipping static feature '{feature_name}' as it has no test groups.")
             continue
 
-        # Calculate total duration for all groups
+        # Get the duration map for these groups
         duration_map = next((dur_map for name, dur_map in duration_entries if name == feature_name), {})
-        total_seconds = sum(parse_duration_to_seconds(duration_map.get(group, "10 hr")) for group in all_groups)
+        group_durations = {group: parse_duration_to_seconds(duration_map.get(group, "1 hr")) for group in all_groups}
 
-        # Create a single dispatch entry for the static node
-        logging.info(f"Feature '{feature_name}' is statically bound to '{static_node}'. Combining all {len(all_groups)} groups into one dispatch.")
-        dispatch_entry = create_dispatch_entry(entry, static_node, all_groups, total_seconds, duration_entries)
-        dispatch_entries.append(dispatch_entry)
+        # Distribute groups across the static nodes using bin-packing
+        logging.info(f"Feature '{feature_name}' is statically bound to {len(static_nodes)} nodes: {static_nodes}. Distributing groups...")
+        distributed_groups = distribute_groups_across_nodes(group_durations, len(static_nodes))
+
+        # Create a dispatch entry for each node's share of groups
+        for i, (groups_for_node, total_seconds) in enumerate(distributed_groups):
+            if not groups_for_node:  # Skip if a node gets no groups
+                continue
+            chosen_node = static_nodes[i]
+            dispatch_entry = create_dispatch_entry(entry, chosen_node, groups_for_node, total_seconds, duration_entries)
+            dispatch_entries.append(dispatch_entry)
 
     # Process dynamic features using remaining available nodes
     remaining_nodes = [node for node in available_nodes if node not in used_nodes]
