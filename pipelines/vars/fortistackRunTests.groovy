@@ -113,6 +113,37 @@ def call() {
                 }
             }
 
+            stage('Autolib Setup') {
+                steps {
+                    script {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'LDAP',
+                                usernameVariable: 'SVN_USER',
+                                passwordVariable: 'SVN_PASS'
+                            )
+                        ]) {
+                            echo "🔄 Syncing autolib repo (${LOCAL_LIB_DIR}) to branch ${AUTOLIB_BRANCH}, stashing any local edits…"
+                            sh """
+                                REPO_DIR=/home/fosqa/${LOCAL_LIB_DIR}
+
+                                # mark it safe
+                                sudo -u fosqa git config --global --add safe.directory \$REPO_DIR
+
+                                cd \$REPO_DIR
+
+                                # run all three as fosqa
+                                sudo -u fosqa sh -c '
+                                    git stash push -u -m "autolib auto-stash before pull" || true
+                                    git checkout ${AUTOLIB_BRANCH}
+                                    git pull --rebase --autostash
+                                '
+                            """
+                        }
+                    }
+                }
+            }
+
             stage('Verify Environment') {
                 steps {
                     script {
@@ -267,7 +298,7 @@ def call() {
                                     def pidFile = "${workDir}/autotest_${group.replaceAll('[^a-zA-Z0-9]', '_')}.pid"
                                     def logFile = "${workDir}/autotest_${group.replaceAll('[^a-zA-Z0-9]', '_')}.log"
                                     def exitCodeFile = "${workDir}/autotest_${group.replaceAll('[^a-zA-Z0-9]', '_')}.exit"
-                                    
+
                                     // Handle ORIOLE_TASK_PATH: replace {} placeholder with actual RELEASE value
                                     def orioleTaskPath = params.ORIOLE_TASK_PATH
                                     if (orioleTaskPath.contains('{}')) {
