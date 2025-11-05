@@ -371,6 +371,7 @@ def call() {
                     booleanParam(name: 'PROVISION_DOCKER', value: params.PROVISION_DOCKER),
                     string(name: 'PARAMS_JSON', value: params.PARAMS_JSON),
                     string(name: 'ORIOLE_SUBMIT_FLAG', value: params.ORIOLE_SUBMIT_FLAG?.trim() ?: 'all'),
+                    string(name: 'ORIOLE_TASK_PATH', value: params.ORIOLE_TASK_PATH?.trim() ?: 'ORIOLE_TASK_PATH not set!'),
                     string(name: 'SEND_TO', value: mergedSendTo)
                 ]
                 echo "Triggering fortistackRunTests pipeline for test group '${group}' with parameters: ${testParams}"

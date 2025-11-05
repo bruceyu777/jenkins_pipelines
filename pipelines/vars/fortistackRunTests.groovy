@@ -267,6 +267,15 @@ def call() {
                                     def pidFile = "${workDir}/autotest_${group.replaceAll('[^a-zA-Z0-9]', '_')}.pid"
                                     def logFile = "${workDir}/autotest_${group.replaceAll('[^a-zA-Z0-9]', '_')}.log"
                                     def exitCodeFile = "${workDir}/autotest_${group.replaceAll('[^a-zA-Z0-9]', '_')}.exit"
+                                    
+                                    // Handle ORIOLE_TASK_PATH: replace {} placeholder with actual RELEASE value
+                                    def orioleTaskPath = params.ORIOLE_TASK_PATH
+                                    if (orioleTaskPath.contains('{}')) {
+                                        orioleTaskPath = orioleTaskPath.replace('{}', params.RELEASE)
+                                        echo "Resolved Oriole Task Path: ${orioleTaskPath}"
+                                    } else {
+                                        echo "Using custom Oriole Task Path: ${orioleTaskPath}"
+                                    }
 
                                     echo "🚀 Starting autotest.py in background (resilient to agent disconnections)"
 
@@ -285,8 +294,7 @@ def call() {
                                             -e "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${params.TEST_CONFIG_CHOICE}" \
                                             -g "testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/${group}" \
                                             -d -s ${params.ORIOLE_SUBMIT_FLAG} \
-                                            -r ${params.RELEASE} \
-                                            -b ${params.BUILD_NUMBER} \
+                                            --task_path "${orioleTaskPath}" \
                                             --non_strict
                                           echo \$? > "${exitCodeFile}"
                                         ' > '${logFile}' 2>&1 &
