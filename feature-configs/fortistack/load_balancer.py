@@ -1005,7 +1005,7 @@ def get_idle_jenkins_nodes(url: str, user: str, token: str) -> List[str]:
                 continue
 
             job_name = current_executable.get("fullDisplayName", "")
-            if job_name.startswith("fortistack_runtest") or job_name.startswith("fortistack_provision_fgts"):
+            if job_name.startswith("fortistackRunTests") or job_name.startswith("fortistackProvisionTestEnv") or job_name.startswith("fortistack_provision_fgts"):
                 node_is_busy = True
                 break
 
@@ -1237,6 +1237,165 @@ def load_features_from_api(session: requests.Session, api_url: str) -> List[Dict
     return feature_entries
 
 
+def parse_node_list(node_spec: str) -> List[str]:
+    """
+    Parse a node specification string supporting comma separation and range notation.
+
+    Examples:
+        "node2,node3,node10-node20" -> ["node2", "node3", "node10", ..., "node20"]
+        "node1-node5,node10" -> ["node1", "node2", "node3", "node4", "node5", "node10"]
+
+    Args:
+        node_spec: Comma-separated node specification with optional range notation
+
+    Returns:
+        List of expanded node names, sorted numerically
+    """
+    if not node_spec or not node_spec.strip():
+        return []
+
+    nodes = set()
+    parts = [p.strip() for p in node_spec.split(",") if p.strip()]
+
+    for part in parts:
+        # Check if this part contains a range
+        if "-" in part and part.count("-") == 1:
+            # Split on the dash
+            range_parts = part.split("-")
+            if len(range_parts) == 2:
+                start_node = range_parts[0].strip()
+                end_node = range_parts[1].strip()
+
+                # Extract prefix and numbers
+                # Assuming format like "node10" -> prefix="node", num=10
+                start_match = re.match(r"([a-zA-Z]+)(\d+)$", start_node)
+                end_match = re.match(r"([a-zA-Z]+)(\d+)$", end_node)
+
+                if start_match and end_match:
+                    start_prefix, start_num = start_match.groups()
+                    end_prefix, end_num = end_match.groups()
+
+                    # Ensure same prefix
+                    if start_prefix == end_prefix:
+                        start_int = int(start_num)
+                        end_int = int(end_num)
+
+                        # Generate range (inclusive)
+                        for i in range(start_int, end_int + 1):
+                            nodes.add(f"{start_prefix}{i}")
+                    else:
+                        logging.warning(f"Range has mismatched prefixes: {part}, treating as literal")
+                        nodes.add(part)
+                else:
+                    # Not a valid range format, treat as literal
+                    logging.warning(f"Invalid range format: {part}, treating as literal")
+                    nodes.add(part)
+            else:
+                nodes.add(part)
+        else:
+            # Simple node name
+            nodes.add(part)
+
+    # Sort numerically
+    node_list = list(nodes)
+    node_list.sort(key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
+
+    return node_list
+
+
+def get_final_node_pool(
+    nodes_spec: str, use_jenkins_nodes: bool, jenkins_url: str, jenkins_user: str, jenkins_token: str, reserved_nodes: List[str], exclude_nodes: List[str]
+) -> List[str]:
+    """
+    Determine the final node pool based on --nodes and --use-jenkins-nodes flags.
+
+    Logic:
+    1. If --nodes is empty/not specified: use Jenkins idle nodes (if --use-jenkins-nodes)
+    2. If --nodes is specified and --use-jenkins-nodes: intersect both pools
+    3. If --nodes is specified without --use-jenkins-nodes: use only --nodes pool
+    4. Apply reserved and exclude node filters to the final pool
+
+    Args:
+        nodes_spec: Node specification string (supports ranges)
+        use_jenkins_nodes: Whether to query Jenkins for idle nodes
+        jenkins_url: Jenkins URL
+        jenkins_user: Jenkins username
+        jenkins_token: Jenkins API token
+        reserved_nodes: List of reserved node names to exclude
+        exclude_nodes: List of additional nodes to exclude
+
+    Returns:
+        Final list of available nodes, sorted numerically
+    """
+    defined_node_pool = parse_node_list(nodes_spec) if nodes_spec else []
+    jenkins_idle_pool = []
+
+    # Get Jenkins idle nodes if requested
+    if use_jenkins_nodes:
+        jenkins_idle_pool = get_idle_jenkins_nodes(jenkins_url, jenkins_user, jenkins_token)
+
+    # Determine base pool based on logic
+    if not defined_node_pool and not use_jenkins_nodes:
+        logging.error("No node pool specified: use --nodes or --use-jenkins-nodes")
+        sys.exit(1)
+
+    if not defined_node_pool:
+        # Case 1: Only --use-jenkins-nodes
+        base_pool = jenkins_idle_pool
+        logging.info(f"Using Jenkins idle nodes only: {len(base_pool)} nodes")
+    elif not use_jenkins_nodes:
+        # Case 3: Only --nodes defined
+        base_pool = defined_node_pool
+        logging.info(f"Using defined node pool only: {len(base_pool)} nodes")
+        logging.info(f"Defined nodes: {base_pool}")
+    else:
+        # Case 2: Both specified - intersect
+        defined_set = set(defined_node_pool)
+        jenkins_set = set(jenkins_idle_pool)
+        base_pool = sorted(list(defined_set & jenkins_set), key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
+        logging.info(f"Intersecting defined pool ({len(defined_node_pool)}) with Jenkins idle pool ({len(jenkins_idle_pool)})")
+        logging.info(f"Defined nodes: {defined_node_pool}")
+        logging.info(f"Jenkins idle nodes: {jenkins_idle_pool}")
+        logging.info(f"Intersection result: {len(base_pool)} nodes: {base_pool}")
+
+        # Warn if intersection is empty
+        if not base_pool:
+            logging.warning("Intersection of defined nodes and Jenkins idle nodes is empty!")
+            logging.warning(f"Nodes only in defined pool: {sorted(list(defined_set - jenkins_set))}")
+            logging.warning(f"Nodes only in Jenkins idle pool: {sorted(list(jenkins_set - defined_set))}")
+
+    if not base_pool:
+        logging.error("No nodes available after intersection/selection")
+        sys.exit(1)
+
+    # Apply reserved node filter
+    available_pool = [node for node in base_pool if node not in reserved_nodes]
+
+    actually_reserved = set(base_pool) & set(reserved_nodes)
+    if actually_reserved:
+        logging.info(
+            f"Excluded reserved nodes <{len(actually_reserved)}>: "
+            f"{sorted(list(actually_reserved), key=lambda name: int(name[4:]) if name.startswith('node') and name[4:].isdigit() else float('inf'))}"
+        )
+
+    # Apply additional exclude filter
+    if exclude_nodes:
+        available_pool = [node for node in available_pool if node not in exclude_nodes]
+
+        actually_excluded = set(base_pool) & set(exclude_nodes)
+        if actually_excluded:
+            logging.info(
+                f"Excluded additional nodes <{len(actually_excluded)}>: "
+                f"{sorted(list(actually_excluded), key=lambda name: int(name[4:]) if name.startswith('node') and name[4:].isdigit() else float('inf'))}"
+            )
+
+    if not available_pool:
+        logging.error("No nodes available after exclusion filters")
+        sys.exit(1)
+
+    return available_pool
+
+
 def main():
     """Main entry point for the load balancer script."""
     logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s [%(filename)s:%(lineno)d]: %(message)s")
@@ -1245,9 +1404,14 @@ def main():
     parser = argparse.ArgumentParser(description="Generate dispatch JSON and update features.json")
     parser.add_argument("-l", "--feature-list", default="feature_list.py", help="Python or JSON feature list")
     parser.add_argument("-d", "--durations", default=None, help="JSON file with test durations (fallback if MongoDB fails)")
-    parser.add_argument("-n", "--nodes", default="node1,node2,node3", help="Comma-separated list of nodes to use")
+    parser.add_argument(
+        "-n",
+        "--nodes",
+        default="",
+        help="Comma-separated list of nodes with optional range notation (e.g., 'node2,node3,node10-node20'). If specified with --use-jenkins-nodes, intersection is used.",
+    )
     parser.add_argument("-x", "--exclude-nodes", default="", help="Comma-separated list of additional nodes to exclude (applied after node selection)")
-    parser.add_argument("-a", "--use-jenkins-nodes", action="store_true", help="Query Jenkins for idle nodes instead of using --nodes")
+    parser.add_argument("-a", "--use-jenkins-nodes", action="store_true", help="Query Jenkins for idle nodes. If --nodes is also specified, use intersection.")
     parser.add_argument("--jenkins-url", default=DEFAULT_JENKINS_URL, help="Jenkins URL for node query")
     parser.add_argument("--jenkins-user", default=DEFAULT_JENKINS_USER, help="Jenkins username for API access")
     parser.add_argument("--jenkins-token", default=DEFAULT_JENKINS_TOKEN, help="Jenkins API token")
@@ -1311,6 +1475,7 @@ def main():
     if not feature_entries:
         feature_entries = load_feature_list(args.feature_list)
         logging.info(f"Loaded features from file: {args.feature_list}")
+
     # Step 2: Generate complete features.json (before filtering)
     merged_features = merge_features(feature_entries)
     write_features_dict(merged_features)
@@ -1374,48 +1539,25 @@ def main():
     # Get duration entries from MongoDB or file
     duration_entries = get_duration_entries(mongo_client=mongo_client, release=args.release, fallback_file=args.durations)
 
-    # Step 7: Determine available Jenkins nodes
+    # Step 7: Determine available Jenkins nodes using improved logic
     logging.info("=" * 60)
     logging.info("DETERMINING AVAILABLE NODES")
     logging.info("=" * 60)
 
-    if args.use_jenkins_nodes:
-        all_nodes = get_idle_jenkins_nodes(args.jenkins_url, args.jenkins_user, args.jenkins_token)
-    else:
-        all_nodes = [node.strip() for node in args.nodes.split(",") if node.strip()]
-
-    # Remove reserved nodes
+    # Parse reserved and exclude nodes
     reserved_nodes = [node.strip() for node in args.reserved_nodes.split(",") if node.strip()]
-    reserved_nodes.sort(key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
-    logging.info(f"Reserved nodes <{len(reserved_nodes)}>: {reserved_nodes}")
-
-    available_nodes = [node for node in all_nodes if node not in reserved_nodes]
-
-    # Remove additionally excluded nodes (applied after initial node selection)
     exclude_nodes = [node.strip() for node in args.exclude_nodes.split(",") if node.strip()]
-    if exclude_nodes:
-        exclude_nodes.sort(key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
-        logging.info(f"Additional exclude nodes <{len(exclude_nodes)}>: {exclude_nodes}")
-        available_nodes = [node for node in available_nodes if node not in exclude_nodes]
 
-    # Calculate all excluded nodes for reporting
-    set(all_nodes) - set(available_nodes)
-    actually_reserved = set(all_nodes) & set(reserved_nodes)
-    actually_excluded_additional = set(all_nodes) & set(exclude_nodes) if exclude_nodes else set()
-
-    logging.info(
-        f"Actually excluded reserved nodes <{len(actually_reserved)}>: "
-        f"{sorted(list(actually_reserved), key=lambda name: int(name[4:]) if name.startswith('node') and name[4:].isdigit() else float('inf'))}"
+    # Get final node pool using improved logic
+    available_nodes = get_final_node_pool(
+        nodes_spec=args.nodes,
+        use_jenkins_nodes=args.use_jenkins_nodes,
+        jenkins_url=args.jenkins_url,
+        jenkins_user=args.jenkins_user,
+        jenkins_token=args.jenkins_token,
+        reserved_nodes=reserved_nodes,
+        exclude_nodes=exclude_nodes,
     )
-
-    if actually_excluded_additional:
-        logging.info(
-            f"Actually excluded additional nodes <{len(actually_excluded_additional)}>: "
-            f"{sorted(list(actually_excluded_additional), key=lambda name: int(name[4:]) if name.startswith('node') and name[4:].isdigit() else float('inf'))}"
-        )
-
-    # Sort nodes numerically by their number portion
-    available_nodes.sort(key=lambda name: int(name[4:]) if name.startswith("node") and name[4:].isdigit() else float("inf"))
 
     logging.info(f"Available nodes for dispatch <{len(available_nodes)}>: {available_nodes}")
 
@@ -1491,6 +1633,16 @@ def main():
         feature_name = entry["FEATURE_NAME"]
         nodes_str = FEATURE_NODE_STATIC_BINDING[feature_name]
         static_nodes = sorted([node.strip() for node in nodes_str.split(",") if node.strip()])
+
+        # Validate that static nodes are in the available pool
+        invalid_static_nodes = [node for node in static_nodes if node not in available_nodes]
+        if invalid_static_nodes:
+            logging.warning(
+                f"Feature '{feature_name}' is statically bound to nodes {static_nodes}, "
+                f"but the following nodes are NOT in the available pool: {invalid_static_nodes}. "
+                f"Skipping this feature."
+            )
+            continue
 
         # Check for conflicts and mark nodes as used
         for node in static_nodes:
