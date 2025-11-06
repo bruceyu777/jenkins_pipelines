@@ -575,16 +575,16 @@ def call() {
                         }
                     }
 
-                    // if (archivedFolders.isEmpty()) {
-                    //     echo "No test results were found for any test group."
-                    // } else {
-                    //     archiveArtifacts artifacts: "test_results/**, summary_*.html", fingerprint: false
-                    //     publishHTML(target: [
-                    //         reportDir   : ".",
-                    //         reportFiles : "summary_${getArchiveGroupName(computedTestGroups[0])}.html",
-                    //         reportName  : "Test Results Summary for ${getArchiveGroupName(computedTestGroups[0])}"
-                    //     ])
-                    // }
+                    if (archivedFolders.isEmpty()) {
+                        echo "No test results were found for any test group."
+                    } else {
+                        archiveArtifacts artifacts: "test_results/**, summary_*.html", fingerprint: false
+                        publishHTML(target: [
+                            reportDir   : ".",
+                            reportFiles : "summary_${getArchiveGroupName(computedTestGroups[0])}.html",
+                            reportName  : "Test Results Summary for ${getArchiveGroupName(computedTestGroups[0])}"
+                        ])
+                    }
 
                     // Clean up the outputs directory
                     sh """
