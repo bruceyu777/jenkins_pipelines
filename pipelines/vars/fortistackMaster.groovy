@@ -476,7 +476,12 @@ def call() {
 
       success {
         script {
-            // Create summary of what was executed
+            // Silent success - no email notification
+            echo "✅ Pipeline completed successfully"
+            echo "Feature: ${params.FEATURE_NAME}"
+            echo "Test groups: ${computedTestGroups.join(', ')}"
+
+            // Create summary of what was executed (for console log only)
             def executedComponents = []
             if (!params.SKIP_PROVISION) {
                 executedComponents << "Provision FGTs"
@@ -486,34 +491,17 @@ def call() {
             }
             if (!params.SKIP_TEST) executedComponents << "Run Tests"
 
-            def componentSummary = executedComponents.isEmpty() ?
-                "<p>No components were executed.</p>" :
-                "<p>Executed components: <b>${executedComponents.join(', ')}</b></p>"
+            echo "Executed components: ${executedComponents.join(', ')}"
+            echo "Build URL: ${env.BUILD_URL}"
 
-            // Create summary links for test results
-            def summaryLinks = ""
+            // Log available test result summaries
             if (!params.SKIP_TEST) {
-                def base = "${env.BUILD_URL}artifact/"
-                summaryLinks = "<p>📄 Test result summaries:</p><ul>"
+                echo "Test result summaries available at:"
                 computedTestGroups.each { group ->
                     def name = getArchiveGroupName(group)
-                    summaryLinks += "<li><a href=\"${base}summary_${name}.html\">Summary: ${name}</a></li>"
+                    echo "  - ${env.BUILD_URL}artifact/summary_${name}.html"
                 }
-                summaryLinks += "</ul>"
             }
-
-            sendFosqaEmail(
-                to:       "yzhengfeng@fortinet.com",
-                subject:  "${env.BUILD_DISPLAY_NAME} Succeeded",
-                body:     """
-                <p>🎉 Good news! Job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>
-                ${componentSummary}
-                <p>Feature: <b>${params.FEATURE_NAME}</b></p>
-                <p>Test groups: <b>${computedTestGroups.join(', ')}</b></p>
-                ${summaryLinks}
-                <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                """
-            )
         }
       }
 
@@ -545,16 +533,24 @@ def call() {
                 summaryLinks += "</ul>"
             }
 
+            // Only send email on failure
             sendFosqaEmail(
                 to:      "yzhengfeng@fortinet.com",
-                subject: "${env.BUILD_DISPLAY_NAME} FAILED",
+                subject: "❌ ${env.BUILD_DISPLAY_NAME} FAILED",
                 body:    """
-                <p>❌ Job <b>${env.BUILD_DISPLAY_NAME}</b> failed.</p>
+                <h2 style="color:red;">❌ Pipeline Failed</h2>
+                <p><b>Job:</b> ${env.BUILD_DISPLAY_NAME}</p>
+                <p><b>Status:</b> <span style="color:red;">FAILED</span></p>
                 ${componentSummary}
-                <p>Feature: <b>${params.FEATURE_NAME}</b></p>
-                <p>Test groups: <b>${computedTestGroups.join(', ')}</b></p>
+                <p><b>Feature:</b> ${params.FEATURE_NAME}</p>
+                <p><b>Test groups:</b> ${computedTestGroups.join(', ')}</p>
+                <p><b>Node:</b> ${params.NODE_NAME}</p>
+                <p><b>Release:</b> ${params.RELEASE}</p>
+                <p><b>Build:</b> ${params.BUILD_NUMBER}</p>
                 ${summaryLinks}
-                <p>🔗 Console output: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                <hr>
+                <p><b>Console Output:</b> <a href="${env.BUILD_URL}console">${env.BUILD_URL}console</a></p>
+                <p><b>Full Details:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                 """
             )
         }
