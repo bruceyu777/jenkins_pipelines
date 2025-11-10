@@ -578,7 +578,7 @@ def call() {
                     if (archivedFolders.isEmpty()) {
                         echo "No test results were found for any test group."
                     } else {
-                        archiveArtifacts artifacts: "test_results/**, summary_*.html", fingerprint: false
+                        archiveArtifacts artifacts: "summary_*.html", fingerprint: false
                         publishHTML(target: [
                             reportDir   : ".",
                             reportFiles : "summary_${getArchiveGroupName(computedTestGroups[0])}.html",
