@@ -68,116 +68,59 @@ pipeline {
                 """
             }
         }
-        // stage('Get Node information summary') {
-        //     steps {
-        //         echo "Summarize useful information..."
-        //         sh """
-        //           cd /home/fosqa/resources/tools
-        //           sudo ./venv/bin/python3 get_node_info.py
-        //         """
-        //     }
-        // }
 
     }
 
     post {
-        always {
-        script {
-            // 1) generate the node_info file
-            sh """
-            cd /home/fosqa/resources/tools
-            sudo ./venv/bin/python3 get_node_info.py
-            """
+        failure {
+            script {
+                // Only send email on failure
+                echo "Build failed - sending notification email..."
 
-            // 2) slurp it in
-            def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
-            def dispName = currentBuild.displayName
-            def isSuccess = (currentBuild.currentResult == 'SUCCESS')
+                // Generate node_info file
+                sh """
+                cd /home/fosqa/resources/tools
+                sudo ./venv/bin/python3 get_node_info.py
+                """
 
-            // 3) common pieces
-            def subject = isSuccess
-            ? "Build ${env.BUILD_NUMBER} Succeeded on ${dispName}"
-            : "Build ${env.BUILD_NUMBER} FAILED on ${dispName}"
+                // Read node info
+                def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
+                def dispName = currentBuild.displayName
 
-            // 4) pick your body
-            def body = """
-            <h2>Build: ${dispName}</h2>
-            <h3>Node Info</h3>
-            <pre style="font-family:monospace; white-space:pre-wrap;">${nodeInfo}</pre>
-            <p style="color:${isSuccess ? 'green' : 'red'};">
-                ${ isSuccess
-                    ? '✅ Build completed successfully!'
-                    : "❌ Build failed. See <a href='${env.BUILD_URL}'>console</a>."
-                }
-            </p>
-            """
+                // Build failure email
+                def subject = "❌ FGT Provisioning FAILED - ${dispName}"
+                def body = """
+                <h2 style="color:red;">❌ FGT Provisioning Failed</h2>
+                <h3>Build: ${dispName}</h3>
+                <p><b>Status:</b> <span style="color:red;">FAILED</span></p>
+                <p><b>Console Log:</b> <a href="${env.BUILD_URL}console">${env.BUILD_URL}console</a></p>
+                <hr>
+                <h3>Node Information</h3>
+                <pre style="font-family:monospace; white-space:pre-wrap; background:#f5f5f5; padding:10px; border:1px solid #ddd;">${nodeInfo}</pre>
+                <hr>
+                <p><b>Next Steps:</b></p>
+                <ul>
+                    <li>Check the console log for error details</li>
+                    <li>Verify the build ${params.BUILD_NUMBER} exists for release ${params.RELEASE}</li>
+                    <li>Check if the node ${params.NODE_NAME} is accessible</li>
+                    <li>Retry the provisioning if needed</li>
+                </ul>
+                """
 
-            // 5) send it once
-            sendFosqaEmail(
-            to:      'yzhengfeng@fortinet.com',
-            subject: subject,
-            body:    body
-            )
+                sendFosqaEmail(
+                    to:      'yzhengfeng@fortinet.com',
+                    subject: subject,
+                    body:    body
+                )
+            }
         }
+        success {
+            script {
+                // Silent success - no email sent
+                echo "✅ FGT provisioning completed successfully - no email notification sent"
+            }
         }
     }
 
-    // post {
-    //     // success {
-    //     //     sendFosqaEmail(
-    //     //         to:       'yzhengfeng@fortinet.com',
-    //     //         subject:  "Build #${env.BUILD_NUMBER} Succeeded",
-    //     //         body:     "<p>Good news: job <b>${env.JOB_NAME}</b> completed at ${new Date()}</p>"
-    //     //     )
-    //     // }
-    //     // failure {
-    //     //     sendFosqaEmail(
-    //     //         to:      'yzhengfeng@fortinet.com',
-    //     //         subject: "Build #${env.BUILD_NUMBER} FAILED",
-    //     //         body:    "<p>Check console output: ${env.BUILD_URL}</p>"
-    //     //     )
-    //     // }
-    //     success {
-    //         script {
-    //             // 1. Read the node_info we just wrote
-    //             def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
-    //             // 2. Grab the display name you set earlier
-    //             def dispName = currentBuild.displayName
-
-    //             // 3. Build an HTML body that shows both
-    //             def htmlBody = """
-    //             <h2>Build: ${dispName}</h2>
-    //             <h3>Node Info</h3>
-    //             <pre style="font-family:monospace; white-space:pre-wrap;">${nodeInfo}</pre>
-    //             <p>Everything completed successfully!</p>
-    //             """
-
-    //             // 4. Send it
-    //             sendFosqaEmail(
-    //             to:      'yzhengfeng@fortinet.com',
-    //             subject: "Build ${env.BUILD_NUMBER} Succeeded on ${dispName}",
-    //             body:    htmlBody
-    //             )
-    //         }
-    //     }
-    //     failure {
-    //         script {
-    //             def nodeInfo = readFile('/home/fosqa/KVM/node_info_summary.txt').trim()
-    //             def dispName = currentBuild.displayName
-    //             def htmlBody = """
-    //             <h2>Build: ${dispName}</h2>
-    //             <h3>Node Info</h3>
-    //             <pre style="font-family:monospace; white-space:pre-wrap;">${nodeInfo}</pre>
-    //             <p style="color:red;">❌ Build failed. Check the console log: ${env.BUILD_URL}</p>
-    //             """
-    //             sendFosqaEmail(
-    //             to:      'yzhengfeng@fortinet.com',
-    //             subject: "Build ${env.BUILD_NUMBER} FAILED on ${dispName}",
-    //             body:    htmlBody
-    //             )
-    //         }
-    //     }
-
-    // }
 }
 }
