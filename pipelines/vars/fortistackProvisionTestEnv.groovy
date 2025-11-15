@@ -402,7 +402,7 @@ def call() {
                         def status = sh(
                             script: """
                                 cd /home/fosqa/resources/tools
-                                python3 override_env.py \
+                                python3 override_envfile.py \
                                     --node ${params.NODE_NAME} \
                                     --svn-branch ${SVN_BRANCH} \
                                     --feature-name ${params.FEATURE_NAME} \
