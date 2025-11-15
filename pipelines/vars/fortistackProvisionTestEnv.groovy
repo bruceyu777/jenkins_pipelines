@@ -389,6 +389,40 @@ def call() {
                 }
             }
 
+            stage('ENV FILE Audit and Update') {
+                steps {
+                    script {
+                        echo "=== Environment Audit and Update ==="
+                        echo "Node: ${params.NODE_NAME}"
+                        echo "SVN Branch: ${SVN_BRANCH}"
+                        echo "Feature: ${params.FEATURE_NAME}"
+                        echo "Test Config: ${params.TEST_CONFIG_CHOICE}"
+                        echo "Release: ${params.RELEASE}"
+
+                        def status = sh(
+                            script: """
+                                cd /home/fosqa/resources/tools
+                                python3 override_env.py \
+                                    --node ${params.NODE_NAME} \
+                                    --svn-branch ${SVN_BRANCH} \
+                                    --feature-name ${params.FEATURE_NAME} \
+                                    --env ${params.TEST_CONFIG_CHOICE} \
+                                    --release ${params.RELEASE} \
+                                    --audit \
+                                    -v
+                            """,
+                            returnStatus: true
+                        )
+
+                        if (status != 0) {
+                            error("Environment audit and update failed with exit code ${status}")
+                        }
+
+                        echo "✅ Environment audit and update completed successfully"
+                    }
+                }
+            }
+
             stage('Update Node Info') {
                 steps {
                     script {
