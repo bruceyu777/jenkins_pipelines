@@ -116,7 +116,9 @@ DEFAULT_RESERVED_NODES: str = ",".join(
         "node48",  # Rain for debug
         # "node47",  # Hayder for spam
         # "node46",  # Dawei for ddos
-        "node24",
+        # "node29",
+        "node36",  # Zach
+        "node3",
     ]
 )
 
@@ -129,7 +131,7 @@ DEFAULT_MONGO_COLLECTION: str = "results"
 FEATURE_NODE_STATIC_BINDING: Dict[str, str] = {
     "avfortisandbox": "node2",  # binding avfortisandbox to node2 https://app.clickup.com/t/86dxg5eem
     "ztna": "node15",  # binding ztna to node15, vmpc1 forticlient has to be fixed, uuid is fixed
-    "foc": "node28",  # binding foc to node28
+    "foc": "node28,node29",  # binding foc to node28 and node29
     "waf": "node40",
     "avfortindr": "node99",  # binding avfortindr to node99
 }
@@ -332,234 +334,504 @@ class MongoDBClient:
 
 
 # =============================================================================
-# FEATURE LIST LOADING AND MERGING
+# FEATURE PARAMETERS GETTER
 # =============================================================================
 
 
-def load_feature_list(path: str) -> List[Dict[str, Any]]:
+class FeatureParametersGetter:
     """
-    Load feature list from JSON (.json) or Python (.py) file.
-
-    Args:
-        path: Path to the feature list file (.py or .json)
-
-    Returns:
-        List of dict entries each containing 'FEATURE_NAME'
-
-    Raises:
-        ValueError: If the file format is invalid or required variables are missing
+    Handles fetching feature parameters from API or file sources.
+    Supports authentication, pagination, and fallback mechanisms.
     """
-    _, file_ext = os.path.splitext(path)
-    feature_entries = []
 
-    if file_ext == ".py":
-        # Load Python module and normalize JSON-style booleans
-        raw_text = open(path).read()
-        normalized_text = re.sub(r"\btrue\b", "True", raw_text, flags=re.IGNORECASE)
-        normalized_text = re.sub(r"\bfalse\b", "False", normalized_text, flags=re.IGNORECASE)
+    def __init__(
+        self,
+        api_url: Optional[str] = None,
+        api_user: Optional[str] = None,
+        api_pass: Optional[str] = None,
+        api_token: Optional[str] = None,
+        fallback_file: Optional[str] = None,
+        use_api: bool = True,
+    ):
+        """
+        Initialize the feature parameters getter.
 
-        # Execute as a module
-        module_spec = importlib.util.spec_from_loader("feature_list", loader=None)
-        feature_module = importlib.util.module_from_spec(module_spec)
-        exec(normalized_text, feature_module.__dict__)
+        Args:
+            api_url: URL of the feature API endpoint
+            api_user: API username for authentication
+            api_pass: API password for authentication
+            api_token: API bearer token for authentication
+            fallback_file: Path to fallback feature list file (.py or .json)
+            use_api: Whether to attempt API fetch (can be disabled for testing)
+        """
+        self.api_url = api_url
+        self.api_user = api_user
+        self.api_pass = api_pass
+        self.api_token = api_token
+        self.fallback_file = fallback_file
+        self.use_api = use_api
+        self._session: Optional[requests.Session] = None
 
-        # Extract feature list
-        if hasattr(feature_module, "FEATURE_LIST"):
-            feature_entries = getattr(feature_module, "FEATURE_LIST")
-        elif hasattr(feature_module, "feature_list"):
-            feature_entries = getattr(feature_module, "feature_list")
+    def _build_session(self) -> requests.Session:
+        """Build a basic requests session with default headers."""
+        session = requests.Session()
+        session.headers.update({"Accept": "application/json"})
+        session.timeout = 30
+        return session
+
+    def _authenticate(self, api_base: str) -> requests.Session:
+        """
+        Build an authenticated session. Tries, in order:
+        1) Bearer token (if provided)
+        2) FastAPI OAuth2 password flow: POST {base}/token (form), expects access_token
+        3) FastAPI /auth/login (json), expects access_token or token
+        4) HTTP Basic (fallback), validated by probing the features endpoint
+
+        Args:
+            api_base: Base URL of the API (e.g., "http://10.96.227.206:8000/")
+
+        Returns:
+            Authenticated requests.Session
+        """
+        session = self._build_session()
+
+        # Try 1: Bearer token
+        if self.api_token:
+            session.headers["Authorization"] = f"Bearer {self.api_token}"
+            logging.info("Using Bearer token authentication")
+            return session
+
+        # Need username/password for the flows below
+        if not (self.api_user and self.api_pass):
+            logging.info("No credentials provided, attempting anonymous access")
+            return session
+
+        # Try 2: OAuth2 password token endpoint
+        try:
+            token_url = urljoin(api_base.rstrip("/") + "/", "token")
+            logging.debug(f"Attempting OAuth2 token authentication at {token_url}")
+            resp = session.post(
+                token_url,
+                data={
+                    "username": self.api_user,
+                    "password": self.api_pass,
+                    "grant_type": "password",
+                },
+            )
+            if resp.ok:
+                data = resp.json()
+                access_token = data.get("access_token") or data.get("token")
+                token_type = data.get("token_type", "bearer")
+                if access_token:
+                    session.headers["Authorization"] = f"{token_type.capitalize()} {access_token}"
+                    logging.info("Successfully authenticated via OAuth2 token endpoint")
+                    return session
+        except Exception as e:
+            logging.debug(f"OAuth2 token authentication failed: {e}")
+
+        # Try 3: /auth/login (common FastAPI pattern)
+        try:
+            login_url = urljoin(api_base.rstrip("/") + "/", "auth/login")
+            logging.debug(f"Attempting login authentication at {login_url}")
+            resp = session.post(
+                login_url,
+                json={"username": self.api_user, "password": self.api_pass},
+            )
+            if resp.ok:
+                data = {}
+                try:
+                    data = resp.json()
+                except Exception:
+                    pass
+
+                access_token = data.get("access_token") or data.get("token")
+                token_type = data.get("token_type", "bearer")
+                if access_token:
+                    session.headers["Authorization"] = f"{token_type.capitalize()} {access_token}"
+                    logging.info("Successfully authenticated via /auth/login endpoint")
+                    return session
+
+                # If session cookie auth, just keep cookies
+                if resp.cookies:
+                    logging.info("Successfully authenticated via session cookies")
+                    return session
+        except Exception as e:
+            logging.debug(f"Login authentication failed: {e}")
+
+        # Try 4: Fallback to HTTP Basic
+        session.auth = (self.api_user, self.api_pass)
+        logging.info("Using HTTP Basic authentication")
+        return session
+
+    def _fetch_from_api(self) -> List[Dict[str, Any]]:
+        """
+        Fetch features from the API endpoint.
+
+        Returns:
+            List of feature entry dictionaries
+
+        Raises:
+            requests.HTTPError: If the request fails (401, 403, etc.)
+            ValueError: If the response format is invalid
+        """
+        if not self.api_url:
+            raise ValueError("API URL not configured")
+
+        # Derive API base from api_url for auth endpoints
+        parsed = urlparse(self.api_url)
+        api_base = f"{parsed.scheme}://{parsed.netloc}/"
+
+        # Authenticate and create session
+        session = self._authenticate(api_base)
+        self._session = session
+
+        # Fetch from API
+        logging.info(f"Fetching features from API: {self.api_url}")
+        resp = session.get(self.api_url)
+
+        # If unauthorized, raise for caller to fallback
+        if resp.status_code in (401, 403):
+            raise requests.HTTPError(f"Unauthorized (status {resp.status_code}) for {self.api_url}")
+
+        resp.raise_for_status()
+        payload = resp.json()
+
+        feature_entries: List[Dict[str, Any]] = []
+
+        # Case 1: Plain list of dicts
+        if isinstance(payload, list):
+            items = payload
+        # Case 2: Paginated dict or dict-mapping
+        elif isinstance(payload, dict):
+            # Try to get paginated items
+            items = payload.get("items") or payload.get("results") or payload.get("data")
+
+            if items is None:
+                # Case 3: Dict mapping {feature_name: config}
+                if all(isinstance(v, (dict, list, str, int, float, bool, type(None))) for v in payload.values()):
+                    for feature_name, config in payload.items():
+                        entry = {"FEATURE_NAME": feature_name}
+                        if isinstance(config, dict):
+                            entry.update(config)
+                        feature_entries.append(entry)
+                    logging.info(f"Loaded {len(feature_entries)} features from dict-map API")
+                    return feature_entries
+                items = []
         else:
-            raise ValueError(f"Python feature-list must define FEATURE_LIST or feature_list: {path}")
+            raise ValueError("API response is neither list nor dict")
 
-    else:
-        # Assume JSON format
-        raw_data = json.load(open(path))
+        if not isinstance(items, list):
+            raise ValueError("API 'items' is not a list")
 
-        if isinstance(raw_data, dict):
-            # Convert {feature_name: config} format to list format
-            for feature_name, config in raw_data.items():
-                entry = {"FEATURE_NAME": feature_name}
-                entry.update(config)
-                feature_entries.append(entry)
+        # Normalize FEATURE_NAME in each item
+        for i, item in enumerate(items):
+            if not isinstance(item, dict):
+                logging.warning(f"Skipping non-dict entry at index {i}: {type(item)}")
+                continue
 
-        elif isinstance(raw_data, list):
-            for item in raw_data:
-                if not isinstance(item, dict):
-                    raise ValueError(f"Invalid entry in {path}: {item}")
+            entry = dict(item)
 
-                if "FEATURE_NAME" in item:
-                    feature_entries.append(dict(item))
-                elif len(item) == 1:
-                    feature_name, config = next(iter(item.items()))
-                    if not isinstance(config, dict):
-                        raise ValueError(f"Config for {feature_name} not dict: {config}")
+            # Ensure FEATURE_NAME exists
+            if "FEATURE_NAME" not in entry or not entry.get("FEATURE_NAME"):
+                for key in ("FEATURE_NAME", "feature_name", "feature", "name"):
+                    if key in item and item[key]:
+                        entry["FEATURE_NAME"] = item[key]
+                        break
+
+            if "FEATURE_NAME" not in entry or not entry.get("FEATURE_NAME"):
+                logging.warning(f"Skipping entry missing FEATURE_NAME: keys={list(item.keys())}")
+                continue
+
+            feature_entries.append(entry)
+
+        logging.info(f"Loaded {len(feature_entries)} features from API")
+        return feature_entries
+
+    def _load_feature_list(self, path: str) -> List[Dict[str, Any]]:
+        """
+        Load feature list from JSON (.json) or Python (.py) file.
+
+        Args:
+            path: Path to the feature list file (.py or .json)
+
+        Returns:
+            List of dict entries each containing 'FEATURE_NAME'
+
+        Raises:
+            ValueError: If the file format is invalid or required variables are missing
+        """
+        _, file_ext = os.path.splitext(path)
+        feature_entries = []
+
+        if file_ext == ".py":
+            # Load Python module and normalize JSON-style booleans
+            raw_text = open(path).read()
+            normalized_text = re.sub(r"\btrue\b", "True", raw_text, flags=re.IGNORECASE)
+            normalized_text = re.sub(r"\bfalse\b", "False", normalized_text, flags=re.IGNORECASE)
+
+            # Execute as a module
+            module_spec = importlib.util.spec_from_loader("feature_list", loader=None)
+            feature_module = importlib.util.module_from_spec(module_spec)
+            exec(normalized_text, feature_module.__dict__)
+
+            # Extract feature list
+            if hasattr(feature_module, "FEATURE_LIST"):
+                feature_entries = getattr(feature_module, "FEATURE_LIST")
+            elif hasattr(feature_module, "feature_list"):
+                feature_entries = getattr(feature_module, "feature_list")
+            else:
+                raise ValueError(f"Python feature-list must define FEATURE_LIST or feature_list: {path}")
+
+        else:
+            # Assume JSON format
+            raw_data = json.load(open(path))
+
+            if isinstance(raw_data, dict):
+                # Convert {feature_name: config} format to list format
+                for feature_name, config in raw_data.items():
                     entry = {"FEATURE_NAME": feature_name}
                     entry.update(config)
                     feature_entries.append(entry)
+
+            elif isinstance(raw_data, list):
+                for item in raw_data:
+                    if not isinstance(item, dict):
+                        raise ValueError(f"Invalid entry in {path}: {item}")
+
+                    if "FEATURE_NAME" in item:
+                        feature_entries.append(dict(item))
+                    elif len(item) == 1:
+                        feature_name, config = next(iter(item.items()))
+                        if not isinstance(config, dict):
+                            raise ValueError(f"Config for {feature_name} not dict: {config}")
+                        entry = {"FEATURE_NAME": feature_name}
+                        entry.update(config)
+                        feature_entries.append(entry)
+                    else:
+                        raise ValueError(f"Cannot decode entry: {item}")
+            else:
+                raise ValueError(f"Feature list {path} must be .py or JSON dict/list")
+
+        logging.info(f"Loaded {len(feature_entries)} entries from {path}")
+        logger.info(f"Feature entries: {pformat(feature_entries, sort_dicts=False)}")
+        return feature_entries
+
+    def _fetch_from_file(self) -> List[Dict[str, Any]]:
+        """
+        Load features from a file (.py or .json).
+
+        Returns:
+            List of feature entry dictionaries
+
+        Raises:
+            ValueError: If file format is invalid or required variables are missing
+            FileNotFoundError: If the file doesn't exist
+        """
+        if not self.fallback_file:
+            raise ValueError("Fallback file not configured")
+
+        logging.info(f"Loading features from file: {self.fallback_file}")
+        return self._load_feature_list(self.fallback_file)
+
+    def get_feature_entries(self) -> List[Dict[str, Any]]:
+        """
+        Get feature entries from API or fallback to file.
+
+        This is the main entry point for getting feature parameters.
+        It tries API first (if enabled), then falls back to file if API fails.
+
+        Returns:
+            List of feature entry dictionaries with 'FEATURE_NAME' key
+
+        Raises:
+            SystemExit: If both API and file loading fail
+        """
+        feature_entries: List[Dict[str, Any]] = []
+
+        # Try API first if enabled
+        if self.use_api and self.api_url:
+            try:
+                feature_entries = self._fetch_from_api()
+                logging.info(f"Successfully loaded {len(feature_entries)} features from API")
+                logging.debug(f"Feature entries: {pformat(feature_entries[:3], sort_dicts=False)}")
+                return feature_entries
+            except Exception as e:
+                logging.warning(f"API load failed: {e}")
+                if self.fallback_file:
+                    logging.info(f"Falling back to file: {self.fallback_file}")
                 else:
-                    raise ValueError(f"Cannot decode entry: {item}")
-        else:
-            raise ValueError(f"Feature list {path} must be .py or JSON dict/list")
+                    logging.error("No fallback file configured, cannot proceed")
+                    raise
 
-    logging.info(f"Loaded {len(feature_entries)} entries from {path}")
-    logger.info(f"Feature entries: {pformat(feature_entries, sort_dicts=False)}")
-    return feature_entries
+        # Fallback to file
+        if self.fallback_file:
+            try:
+                feature_entries = self._fetch_from_file()
+                logging.info(f"Successfully loaded {len(feature_entries)} features from file")
+                logging.debug(f"Feature entries: {pformat(feature_entries[:3], sort_dicts=False)}")
+                return feature_entries
+            except Exception as e:
+                logging.error(f"Failed to load from file '{self.fallback_file}': {e}")
+                raise
 
+        # Both methods failed
+        logging.error("No valid source for feature entries (API disabled and no fallback file)")
+        sys.exit(1)
 
-def merge_features(entries: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-    """
-    Merge entries with the same FEATURE_NAME into a single configuration.
-    Normalize API snake_case keys to expected UPPERCASE keys for features.json.
-    Shape email as a one-element list with a single comma-separated string.
-    """
-    merged_features: Dict[str, Dict[str, Any]] = {}
+    def merge_features(self, entries: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        """
+        Merge entries with the same FEATURE_NAME into a single configuration.
+        Normalize API snake_case keys to expected UPPERCASE keys for features.json.
+        Shape email as a one-element list with a single comma-separated string.
+        """
+        merged_features: Dict[str, Dict[str, Any]] = {}
 
-    # Map API snake_case to expected UPPERCASE keys in features.json
-    key_map = {
-        "provision_vmpc": "PROVISION_VMPC",
-        "vmpc_names": "VMPC_NAMES",
-        "provision_docker": "PROVISION_DOCKER",
-        "oriole_submit_flag": "ORIOLE_SUBMIT_FLAG",
-        # ignore: enabled, extra_data, id, created_at, updated_at
-    }
+        # Map API snake_case to expected UPPERCASE keys in features.json
+        key_map = {
+            "provision_vmpc": "PROVISION_VMPC",
+            "vmpc_names": "VMPC_NAMES",
+            "provision_docker": "PROVISION_DOCKER",
+            "oriole_submit_flag": "ORIOLE_SUBMIT_FLAG",
+            # ignore: enabled, extra_data, id, created_at, updated_at
+        }
 
-    list_fields = ["test_case_folder", "test_config", "test_groups", "docker_compose"]
-    scalar_fields_upper = ["PROVISION_VMPC", "PROVISION_DOCKER", "VMPC_NAMES", "ORIOLE_SUBMIT_FLAG"]
+        list_fields = ["test_case_folder", "test_config", "test_groups", "docker_compose"]
+        scalar_fields_upper = ["PROVISION_VMPC", "PROVISION_DOCKER", "VMPC_NAMES", "ORIOLE_SUBMIT_FLAG"]
 
-    def normalize_entry(raw: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-        """Normalize a raw entry from file or API to a consistent dict."""
-        entry = dict(raw)
+        def normalize_entry(raw: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+            """Normalize a raw entry from file or API to a consistent dict."""
+            entry = dict(raw)
 
-        # Ensure FEATURE_NAME is present
-        if "FEATURE_NAME" not in entry or not entry.get("FEATURE_NAME"):
-            for k in ("feature_name", "feature", "name"):
-                if k in entry and entry[k]:
-                    entry["FEATURE_NAME"] = entry[k]
-                    break
-        feature_name = entry.get("FEATURE_NAME")
-        if not feature_name:
-            return "", {}
+            # Ensure FEATURE_NAME is present
+            if "FEATURE_NAME" not in entry or not entry.get("FEATURE_NAME"):
+                for k in ("feature_name", "feature", "name"):
+                    if k in entry and entry[k]:
+                        entry["FEATURE_NAME"] = entry[k]
+                        break
+            feature_name = entry.get("FEATURE_NAME")
+            if not feature_name:
+                return "", {}
 
-        # Start normalized config
-        cfg: Dict[str, Any] = {}
+            # Start normalized config
+            cfg: Dict[str, Any] = {}
 
-        # Copy list fields as-is if present
-        for f in list_fields:
-            v = entry.get(f)
-            if v is not None:
-                # Ensure list
-                if isinstance(v, list):
-                    cfg[f] = v
-                else:
-                    cfg[f] = [v]
+            # Copy list fields as-is if present
+            for f in list_fields:
+                v = entry.get(f)
+                if v is not None:
+                    # Ensure list
+                    if isinstance(v, list):
+                        cfg[f] = v
+                    else:
+                        cfg[f] = [v]
 
-        # Normalize email into a set of addresses (flatten strings/lists)
-        emails_set: Set[str] = set()
-        raw_email = entry.get("email")
-        if raw_email:
-            if isinstance(raw_email, list):
-                for item in raw_email:
-                    if isinstance(item, str):
-                        for addr in item.split(","):
-                            addr = addr.strip()
-                            if addr:
-                                emails_set.add(addr)
-            elif isinstance(raw_email, str):
-                for addr in raw_email.split(","):
-                    addr = addr.strip()
-                    if addr:
-                        emails_set.add(addr)
-
-        # Add admin emails
-        if emails_set:
-            emails_set |= ADMIN_EMAILS
-
-        # Store as one-element list with comma-separated string (if any)
-        if emails_set:
-            cfg["email"] = [",".join(sorted(emails_set))]
-
-        # Map API snake_case to UPPERCASE scalar keys
-        for src, dst in key_map.items():
-            if src in entry and entry[src] is not None:
-                cfg[dst] = entry[src]
-
-        # Accept already UPPERCASE scalar fields
-        for sf in scalar_fields_upper:
-            if sf in entry and entry[sf] is not None:
-                cfg[sf] = entry[sf]
-
-        # Ensure default ORIOLE_SUBMIT_FLAG if missing
-        if "ORIOLE_SUBMIT_FLAG" not in cfg:
-            cfg["ORIOLE_SUBMIT_FLAG"] = "all"
-
-        return feature_name, cfg
-
-    for raw in entries:
-        feature_name, config = normalize_entry(raw)
-        if not feature_name:
-            continue
-
-        if feature_name not in merged_features:
-            merged_features[feature_name] = dict(config)
-            continue
-
-        base = merged_features[feature_name]
-
-        # Merge list fields with deduplication (preserve order)
-        for f in list_fields:
-            if f in config:
-                base_list = base.get(f, [])
-                if not isinstance(base_list, list):
-                    base_list = [base_list]
-                new_list = config.get(f, [])
-                if not isinstance(new_list, list):
-                    new_list = [new_list]
-                combined = base_list + new_list
-                deduped: List[Any] = []
-                seen: Set[Any] = set()
-                for val in combined:
-                    key = json.dumps(val, sort_keys=True) if isinstance(val, (dict, list)) else val
-                    if key not in seen:
-                        seen.add(key)
-                        deduped.append(val)
-                base[f] = deduped
-
-        # Merge email sets and re-shape to one-element list
-        if "email" in config:
-            current = base.get("email", [])
-            current_set: Set[str] = set()
-            if isinstance(current, list) and current:
-                # FIX: Process ALL elements in the list, not just current[0]
-                for item in current:
-                    if isinstance(item, str):
-                        for addr in item.split(","):
-                            addr = addr.strip()
-                            if addr:
-                                current_set.add(addr)
-
-            new_set: Set[str] = set()
-            for item in config.get("email", []):
-                if isinstance(item, str):
-                    for addr in item.split(","):
+            # Normalize email into a set of addresses (flatten strings/lists)
+            emails_set: Set[str] = set()
+            raw_email = entry.get("email")
+            if raw_email:
+                if isinstance(raw_email, list):
+                    for item in raw_email:
+                        if isinstance(item, str):
+                            for addr in item.split(","):
+                                addr = addr.strip()
+                                if addr:
+                                    emails_set.add(addr)
+                elif isinstance(raw_email, str):
+                    for addr in raw_email.split(","):
                         addr = addr.strip()
                         if addr:
-                            new_set.add(addr)
+                            emails_set.add(addr)
 
-            all_emails = (current_set | new_set | ADMIN_EMAILS) if (current_set or new_set) else set()
-            if all_emails:
-                base["email"] = [",".join(sorted(all_emails))]
+            # Add admin emails
+            if emails_set:
+                emails_set |= ADMIN_EMAILS
 
-        # Overwrite scalar fields with latest occurrence
-        for sf in scalar_fields_upper:
-            if sf in config:
-                base[sf] = config[sf]
+            # Store as one-element list with comma-separated string (if any)
+            if emails_set:
+                cfg["email"] = [",".join(sorted(emails_set))]
 
-    # Also ensure default ORIOLE_SUBMIT_FLAG after merge
-    for _, base in merged_features.items():
-        if "ORIOLE_SUBMIT_FLAG" not in base:
-            base["ORIOLE_SUBMIT_FLAG"] = "all"
+            # Map API snake_case to UPPERCASE scalar keys
+            for src, dst in key_map.items():
+                if src in entry and entry[src] is not None:
+                    cfg[dst] = entry[src]
 
-    return merged_features
+            # Accept already UPPERCASE scalar fields
+            for sf in scalar_fields_upper:
+                if sf in entry and entry[sf] is not None:
+                    cfg[sf] = entry[sf]
+
+            # Ensure default ORIOLE_SUBMIT_FLAG if missing
+            if "ORIOLE_SUBMIT_FLAG" not in cfg:
+                cfg["ORIOLE_SUBMIT_FLAG"] = "all"
+
+            return feature_name, cfg
+
+        for raw in entries:
+            feature_name, config = normalize_entry(raw)
+            if not feature_name:
+                continue
+
+            if feature_name not in merged_features:
+                merged_features[feature_name] = dict(config)
+                continue
+
+            base = merged_features[feature_name]
+
+            # Merge list fields with deduplication (preserve order)
+            for f in list_fields:
+                if f in config:
+                    base_list = base.get(f, [])
+                    if not isinstance(base_list, list):
+                        base_list = [base_list]
+                    new_list = config.get(f, [])
+                    if not isinstance(new_list, list):
+                        new_list = [new_list]
+                    combined = base_list + new_list
+                    deduped: List[Any] = []
+                    seen: Set[Any] = set()
+                    for val in combined:
+                        key = json.dumps(val, sort_keys=True) if isinstance(val, (dict, list)) else val
+                        if key not in seen:
+                            seen.add(key)
+                            deduped.append(val)
+                    base[f] = deduped
+
+            # Merge email sets and re-shape to one-element list
+            if "email" in config:
+                current = base.get("email", [])
+                current_set: Set[str] = set()
+                if isinstance(current, list) and current:
+                    # FIX: Process ALL elements in the list, not just current[0]
+                    for item in current:
+                        if isinstance(item, str):
+                            for addr in item.split(","):
+                                addr = addr.strip()
+                                if addr:
+                                    current_set.add(addr)
+
+                new_set: Set[str] = set()
+                for item in config.get("email", []):
+                    if isinstance(item, str):
+                        for addr in item.split(","):
+                            addr = addr.strip()
+                            if addr:
+                                new_set.add(addr)
+
+                all_emails = (current_set | new_set | ADMIN_EMAILS) if (current_set or new_set) else set()
+                if all_emails:
+                    base["email"] = [",".join(sorted(all_emails))]
+
+            # Overwrite scalar fields with latest occurrence
+            for sf in scalar_fields_upper:
+                if sf in config:
+                    base[sf] = config[sf]
+
+        # Also ensure default ORIOLE_SUBMIT_FLAG after merge
+        for _, base in merged_features.items():
+            if "ORIOLE_SUBMIT_FLAG" not in base:
+                base["ORIOLE_SUBMIT_FLAG"] = "all"
+
+        return merged_features
 
 
 def write_features_dict(merged_features: Dict[str, Dict[str, Any]], output_path: str = "features.json") -> None:
@@ -1458,26 +1730,21 @@ def main():
     logging.info("LOADING AND PROCESSING FEATURE LIST")
     logging.info("=" * 60)
 
-    feature_entries: List[Dict[str, Any]] = []
+    # Create feature parameters getter with refactored class
+    feature_getter = FeatureParametersGetter(
+        api_url=args.api_url if not args.no_api else None,
+        api_user=args.api_user or None,
+        api_pass=args.api_pass or None,
+        api_token=args.api_token or None,
+        fallback_file=args.feature_list,
+        use_api=not args.no_api,
+    )
 
-    if not args.no_api:
-        try:
-            # Derive API base from api-url for auth endpoints
-            parsed = urlparse(args.api_url)
-            api_base = f"{parsed.scheme}://{parsed.netloc}/"
-            session = authenticate_api(api_base, args.api_user or None, args.api_pass or None, args.api_token or None)
-
-            # Probe with API call; if it fails (401/403/network), we fallback
-            feature_entries = load_features_from_api(session, args.api_url)
-        except Exception as e:
-            logging.warning(f"API load failed, falling back to file '{args.feature_list}': {e}")
-
-    if not feature_entries:
-        feature_entries = load_feature_list(args.feature_list)
-        logging.info(f"Loaded features from file: {args.feature_list}")
+    # Get feature entries using the new class
+    feature_entries = feature_getter.get_feature_entries()
 
     # Step 2: Generate complete features.json (before filtering)
-    merged_features = merge_features(feature_entries)
+    merged_features = feature_getter.merge_features(feature_entries)
     write_features_dict(merged_features)
     write_features_dict_to_all_in_one_tools(merged_features)
 
@@ -1634,15 +1901,23 @@ def main():
         nodes_str = FEATURE_NODE_STATIC_BINDING[feature_name]
         static_nodes = sorted([node.strip() for node in nodes_str.split(",") if node.strip()])
 
-        # Validate that static nodes are in the available pool
+        # Filter to only use static nodes that are in the available pool
         invalid_static_nodes = [node for node in static_nodes if node not in available_nodes]
+        valid_static_nodes = [node for node in static_nodes if node in available_nodes]
+
         if invalid_static_nodes:
             logging.warning(
                 f"Feature '{feature_name}' is statically bound to nodes {static_nodes}, "
                 f"but the following nodes are NOT in the available pool: {invalid_static_nodes}. "
-                f"Skipping this feature."
+                f"Will use only available nodes: {valid_static_nodes}."
             )
+
+        if not valid_static_nodes:
+            logging.warning(f"Feature '{feature_name}' has no available nodes from its static binding {static_nodes}. " f"Skipping this feature.")
             continue
+
+        # Use only the valid static nodes
+        static_nodes = valid_static_nodes
 
         # Check for conflicts and mark nodes as used
         for node in static_nodes:
@@ -1681,6 +1956,7 @@ def main():
         sys.exit(1)
 
     node_index = 0
+    skipped_features = []  # Track features that couldn't be scheduled
 
     for entry, node_count in dynamic_features:
         feature_name = entry["FEATURE_NAME"]
@@ -1694,8 +1970,11 @@ def main():
         for groups, total_seconds in distributed_groups:
             # Check if we have enough nodes left
             if node_index >= len(remaining_nodes):
-                logging.error(f"Not enough nodes for all features! " f"Need at least {node_index+1} but only have {len(remaining_nodes)}")
-                sys.exit(1)
+                # Not enough nodes - skip this feature with a warning
+                if feature_name not in skipped_features:
+                    logging.warning(f"⚠️  Insufficient nodes: Skipping feature '{feature_name}' " f"(needs {node_count} nodes, only {len(remaining_nodes) - node_index} remaining)")
+                    skipped_features.append(feature_name)
+                break  # Move to next feature
 
             # Select the next available node
             chosen_node = remaining_nodes[node_index]
@@ -1704,6 +1983,17 @@ def main():
 
             dispatch_entry = create_dispatch_entry(entry, chosen_node, groups, total_seconds, duration_entries)
             dispatch_entries.append(dispatch_entry)
+
+    # Log skipped features summary
+    if skipped_features:
+        logging.warning("=" * 60)
+        logging.warning(f"⚠️  SKIPPED {len(skipped_features)} FEATURES DUE TO INSUFFICIENT NODES")
+        logging.warning("=" * 60)
+        for feature in skipped_features:
+            logging.warning(f"  - {feature}")
+        logging.warning("")
+        logging.warning("Recommendation: Increase available nodes or exclude some features using --exclude")
+        logging.warning("=" * 60)
 
     # Step 11: Sort and write dispatch JSON
     def node_sort_key(entry):
