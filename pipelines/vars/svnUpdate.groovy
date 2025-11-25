@@ -3,6 +3,7 @@
  *
  * Handles SVN checkout and update operations with marker file tracking
  * to detect when TEST_CASE_FOLDER changes.
+ * Always accepts remote changes to avoid conflicts.
  */
 
 /**
@@ -92,7 +93,7 @@ def updateOrCheckout(Map config) {
             cd ${baseTestDir} && \
             sudo svn checkout \
             https://qa-svn.corp.fortinet.com/svn/qa/FOS/${config.TEST_CASE_FOLDER}/${config.SVN_BRANCH}/${config.FEATURE_NAME} \
-            --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive
+            --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive --trust-server-cert
         """)
 
         // Create marker file to track which TEST_CASE_FOLDER was used
@@ -106,11 +107,57 @@ def updateOrCheckout(Map config) {
     } else {
         echo "=== Performing SVN update on existing folder ==="
 
-        // Use shared runWithRetry helper
+        // **FIX: Check for local modifications and handle conflicts**
+        echo "Checking for local modifications..."
+        def hasModifications = sh(
+            script: """
+                cd ${folderPath}
+                sudo svn status --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive | grep -E '^M|^C|^A|^D' || true
+            """,
+            returnStdout: true
+        ).trim()
+
+        if (hasModifications) {
+            echo "⚠️  Local modifications detected:"
+            echo "${hasModifications}"
+            echo "Reverting all local changes to avoid conflicts..."
+
+            // Revert all local changes recursively
+            sh """
+                cd ${folderPath}
+                sudo svn revert -R . --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive
+            """
+            echo "✅ Local changes reverted"
+        } else {
+            echo "No local modifications detected"
+        }
+
+        // Perform update with conflict resolution strategy: accept theirs-full (remote wins)
         runWithRetry(4, [5, 15, 45], """
             cd ${folderPath} && \
-            sudo svn update --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive
+            sudo svn update \
+            --accept theirs-full \
+            --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive --trust-server-cert
         """)
+
+        // Double-check: resolve any remaining conflicts (paranoid mode)
+        def hasConflicts = sh(
+            script: """
+                cd ${folderPath}
+                sudo svn status --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive | grep '^C' || true
+            """,
+            returnStdout: true
+        ).trim()
+
+        if (hasConflicts) {
+            echo "⚠️  Conflicts still detected after update, resolving with theirs-full..."
+            echo "${hasConflicts}"
+            sh """
+                cd ${folderPath}
+                sudo svn resolve --accept theirs-full -R . --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive
+            """
+            echo "✅ Conflicts resolved with remote version"
+        }
 
         action = "update"
         reason = "Folder exists and TEST_CASE_FOLDER matches"
