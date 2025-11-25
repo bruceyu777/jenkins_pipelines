@@ -107,32 +107,37 @@ def updateOrCheckout(Map config) {
     } else {
         echo "=== Performing SVN update on existing folder ==="
 
-        // **FIX: Check for local modifications and handle conflicts**
-        echo "Checking for local modifications..."
-        def hasModifications = sh(
+        // **STRATEGY: Preserve local changes, accept remote only when conflicts occur**
+
+        // Step 1: Check current status before update
+        echo "Checking working copy status..."
+        def statusBefore = sh(
             script: """
                 cd ${folderPath}
-                sudo svn status --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive | grep -E '^M|^C|^A|^D' || true
+                sudo svn status --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive 2>/dev/null || true
             """,
             returnStdout: true
         ).trim()
 
-        if (hasModifications) {
-            echo "⚠️  Local modifications detected:"
-            echo "${hasModifications}"
-            echo "Reverting all local changes to avoid conflicts..."
+        if (statusBefore) {
+            echo "📝 Local changes detected (will be preserved):"
+            echo "${statusBefore}"
 
-            // Revert all local changes recursively
-            sh """
-                cd ${folderPath}
-                sudo svn revert -R . --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive
-            """
-            echo "✅ Local changes reverted"
+            // Categorize changes for visibility
+            def hasModified = statusBefore.contains('M ')
+            def hasAdded = statusBefore.contains('A ') || statusBefore.contains('? ')
+            def hasDeleted = statusBefore.contains('D ')
+
+            if (hasModified) echo "  → Modified files (preserved unless remote also changed)"
+            if (hasAdded) echo "  → Added/new files (preserved)"
+            if (hasDeleted) echo "  → Deleted files (preserved)"
         } else {
-            echo "No local modifications detected"
+            echo "✅ Working copy is clean"
         }
 
-        // Perform update with conflict resolution strategy: accept theirs-full (remote wins)
+        // Step 2: Update with automatic conflict resolution
+        // --accept theirs-full means: "If conflict, use remote; otherwise keep local"
+        echo "Updating from remote (conflicts will be auto-resolved with remote version)..."
         runWithRetry(4, [5, 15, 45], """
             cd ${folderPath} && \
             sudo svn update \
@@ -140,23 +145,41 @@ def updateOrCheckout(Map config) {
             --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive --trust-server-cert
         """)
 
-        // Double-check: resolve any remaining conflicts (paranoid mode)
+        // Step 3: Safety check - ensure no conflicts remain
+        echo "Verifying no conflicts remain..."
         def hasConflicts = sh(
             script: """
                 cd ${folderPath}
-                sudo svn status --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive | grep '^C' || true
+                sudo svn status --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive 2>/dev/null | grep '^C' || true
             """,
             returnStdout: true
         ).trim()
 
         if (hasConflicts) {
-            echo "⚠️  Conflicts still detected after update, resolving with theirs-full..."
+            echo "⚠️  Resolving remaining conflicts with remote version..."
             echo "${hasConflicts}"
             sh """
                 cd ${folderPath}
-                sudo svn resolve --accept theirs-full -R . --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive
+                sudo svn resolve --accept theirs-full -R . \
+                --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive
             """
-            echo "✅ Conflicts resolved with remote version"
+            echo "✅ Conflicts resolved"
+        }
+
+        // Step 4: Show what remains after update
+        def statusAfter = sh(
+            script: """
+                cd ${folderPath}
+                sudo svn status --username "\$SVN_USER" --password "\$SVN_PASS" --non-interactive 2>/dev/null || true
+            """,
+            returnStdout: true
+        ).trim()
+
+        if (statusAfter) {
+            echo "📝 Local changes after update (preserved):"
+            echo "${statusAfter}"
+        } else {
+            echo "✅ Working copy is clean"
         }
 
         action = "update"
