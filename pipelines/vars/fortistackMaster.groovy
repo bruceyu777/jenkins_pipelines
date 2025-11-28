@@ -258,6 +258,39 @@ def call() {
         }
       }
 
+      // ADD THIS NEW STAGE HERE - Before any provision/test stages
+      stage('Wait Until Previous Build Finishes') {
+        // Run on the designated node to check for running pipelines on this specific node
+        agent { label "${params.NODE_NAME.trim()}" }
+        steps {
+          script {
+            echo "=== Checking for previous builds on ${params.NODE_NAME} ==="
+            echo "TERMINATE_PREVIOUS: ${params.TERMINATE_PREVIOUS}"
+
+            if (params.TERMINATE_PREVIOUS?.toString()?.trim()?.toLowerCase() in ['true', '1', 'yes']) {
+              echo "⚠️  Will forcefully terminate any previous running pipeline on this node"
+            } else {
+              echo "Will wait for any previous running pipeline to complete naturally"
+            }
+
+            try {
+              sh """
+                cd /home/fosqa/resources/tools
+                . /home/fosqa/resources/tools/venv/bin/activate
+                echo "Current node: \$(hostname)"
+                echo "Checking for running pipelines..."
+                sudo -E PYTHONUNBUFFERED=1 stdbuf -oL -eL ./venv/bin/python3 -u wait_until_aio_pipeline_not_running.py --terminate ${params.TERMINATE_PREVIOUS}
+              """
+              echo "✅ No conflicting pipelines running on ${params.NODE_NAME}"
+            } catch (Exception e) {
+              echo "⚠️  Warning: Error checking for previous builds: ${e.getMessage()}"
+              echo "Continuing with pipeline execution..."
+              // Don't fail the build, just log the warning
+            }
+          }
+        }
+      }
+
       stage('Trigger Provision FGT Pipeline') {
         // This stage runs on the designated node.
         agent { label "${params.NODE_NAME.trim()}" }
