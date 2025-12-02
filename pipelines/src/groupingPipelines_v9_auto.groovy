@@ -9,20 +9,26 @@ pipeline {
         )
         string(
             name: 'BUILD_NUMBER',
-            defaultValue: '3619',
+            defaultValue: '3634',
             description: 'Enter the build number'
         )
+        
+        string(
+            name: 'TERMINATE_PREVIOUS',
+            defaultValue: 'true',
+            description: 'Whether to terminate previous pipeline runs before starting this one'
+        )
+
         string(
             name: 'BUILD_KEYWORD',
             defaultValue: 'KVM',
-            description: 'Build keyword for image type (e.g., KVM, DOCKER, VMWARE, etc.)'
+            description: 'Build keyword for image type search (e.g., KVM etc.)'
         )
         string(
             name: 'AUTOLIB_BRANCH',
             defaultValue: 'v3r10build0007',
             description: 'Which branch of the autolib_v3 repo to checkout before running tests'
         )
-        // NEW: Add SCHEDULE parameter
         booleanParam(
             name: 'SCHEDULE',
             defaultValue: false,
@@ -32,6 +38,20 @@ pipeline {
             name: 'SCHEDULE_TIMEOUT_MINUTES',
             defaultValue: '1200',
             description: 'Maximum time (in minutes) to wait for build readiness when SCHEDULE is enabled'
+        )
+        // SIMPLIFIED: Just 2 parameters for delayed start!
+        booleanParam(
+            name: 'DELAYED_START',
+            defaultValue: false,
+            description: 'Enable to delay pipeline execution until a specific time or after X minutes'
+        )
+        string(
+            name: 'START_AT',
+            defaultValue: '18:00',
+            description: '''When to start the pipeline. Supports:
+• Time format (HH:MM): "18:00" or "06:30" - starts at that time today (or tomorrow if passed)
+• Minutes from now: "60" or "120" - waits that many minutes
+• Examples: "18:00", "19:30", "90", "120"'''
         )
         text(
             name: 'COMMON_CONFIG',
@@ -56,8 +76,11 @@ pipeline {
         )
         string(
             name: 'LOAD_BALANCER_ARGS',
-            defaultValue: '-a',
-            description: 'Arguments to pass to load-balancer.py'
+            defaultValue: '-a -n node2-node99',
+            description: '''Arguments to pass to load-balancer.py:
+-n: Define node pool with optional range notation (e.g., node2,node3,node10-node20)
+-a: Use available Jenkins nodes
+If both defined, intersection is used.'''
         )
         string(
             name: 'TEST_GROUP_TYPE',
@@ -99,6 +122,9 @@ pipeline {
                     if (params.DRY_RUN) {
                         displayName += "-DRY_RUN"
                     }
+                    if (params.DELAYED_START) {
+                        displayName += "-START@${params.START_AT}"
+                    }
                     if (params.SCHEDULE) {
                         displayName += "-SCHEDULED"
                     }
@@ -114,7 +140,151 @@ pipeline {
             }
         }
 
-        // NEW STAGE: Wait for Build Readiness
+        // SIMPLIFIED: Smart delay detection
+        stage('Wait Until Scheduled Time') {
+            when {
+                expression { return params.DELAYED_START }
+            }
+            steps {
+                script {
+                    echo "=== DELAYED START ENABLED ==="
+                    
+                    def startAt = params.START_AT.trim()
+                    def targetTime
+                    def currentTime = new Date()
+                    def delaySeconds = 0
+                    def isTimeFormat = false
+                    
+                    // Auto-detect format: if contains ":", it's HH:MM format, otherwise it's minutes
+                    if (startAt.contains(':')) {
+                        // Time format (HH:MM)
+                        isTimeFormat = true
+                        echo "Delay Type: Start at specific time"
+                        echo "Target Start Time: ${startAt}"
+                        
+                        def timeParts = startAt.split(':')
+                        if (timeParts.size() != 2) {
+                            error "Invalid time format. Use HH:MM (24-hour), e.g., 18:00 or 06:30"
+                        }
+                        
+                        try {
+                            def targetHour = timeParts[0].toInteger()
+                            def targetMinute = timeParts[1].toInteger()
+                            
+                            if (targetHour < 0 || targetHour > 23 || targetMinute < 0 || targetMinute > 59) {
+                                error "Invalid time. Hour must be 0-23, minute must be 0-59"
+                            }
+                            
+                            // Create target time for today
+                            def calendar = Calendar.getInstance()
+                            calendar.set(Calendar.HOUR_OF_DAY, targetHour)
+                            calendar.set(Calendar.MINUTE, targetMinute)
+                            calendar.set(Calendar.SECOND, 0)
+                            calendar.set(Calendar.MILLISECOND, 0)
+                            targetTime = calendar.time
+                            
+                            // If target time is in the past, schedule for tomorrow
+                            if (targetTime.before(currentTime)) {
+                                echo "⚠️  Target time ${startAt} has passed today"
+                                calendar.add(Calendar.DAY_OF_MONTH, 1)
+                                targetTime = calendar.time
+                                echo "Rescheduling for tomorrow: ${targetTime.format('yyyy-MM-dd HH:mm:ss')}"
+                            }
+                            
+                            delaySeconds = ((targetTime.time - currentTime.time) / 1000).toLong()
+                            
+                        } catch (NumberFormatException e) {
+                            error "Invalid time format: ${startAt}. Use HH:MM format (e.g., 18:00)"
+                        }
+                        
+                    } else {
+                        // Minutes format (numeric only)
+                        echo "Delay Type: Delay by minutes from now"
+                        echo "Delay Duration: ${startAt} minutes"
+                        
+                        try {
+                            def delayMinutes = startAt.toInteger()
+                            if (delayMinutes < 0) {
+                                error "Delay minutes must be positive"
+                            }
+                            
+                            def calendar = Calendar.getInstance()
+                            calendar.add(Calendar.MINUTE, delayMinutes)
+                            targetTime = calendar.time
+                            
+                            delaySeconds = delayMinutes * 60
+                            
+                        } catch (NumberFormatException e) {
+                            error "Invalid format: ${startAt}. Use either HH:MM (e.g., 18:00) or minutes (e.g., 60)"
+                        }
+                    }
+                    
+                    // Display waiting information
+                    def delayMinutes = (delaySeconds / 60).toLong()
+                    def delayHours = (delayMinutes / 60).toLong()
+                    def remainingMinutes = delayMinutes % 60
+                    
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "⏰ PIPELINE DELAYED START"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "Current Time:    ${currentTime.format('yyyy-MM-dd HH:mm:ss')}"
+                    echo "Target Time:     ${targetTime.format('yyyy-MM-dd HH:mm:ss')}"
+                    echo "Wait Duration:   ${delayHours}h ${remainingMinutes}m (${delaySeconds}s)"
+                    echo "Format Detected: ${isTimeFormat ? 'Specific Time (HH:MM)' : 'Delay Minutes'}"
+                    echo "Release:         ${params.RELEASE}"
+                    echo "Build:           ${params.BUILD_NUMBER}"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    
+                    // Store for email notification
+                    env.DELAYED_START_TIME = targetTime.format('yyyy-MM-dd HH:mm:ss')
+                    env.DELAY_DURATION = "${delayHours}h ${remainingMinutes}m"
+                    env.DELAY_TYPE = isTimeFormat ? "Specific Time (${startAt})" : "Delay Minutes (${startAt})"
+                    
+                    // Show periodic updates for delays > 5 minutes
+                    if (delaySeconds > 300) {
+                        def checkInterval = 300 // Check every 5 minutes
+                        def checksRemaining = (delaySeconds / checkInterval).toInteger()
+                        
+                        echo "Pipeline will show status updates every 5 minutes..."
+                        echo ""
+                        
+                        for (int i = 0; i < checksRemaining; i++) {
+                            sleep time: checkInterval, unit: 'SECONDS'
+                            
+                            def now = new Date()
+                            def remaining = ((targetTime.time - now.time) / 1000).toLong()
+                            def remainMin = (remaining / 60).toLong()
+                            def remainHour = (remainMin / 60).toLong()
+                            def remainMinOnly = remainMin % 60
+                            
+                            echo "⏳ [${now.format('HH:mm:ss')}] Still waiting... ${remainHour}h ${remainMinOnly}m remaining until ${targetTime.format('HH:mm:ss')}"
+                        }
+                        
+                        // Sleep for remaining seconds
+                        def finalDelay = delaySeconds - (checksRemaining * checkInterval)
+                        if (finalDelay > 0) {
+                            sleep time: finalDelay.toInteger(), unit: 'SECONDS'
+                        }
+                    } else {
+                        // Short delays - just sleep once
+                        echo "Waiting ${delaySeconds} seconds..."
+                        sleep time: delaySeconds.toInteger(), unit: 'SECONDS'
+                    }
+                    
+                    def actualStartTime = new Date()
+                    echo ""
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "✅ SCHEDULED TIME REACHED"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "Target Time:     ${targetTime.format('yyyy-MM-dd HH:mm:ss')}"
+                    echo "Actual Start:    ${actualStartTime.format('yyyy-MM-dd HH:mm:ss')}"
+                    echo "Pipeline now proceeding with test execution..."
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo ""
+                }
+            }
+        }
+
         stage('Wait for Build Readiness') {
             when {
                 expression { return params.SCHEDULE }
@@ -162,7 +332,6 @@ pipeline {
 
                                 echo "=== Triggering rsync on Docker host via SSH ==="
                                 try {
-                                    // Use Jenkins credentials for SSH authentication
                                     withCredentials([usernamePassword(
                                         credentialsId: 'CdnSshCredential',
                                         usernameVariable: 'SSH_USER',
@@ -170,7 +339,6 @@ pipeline {
                                     )]) {
                                         def rsyncOutput = sh(
                                             script: '''
-                                                # Use sshpass to provide password for SSH
                                                 export SSHPASS="$SSH_PASS"
                                                 sshpass -e ssh \
                                                     -o StrictHostKeyChecking=no \
@@ -215,11 +383,9 @@ pipeline {
                         def totalWaitTime = String.format('%.1f', (System.currentTimeMillis() - startTime) / 60000)
                         echo "❌ Build ${params.BUILD_NUMBER} (${params.BUILD_KEYWORD}) did not become ready within ${timeoutMinutes} minutes (waited ${totalWaitTime} minutes)"
 
-                        // Store failure information for email notification
                         env.BUILD_READY_TIMEOUT = 'true'
                         env.BUILD_WAIT_TIME = totalWaitTime
 
-                        // Set build result and stop pipeline
                         currentBuild.result = 'ABORTED'
                         error "Build readiness timeout: Build ${params.BUILD_NUMBER} (${params.BUILD_KEYWORD}) not ready after ${totalWaitTime} minutes"
                     }
@@ -290,35 +456,27 @@ pipeline {
         stage('Prepare Job Configurations') {
             steps {
                 script {
-                    // Parse the common config JSON
                     def common = readJSON text: params.COMMON_CONFIG
-                    // Parse the individual configurations from the environment variable
                     def individualConfigs = readJSON text: env.INDIVIDUAL_CONFIGS_JSON
 
                     def jobConfigs = []
                     def configSummary = [:]
 
-                    // Iterate over each individual configuration and merge with common settings.
                     individualConfigs.eachWithIndex { individual, i ->
                         def merged = common + individual
-                        // Override BUILD_NUMBER with the standalone parameter.
                         merged.BUILD_NUMBER = params.BUILD_NUMBER
                         merged.RELEASE = params.RELEASE
-
-                        // ADDED: Add AUTOLIB_BRANCH to the merged configuration
                         merged.AUTOLIB_BRANCH = params.AUTOLIB_BRANCH
-
-                        // ADDED: Add ORIOLE_SUBMIT_FLAG to the merged configuration
                         merged.ORIOLE_SUBMIT_FLAG = params.ORIOLE_SUBMIT_FLAG
+                        
+                        // ✅ ADD THIS LINE - Pass TERMINATE_PREVIOUS to downstream jobs
+                        merged.TERMINATE_PREVIOUS = params.TERMINATE_PREVIOUS
 
-                        // Normalize TEST_GROUPS to handle different formats
                         def testGroups = individual.TEST_GROUPS
 
-                        // If TEST_GROUPS is already a JSON array in the input
                         if (testGroups instanceof List) {
                             merged.TEST_GROUPS = groovy.json.JsonOutput.toJson(testGroups)
                         }
-                        // If it's a string or anything else, ensure it's properly formatted
                         else if (testGroups) {
                             merged.TEST_GROUPS = groovy.json.JsonOutput.toJson(testGroups)
                         } else {
@@ -327,7 +485,6 @@ pipeline {
 
                         jobConfigs << merged
 
-                        // Track node usage for summary
                         def nodeName = individual.NODE_NAME
                         if (!configSummary.containsKey(nodeName)) {
                             configSummary[nodeName] = []
@@ -380,6 +537,16 @@ pipeline {
                     echo "ORIOLE_SUBMIT_FLAG: ${params.ORIOLE_SUBMIT_FLAG}"
                     echo "This will be passed to all downstream jobs"
 
+                    // ✅ ADD THIS: Log TERMINATE_PREVIOUS configuration
+                    echo "==== TERMINATE_PREVIOUS CONFIGURATION ===="
+                    echo "TERMINATE_PREVIOUS: ${params.TERMINATE_PREVIOUS}"
+                    if (params.TERMINATE_PREVIOUS?.toString()?.trim()?.toLowerCase() in ['true', '1']) {
+                        echo "⚠️  Any previous running pipeline on each node will be forcefully terminated"
+                    } else {
+                        echo "Previous pipelines will be allowed to complete"
+                    }
+                    echo ""
+
                     // Store for downstream stage
                     env.JOB_CONFIGS = groovy.json.JsonOutput.toJson(jobConfigs)
                 }
@@ -402,7 +569,6 @@ pipeline {
                             try {
                                 echo "Triggering fortistack_master_provision_runtest with configuration: ${config}"
 
-                                // Start with required parameters that are always present
                                 def buildParams = [
                                     string(name: 'PARAMS_JSON', value: groovy.json.JsonOutput.toJson(config.PARAMS_JSON)),
                                     string(name: 'RELEASE', value: config.RELEASE),
@@ -444,6 +610,10 @@ pipeline {
                                     buildParams << string(name: 'VMPC_NAMES', value: config.VMPC_NAMES)
                                 }
 
+                                if (config.containsKey('TERMINATE_PREVIOUS')) {
+                                    buildParams << string(name: 'TERMINATE_PREVIOUS', value: config.TERMINATE_PREVIOUS)
+                                }
+
                                 // Defensively add boolean parameters only if they exist in config
                                 if (config.containsKey('FORCE_UPDATE_DOCKER_FILE')) {
                                     buildParams << booleanParam(name: 'FORCE_UPDATE_DOCKER_FILE', value: config.FORCE_UPDATE_DOCKER_FILE)
@@ -470,7 +640,6 @@ pipeline {
                             } catch (Exception e) {
                                 jobResults[branchName] = [status: 'FAILED', error: e.getMessage()]
                                 echo "Job ${branchName} failed: ${e.getMessage()}"
-                                // Don't throw the exception - let other jobs continue
                             }
                         }
                     }
@@ -507,13 +676,18 @@ pipeline {
         }
 
         stage('Send Test Results Report') {
-            // Always run this stage unless it's a dry run (and FORCE_SEND_TEST_RESULTS is false)
             when {
                 expression { return !params.DRY_RUN || params.FORCE_SEND_TEST_RESULTS }
             }
             steps {
                 script {
                     echo "=== SENDING TEST RESULTS REPORT ==="
+                    // Add a warning for the DRY_RUN + FORCE_SEND case
+                    if (params.DRY_RUN && params.FORCE_SEND_TEST_RESULTS) {
+                        echo "⚠️ WARNING: Running in DRY_RUN mode."
+                        echo "The test results report will be generated based on any PRE-EXISTING data for this build number."
+                        echo "No new tests were executed in this pipeline run, so if this is a new build, the report may be empty or fail to generate."
+                    }
                     echo "Release: ${params.RELEASE}"
                     echo "Build: ${params.BUILD_NUMBER}"
                     echo "Recipients: ${params.EMAIL_RECIPIENTS}"
@@ -531,7 +705,7 @@ pipeline {
                         echo "=== SENDING AUTOLIB TEST RESULTS EMAIL ==="
                         echo "=== CHECKING PYTHON ENVIRONMENT ==="
                         python3 --version
-                        python3 -c "import pandas, openpyxl, pymongo, requests, libvirt; print('All required packages available')"
+                        python3 -c "import pandas, openpyxl, pymongo, requests, libvirt, matplotlib; print('All required packages available')"
                         echo "=== RUNNING FETCH_AUTOLIB_RESULTS ==="
                         python3 fetch_autolib_results.py -r ${params.RELEASE} -b ${params.BUILD_NUMBER} -t ${params.EMAIL_RECIPIENTS}
                     """.stripIndent().trim()
@@ -566,6 +740,13 @@ pipeline {
                     echo "ORIOLE_SUBMIT_FLAG: ${params.ORIOLE_SUBMIT_FLAG}"
                     echo "FORCE_SEND_TEST_RESULTS: ${params.FORCE_SEND_TEST_RESULTS}"
 
+                    if (params.DELAYED_START) {
+                        echo "DELAYED_START: Enabled"
+                        echo "Target Time: ${env.DELAYED_START_TIME}"
+                        echo "Delay Duration: ${env.DELAY_DURATION}"
+                        echo "Delay Type: ${env.DELAY_TYPE}"
+                    }
+
                     if (params.FORCE_SEND_TEST_RESULTS) {
                         echo "NOTE: Test results report will be sent despite dry run mode"
                     }
@@ -594,6 +775,7 @@ pipeline {
 
                 def dryRunPrefix = params.DRY_RUN ? "[DRY RUN] " : ""
                 def schedulePrefix = params.SCHEDULE ? "[SCHEDULED] " : ""
+                def delayedPrefix = params.DELAYED_START ? "[DELAYED] " : ""
 
                 // Check if pipeline was aborted due to build readiness timeout
                 if (env.BUILD_READY_TIMEOUT == 'true') {
@@ -629,7 +811,7 @@ pipeline {
                     def notifyTo = commonConfig.PARAMS_JSON.send_to ?: "yzhengfeng@fortinet.com"
 
                     emailext (
-                        subject: "❌ [TIMEOUT] ${schedulePrefix}Build Not Ready: ${params.RELEASE}-${params.BUILD_NUMBER} (${params.BUILD_KEYWORD})",
+                        subject: "❌ [TIMEOUT] ${schedulePrefix}${delayedPrefix}Build Not Ready: ${params.RELEASE}-${params.BUILD_NUMBER} (${params.BUILD_KEYWORD})",
                         body: timeoutSummary,
                         to: notifyTo,
                         mimeType: 'text/html'
@@ -641,7 +823,7 @@ pipeline {
 
                 // Normal pipeline completion email (only sent if build was ready)
                 def individualConfigs = readJSON text: env.INDIVIDUAL_CONFIGS_JSON
-                def buildSummary = "<h3>${schedulePrefix}${dryRunPrefix}Build Summary</h3>"
+                def buildSummary = "<h3>${delayedPrefix}${schedulePrefix}${dryRunPrefix}Build Summary</h3>"
 
                 // Add schedule information if enabled
                 if (params.SCHEDULE) {
@@ -650,6 +832,14 @@ pipeline {
                     if (env.BUILD_WAIT_TIME) {
                         buildSummary += "<p><b>Actual Wait Time:</b> ${env.BUILD_WAIT_TIME} minutes</p>"
                     }
+                }
+
+                // Add delayed start information if enabled
+                if (params.DELAYED_START && env.DELAYED_START_TIME) {
+                    buildSummary += "<p><b>⏰ DELAYED START:</b> Pipeline waited until scheduled time</p>"
+                    buildSummary += "<p><b>Scheduled Start Time:</b> ${env.DELAYED_START_TIME}</p>"
+                    buildSummary += "<p><b>Delay Duration:</b> ${env.DELAY_DURATION}</p>"
+                    buildSummary += "<p><b>Delay Type:</b> ${env.DELAY_TYPE}</p>"
                 }
 
                 buildSummary += "<p><b>Release:</b> ${params.RELEASE}</p>"
@@ -699,9 +889,9 @@ pipeline {
                 def notifyTo = commonConfig.PARAMS_JSON.send_to ?: "yzhengfeng@fortinet.com"
 
                 emailext (
-                    subject: "${schedulePrefix}${dryRunPrefix}Fortistack Group Pipeline: ${currentBuild.fullDisplayName}",
+                    subject: "${delayedPrefix}${schedulePrefix}${dryRunPrefix}Fortistack Group Pipeline: ${currentBuild.fullDisplayName}",
                     body: """
-                    <p>${schedulePrefix}${dryRunPrefix}Fortistack group pipeline has completed.</p>
+                    <p>${delayedPrefix}${schedulePrefix}${dryRunPrefix}Fortistack group pipeline has completed.</p>
                     <p><b>Status:</b> ${currentBuild.result ?: 'SUCCESS'}</p>
                     <p><b>Pipeline URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                     ${buildSummary}
