@@ -349,7 +349,8 @@ def call() {
                             )
                         ]) {
                             echo "=== Docker provisioning is ENABLED ==="
-                            // Step 3: Update Docker file, if needed
+
+                            // Step 1: Update Docker file, if needed
                             def forceArg = params.FORCE_UPDATE_DOCKER_FILE ? "--force" : ""
                             sh """
                                 cd /home/fosqa/resources/tools
@@ -357,7 +358,7 @@ def call() {
                                   get_dockerfile_from_cdn.py --feature ${FEATURE_NAME} ${forceArg}
                             """
 
-                            // Step 4: Create Docker file soft link
+                            // Step 2: Create Docker file soft link
                             sh """
                                 cd /home/fosqa/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}
                                 sudo rm -f docker_filesys
@@ -374,18 +375,144 @@ def call() {
                                 baseDir: dockerDir
                             )
 
+                            // Step 3: Login to Docker registry
+                            echo "=== Logging in to Docker registry ==="
+                            sh "docker login harbor-robot.corp.fortinet.com -u \$SVN_USER -p \$SVN_PASS"
+
+                            // Step 4: COMPLETE Docker cleanup (nuclear option)
+                            echo "=== 🧹 Starting COMPLETE Docker cleanup (all containers, networks, volumes) ==="
+
+                            try {
+                                // 4.1: Stop all running containers gracefully (30 second timeout)
+                                echo "🛑 Stopping all running containers (30s timeout)..."
+                                sh """
+                                    RUNNING=\$(docker ps -q)
+                                    if [ -n "\$RUNNING" ]; then
+                                        echo "Found running containers: \$RUNNING"
+                                        docker stop --time 30 \$RUNNING || echo "⚠️ Some containers failed to stop gracefully"
+                                    else
+                                        echo "No running containers found"
+                                    fi
+                                """
+
+                                // 4.2: Force remove ALL containers (running or stopped)
+                                echo "🗑️  Force removing ALL containers..."
+                                sh """
+                                    ALL_CONTAINERS=\$(docker ps -aq)
+                                    if [ -n "\$ALL_CONTAINERS" ]; then
+                                        echo "Removing containers: \$ALL_CONTAINERS"
+                                        docker rm -f \$ALL_CONTAINERS || echo "⚠️ Some containers failed to remove"
+                                    else
+                                        echo "No containers to remove"
+                                    fi
+                                """
+
+                                // 4.3: Remove all custom networks (except default bridge/host/none)
+                                echo "🔌 Removing all custom Docker networks..."
+                                sh """
+                                    CUSTOM_NETWORKS=\$(docker network ls --filter type=custom -q)
+                                    if [ -n "\$CUSTOM_NETWORKS" ]; then
+                                        echo "Found custom networks: \$CUSTOM_NETWORKS"
+                                        docker network rm \$CUSTOM_NETWORKS || echo "⚠️ Some networks still in use"
+                                    else
+                                        echo "No custom networks to remove"
+                                    fi
+                                """
+
+                                // 4.4: Remove all volumes (CAREFUL: This deletes persistent data!)
+                                echo "💾 Removing all Docker volumes..."
+                                sh """
+                                    ALL_VOLUMES=\$(docker volume ls -q)
+                                    if [ -n "\$ALL_VOLUMES" ]; then
+                                        echo "Found volumes: \$ALL_VOLUMES"
+                                        docker volume rm \$ALL_VOLUMES || echo "⚠️ Some volumes still in use"
+                                    else
+                                        echo "No volumes to remove"
+                                    fi
+                                """
+
+                                // 4.5: Prune everything to remove dangling resources
+                                echo "🧽 Running docker system prune to clean up dangling resources..."
+                                sh """
+                                    docker system prune -af --volumes || echo "⚠️ System prune encountered issues"
+                                """
+
+                                echo "✅ Docker cleanup completed successfully"
+
+                            } catch (Exception e) {
+                                echo "⚠️ Warning during Docker cleanup: ${e.getMessage()}"
+                                echo "Continuing with fresh deployment anyway..."
+                            }
+
+                            // Step 5: Setup network and cleanup telnet ports
+                            echo "=== Setting up Docker network and cleaning telnet ports ==="
                             sh """
-                                docker login harbor-robot.corp.fortinet.com -u \$SVN_USER -p \$SVN_PASS
-                                docker ps -aq | xargs -r docker rm -f
                                 cd /home/fosqa/resources/tools
                                 make setup_docker_network_and_cleanup_telnet_ports
+                            """
 
-                                docker compose \
-                                  -f "${composeFile}" \
-                                  up --build -d
+                            // Step 6: Bring up the new Docker Compose stack
+                            echo "=== 🚀 Bringing up fresh Docker Compose stack ==="
+                            sh """
+                                cd "${dockerDir}"
+                                docker compose -f "${composeFile}" up --build -d
+                            """
+
+                            // Step 7: Verify containers are running
+                            echo "=== ✅ Verifying Docker containers started successfully ==="
+                            sh """
+                                cd "${dockerDir}"
+                                echo "Running containers:"
+                                docker compose -f "${composeFile}" ps
+
+                                # Count running containers
+                                RUNNING_COUNT=\$(docker compose -f "${composeFile}" ps --services --filter "status=running" | wc -l)
+                                echo "Number of running containers: \$RUNNING_COUNT"
+
+                                if [ "\$RUNNING_COUNT" -eq 0 ]; then
+                                    echo "❌ ERROR: No containers are running after docker compose up!"
+                                    exit 1
+                                fi
+
+                                echo "✅ Docker Compose stack is up and running"
+                            """
+
+                            // Step 8: Wait for containers to become healthy (optional, with timeout)
+                            echo "=== ⏳ Waiting for containers to become healthy (max 2 minutes) ==="
+                            sh """
+                                cd "${dockerDir}"
+
+                                timeout 120 bash -c '
+                                    while true; do
+                                        # Check for any unhealthy containers
+                                        UNHEALTHY=\$(docker compose -f "${composeFile}" ps --format json 2>/dev/null | \
+                                                    jq -r "select(.Health == \\"unhealthy\\") | .Service" 2>/dev/null | wc -l)
+
+                                        if [ "\$UNHEALTHY" -eq 0 ]; then
+                                            echo "✅ All containers are healthy or have no health checks defined"
+                                            break
+                                        fi
+
+                                        echo "⏳ Waiting for \$UNHEALTHY container(s) to become healthy..."
+                                        sleep 5
+                                    done
+                                ' || echo "⚠️ Timeout waiting for health checks (containers may still be starting)"
+
+                                echo "Final container status:"
+                                docker compose -f "${composeFile}" ps
                             """
                         }
                     }
+                }
+            }
+
+            stage('Check Docker and KVM domains again!') {
+                steps {
+                    echo "Checking Docker environment..."
+                    sh 'docker ps'
+                    sh 'docker-compose --version'
+                    echo "Checking KVM domains..."
+                    sh 'virsh -c qemu:///system list --all'
                 }
             }
 
