@@ -12,7 +12,7 @@ pipeline {
             defaultValue: '3634',
             description: 'Enter the build number'
         )
-        
+
         string(
             name: 'TERMINATE_PREVIOUS',
             defaultValue: 'true',
@@ -94,7 +94,7 @@ If both defined, intersection is used.'''
         )
         string(
             name: 'EMAIL_RECIPIENTS',
-            defaultValue: 'yzhengfeng@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,nzhang@fortinet.com,qxu@fortinet.com',
+            defaultValue: 'yzhengfeng@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,nzhang@fortinet.com,qxu@fortinet.com,scai@fortinet.com',
             description: 'Comma-separated list of email recipients for the test results report'
         )
         booleanParam(
@@ -148,33 +148,33 @@ If both defined, intersection is used.'''
             steps {
                 script {
                     echo "=== DELAYED START ENABLED ==="
-                    
+
                     def startAt = params.START_AT.trim()
                     def targetTime
                     def currentTime = new Date()
                     def delaySeconds = 0
                     def isTimeFormat = false
-                    
+
                     // Auto-detect format: if contains ":", it's HH:MM format, otherwise it's minutes
                     if (startAt.contains(':')) {
                         // Time format (HH:MM)
                         isTimeFormat = true
                         echo "Delay Type: Start at specific time"
                         echo "Target Start Time: ${startAt}"
-                        
+
                         def timeParts = startAt.split(':')
                         if (timeParts.size() != 2) {
                             error "Invalid time format. Use HH:MM (24-hour), e.g., 18:00 or 06:30"
                         }
-                        
+
                         try {
                             def targetHour = timeParts[0].toInteger()
                             def targetMinute = timeParts[1].toInteger()
-                            
+
                             if (targetHour < 0 || targetHour > 23 || targetMinute < 0 || targetMinute > 59) {
                                 error "Invalid time. Hour must be 0-23, minute must be 0-59"
                             }
-                            
+
                             // Create target time for today
                             def calendar = Calendar.getInstance()
                             calendar.set(Calendar.HOUR_OF_DAY, targetHour)
@@ -182,7 +182,7 @@ If both defined, intersection is used.'''
                             calendar.set(Calendar.SECOND, 0)
                             calendar.set(Calendar.MILLISECOND, 0)
                             targetTime = calendar.time
-                            
+
                             // If target time is in the past, schedule for tomorrow
                             if (targetTime.before(currentTime)) {
                                 echo "⚠️  Target time ${startAt} has passed today"
@@ -190,40 +190,40 @@ If both defined, intersection is used.'''
                                 targetTime = calendar.time
                                 echo "Rescheduling for tomorrow: ${targetTime.format('yyyy-MM-dd HH:mm:ss')}"
                             }
-                            
+
                             delaySeconds = ((targetTime.time - currentTime.time) / 1000).toLong()
-                            
+
                         } catch (NumberFormatException e) {
                             error "Invalid time format: ${startAt}. Use HH:MM format (e.g., 18:00)"
                         }
-                        
+
                     } else {
                         // Minutes format (numeric only)
                         echo "Delay Type: Delay by minutes from now"
                         echo "Delay Duration: ${startAt} minutes"
-                        
+
                         try {
                             def delayMinutes = startAt.toInteger()
                             if (delayMinutes < 0) {
                                 error "Delay minutes must be positive"
                             }
-                            
+
                             def calendar = Calendar.getInstance()
                             calendar.add(Calendar.MINUTE, delayMinutes)
                             targetTime = calendar.time
-                            
+
                             delaySeconds = delayMinutes * 60
-                            
+
                         } catch (NumberFormatException e) {
                             error "Invalid format: ${startAt}. Use either HH:MM (e.g., 18:00) or minutes (e.g., 60)"
                         }
                     }
-                    
+
                     // Display waiting information
                     def delayMinutes = (delaySeconds / 60).toLong()
                     def delayHours = (delayMinutes / 60).toLong()
                     def remainingMinutes = delayMinutes % 60
-                    
+
                     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                     echo "⏰ PIPELINE DELAYED START"
                     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -234,32 +234,32 @@ If both defined, intersection is used.'''
                     echo "Release:         ${params.RELEASE}"
                     echo "Build:           ${params.BUILD_NUMBER}"
                     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                    
+
                     // Store for email notification
                     env.DELAYED_START_TIME = targetTime.format('yyyy-MM-dd HH:mm:ss')
                     env.DELAY_DURATION = "${delayHours}h ${remainingMinutes}m"
                     env.DELAY_TYPE = isTimeFormat ? "Specific Time (${startAt})" : "Delay Minutes (${startAt})"
-                    
+
                     // Show periodic updates for delays > 5 minutes
                     if (delaySeconds > 300) {
                         def checkInterval = 300 // Check every 5 minutes
                         def checksRemaining = (delaySeconds / checkInterval).toInteger()
-                        
+
                         echo "Pipeline will show status updates every 5 minutes..."
                         echo ""
-                        
+
                         for (int i = 0; i < checksRemaining; i++) {
                             sleep time: checkInterval, unit: 'SECONDS'
-                            
+
                             def now = new Date()
                             def remaining = ((targetTime.time - now.time) / 1000).toLong()
                             def remainMin = (remaining / 60).toLong()
                             def remainHour = (remainMin / 60).toLong()
                             def remainMinOnly = remainMin % 60
-                            
+
                             echo "⏳ [${now.format('HH:mm:ss')}] Still waiting... ${remainHour}h ${remainMinOnly}m remaining until ${targetTime.format('HH:mm:ss')}"
                         }
-                        
+
                         // Sleep for remaining seconds
                         def finalDelay = delaySeconds - (checksRemaining * checkInterval)
                         if (finalDelay > 0) {
@@ -270,7 +270,7 @@ If both defined, intersection is used.'''
                         echo "Waiting ${delaySeconds} seconds..."
                         sleep time: delaySeconds.toInteger(), unit: 'SECONDS'
                     }
-                    
+
                     def actualStartTime = new Date()
                     echo ""
                     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -468,7 +468,7 @@ If both defined, intersection is used.'''
                         merged.RELEASE = params.RELEASE
                         merged.AUTOLIB_BRANCH = params.AUTOLIB_BRANCH
                         merged.ORIOLE_SUBMIT_FLAG = params.ORIOLE_SUBMIT_FLAG
-                        
+
                         // ✅ ADD THIS LINE - Pass TERMINATE_PREVIOUS to downstream jobs
                         merged.TERMINATE_PREVIOUS = params.TERMINATE_PREVIOUS
 
