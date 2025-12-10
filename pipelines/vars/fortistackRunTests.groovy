@@ -201,6 +201,91 @@ def call() {
                 }
             }
 
+            stage('Docker Restart') {
+                when {
+                    expression { return params.PROVISION_DOCKER }
+                }
+                steps {
+                    script {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'LDAP',
+                                usernameVariable: 'SVN_USER',
+                                passwordVariable: 'SVN_PASS'
+                            )
+                        ]) {
+                            echo "=== Docker provisioning is ENABLED ==="
+
+                            def composeFile = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker/${params.DOCKER_COMPOSE_FILE_CHOICE}"
+                            def dockerDir = "/home/fosqa/${LOCAL_LIB_DIR}/testcase/${SVN_BRANCH}/${params.FEATURE_NAME}/docker"
+
+                            // Use printFile helper to debug docker compose file
+                            printFile(
+                                filePath: composeFile,
+                                fileLabel: "Docker Compose File",
+                                baseDir: dockerDir
+                            )
+
+                            // Step 3: Login to Docker registry
+                            echo "=== Logging in to Docker registry ==="
+                            sh "docker login harbor-robot.corp.fortinet.com -u \$SVN_USER -p \$SVN_PASS"
+
+                            // Step 6: Restart Docker Compose stack
+                            echo "=== 🚀 Restart Docker Compose ==="
+                            sh """
+                                cd "${dockerDir}"
+                                docker compose -f "${composeFile}" down -v || echo "⚠️ docker compose down encountered issues, continuing..."
+                                docker compose -f "${composeFile}" up --build -d
+                            """
+
+                            // Step 7: Verify containers are running
+                            echo "=== ✅ Verifying Docker containers started successfully ==="
+                            sh """
+                                cd "${dockerDir}"
+                                echo "Running containers:"
+                                docker compose -f "${composeFile}" ps
+
+                                # Count running containers
+                                RUNNING_COUNT=\$(docker compose -f "${composeFile}" ps --services --filter "status=running" | wc -l)
+                                echo "Number of running containers: \$RUNNING_COUNT"
+
+                                if [ "\$RUNNING_COUNT" -eq 0 ]; then
+                                    echo "❌ ERROR: No containers are running after docker compose up!"
+                                    exit 1
+                                fi
+
+                                echo "✅ Docker Compose stack is up and running"
+                            """
+
+                            // Step 8: Wait for containers to become healthy (optional, with timeout)
+                            echo "=== ⏳ Waiting for containers to become healthy (max 2 minutes) ==="
+                            sh """
+                                cd "${dockerDir}"
+
+                                timeout 120 bash -c '
+                                    while true; do
+                                        # Check for any unhealthy containers
+                                        UNHEALTHY=\$(docker compose -f "${composeFile}" ps --format json 2>/dev/null | \
+                                                    jq -r "select(.Health == \\"unhealthy\\") | .Service" 2>/dev/null | wc -l)
+
+                                        if [ "\$UNHEALTHY" -eq 0 ]; then
+                                            echo "✅ All containers are healthy or have no health checks defined"
+                                            break
+                                        fi
+
+                                        echo "⏳ Waiting for \$UNHEALTHY container(s) to become healthy..."
+                                        sleep 5
+                                    done
+                                ' || echo "⚠️ Timeout waiting for health checks (containers may still be starting)"
+
+                                echo "Final container status:"
+                                docker compose -f "${composeFile}" ps
+                            """
+                        }
+                    }
+                }
+            }
+
             stage('Run Tests') {
                 when {
                     expression { return !params.SKIP_TEST }
