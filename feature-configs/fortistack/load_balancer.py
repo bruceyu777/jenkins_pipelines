@@ -1842,19 +1842,15 @@ def main():
     logging.info("CALCULATING LOAD DISTRIBUTION")
     logging.info("=" * 60)
 
-    durations_queue = list(duration_entries)
+    # Convert duration_entries list to a dict for O(1) lookup
+    duration_dict = dict(duration_entries)
     feature_durations = []
 
     for entry in filtered_entries:
         feature_name = entry["FEATURE_NAME"]
-        duration_map = {}
 
-        # Find matching duration entry
-        for i, (name, dur_map) in enumerate(durations_queue):
-            if name == feature_name:
-                duration_map = dur_map
-                durations_queue.pop(i)
-                break
+        # Look up duration map from dict (no queue modification issues)
+        duration_map = duration_dict.get(feature_name, {})
 
         if not duration_map:
             logging.warning(f"No durations for '{feature_name}' -> using 1hr/group default")
