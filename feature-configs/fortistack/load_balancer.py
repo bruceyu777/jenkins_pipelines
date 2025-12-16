@@ -1314,6 +1314,113 @@ def filter_test_groups_by_choice(test_groups: List[str], group_choice: str) -> L
     return [group for group in test_groups if group.endswith(f".{group_choice}")]
 
 
+def match_feature_name(feature_name: str, pattern: str) -> bool:
+    """
+    Check if a feature name matches a pattern with flexible matching.
+
+    Supports:
+    - Exact match: "antivirus" matches "antivirus"
+    - Case-insensitive: "AntiVirus" matches "antivirus"
+    - Partial match: "anti" matches "antivirus"
+    - Wildcard: "anti*" matches "antivirus", "antispam"
+    - Contains: "*virus" matches "antivirus"
+
+    Args:
+        feature_name: The feature name to check (e.g., "antivirus")
+        pattern: The pattern to match against (e.g., "anti", "anti*")
+
+    Returns:
+        True if the feature name matches the pattern
+    """
+    # Normalize both to lowercase for case-insensitive matching
+    feature_lower = feature_name.lower()
+    pattern_lower = pattern.lower()
+
+    # Check for wildcard patterns
+    if "*" in pattern_lower:
+        # Convert wildcard pattern to regex
+        # Escape special regex characters except *
+        regex_pattern = re.escape(pattern_lower).replace(r"\*", ".*")
+        regex_pattern = f"^{regex_pattern}$"
+        return bool(re.match(regex_pattern, feature_lower))
+
+    # Check for exact match first (fastest)
+    if feature_lower == pattern_lower:
+        return True
+
+    # Check if pattern is contained in feature name (partial match)
+    if pattern_lower in feature_lower:
+        return True
+
+    return False
+
+
+def filter_features_by_patterns(feature_entries: List[Dict[str, Any]], patterns: str, mode: str = "include") -> List[Dict[str, Any]]:
+    """
+    Filter feature entries by matching patterns with fuzzy matching support.
+
+    Args:
+        feature_entries: List of feature entry dictionaries
+        patterns: Comma-separated list of patterns (e.g., "anti,web*,*filter")
+        mode: "include" (keep matches) or "exclude" (remove matches)
+
+    Returns:
+        Filtered list of feature entries
+    """
+    if not patterns or not patterns.strip():
+        return feature_entries
+
+    # Parse patterns
+    pattern_list = [p.strip() for p in patterns.split(",") if p.strip()]
+
+    if not pattern_list:
+        return feature_entries
+
+    # Build set of matching feature names
+    matching_features = set()
+    pattern_matches = {pattern: [] for pattern in pattern_list}
+
+    for entry in feature_entries:
+        feature_name = entry.get("FEATURE_NAME", "")
+        if not feature_name:
+            continue
+
+        # Check if feature matches any pattern
+        for pattern in pattern_list:
+            if match_feature_name(feature_name, pattern):
+                matching_features.add(feature_name)
+                pattern_matches[pattern].append(feature_name)
+                break  # Feature matched, no need to check other patterns
+
+    # Log matching results
+    mode_label = "inclusion" if mode == "include" else "exclusion"
+    logging.info(f"Feature {mode_label} patterns: {pattern_list}")
+    logging.info(f"Pattern matching results:")
+
+    for pattern, matches in pattern_matches.items():
+        if matches:
+            logging.info(f"  '{pattern}' matched {len(matches)} features: {sorted(matches)}")
+        else:
+            logging.warning(f"  '{pattern}' matched 0 features")
+
+    # Check if any patterns had no matches
+    unmatched_patterns = [p for p, matches in pattern_matches.items() if not matches]
+    if unmatched_patterns:
+        logging.warning(f"⚠️  Patterns with no matches: {unmatched_patterns}")
+        available_features = sorted([e["FEATURE_NAME"] for e in feature_entries])
+        logging.warning(f"    Available features: {available_features}")
+
+    # Filter entries based on mode
+    if mode == "include":
+        filtered_entries = [entry for entry in feature_entries if entry.get("FEATURE_NAME") in matching_features]
+        logging.info(f"Total features matched for inclusion: {len(filtered_entries)}/{len(feature_entries)}")
+    else:  # mode == "exclude"
+        filtered_entries = [entry for entry in feature_entries if entry.get("FEATURE_NAME") not in matching_features]
+        logging.info(f"Total features excluded: {len(matching_features)}, remaining: {len(filtered_entries)}/{len(feature_entries)}")
+
+    return filtered_entries
+
+
 # =============================================================================
 # DISPATCH GENERATION
 # =============================================================================
@@ -1688,8 +1795,24 @@ def main():
     parser.add_argument("--jenkins-user", default=DEFAULT_JENKINS_USER, help="Jenkins username for API access")
     parser.add_argument("--jenkins-token", default=DEFAULT_JENKINS_TOKEN, help="Jenkins API token")
     parser.add_argument("-r", "--reserved-nodes", default=DEFAULT_RESERVED_NODES, help="Comma-separated list of nodes to exclude")
-    parser.add_argument("-e", "--exclude", default="", help="Comma-separated list of features to exclude")
-    parser.add_argument("-f", "--features", nargs="?", const="", default="", help="Comma-separated list of features to include (if empty or not specified, include all)")
+    parser.add_argument(
+        "-e",
+        "--exclude",
+        default="",
+        help=("Comma-separated list of feature patterns to exclude. " "Supports: exact match ('antivirus'), partial match ('anti'), " "wildcard ('anti*', '*virus', '*anti*')"),
+    )
+    parser.add_argument(
+        "-f",
+        "--features",
+        nargs="?",
+        const="",
+        default="",
+        help=(
+            "Comma-separated list of feature patterns to include (if empty or not specified, include all). "
+            "Supports: exact match ('antivirus'), partial match ('anti'), "
+            "wildcard ('anti*', '*virus', '*anti*')"
+        ),
+    )
     parser.add_argument("-o", "--output", default="dispatch.json", help="Output dispatch JSON path")
     parser.add_argument(
         "-g",
@@ -1748,29 +1871,46 @@ def main():
     write_features_dict(merged_features)
     write_features_dict_to_all_in_one_tools(merged_features)
 
-    # Step 3: Apply feature inclusion filter (if specified)
+    # Step 3: Apply feature INCLUSION filter (if specified)
     if args.features and args.features.strip():
-        included_features = {name.strip() for name in args.features.split(",") if name.strip()}
-        logging.info(f"Including only features: {', '.join(sorted(included_features))}")
-        feature_entries = [entry for entry in feature_entries if entry["FEATURE_NAME"] in included_features]
-        logging.info(f"After feature inclusion filter: {len(feature_entries)} features remaining")
+        logging.info("=" * 60)
+        logging.info("APPLYING FEATURE INCLUSION FILTER")
+        logging.info("=" * 60)
 
-    # Step 4: Apply exclusion filter
-    static_exclusions = set(EXCLUDE_FEATURES)
-    cli_exclusions = {name.strip() for name in args.exclude.split(",") if name.strip()}
-    all_exclusions = static_exclusions.union(cli_exclusions)
+        feature_entries = filter_features_by_patterns(feature_entries, args.features, mode="include")
 
-    if all_exclusions:
-        logging.info(f"Excluding features: {', '.join(sorted(all_exclusions))}")
+        if not feature_entries:
+            logging.error("❌ No features matched the inclusion patterns")
+            logging.error(f"   Patterns: {args.features}")
+            sys.exit(1)
 
-    filtered_entries = [entry for entry in feature_entries if entry["FEATURE_NAME"] not in all_exclusions]
+        logging.info(f"✅ After feature inclusion filter: {len(feature_entries)} features remaining")
+        logging.info("")
+
+    # Step 4: Apply feature EXCLUSION filter
+    # Combine static exclusions from code with CLI exclusions
+    static_exclusions_str = ",".join(EXCLUDE_FEATURES) if EXCLUDE_FEATURES else ""
+    all_exclusion_patterns = ",".join(filter(None, [static_exclusions_str, args.exclude]))
+
+    if all_exclusion_patterns:
+        logging.info("=" * 60)
+        logging.info("APPLYING FEATURE EXCLUSION FILTER")
+        logging.info("=" * 60)
+
+        feature_entries = filter_features_by_patterns(feature_entries, all_exclusion_patterns, mode="exclude")
+
+        logging.info(f"✅ After feature exclusion filter: {len(feature_entries)} features remaining")
+        logging.info("")
 
     # Step 5: Filter test groups based on group choice
     if args.group_choice != "all":
-        logging.info(f"Filtering test groups by choice: {args.group_choice}")
+        logging.info("=" * 60)
+        logging.info(f"FILTERING TEST GROUPS: {args.group_choice}")
+        logging.info("=" * 60)
+
         entries_with_groups = []
 
-        for entry in filtered_entries:
+        for entry in feature_entries:
             original_groups = entry.get("test_groups", [])
             filtered_groups = filter_test_groups_by_choice(original_groups, args.group_choice)
 
@@ -1783,10 +1923,11 @@ def main():
             else:
                 logging.info(f"Feature '{entry['FEATURE_NAME']}': " f"excluded (no {args.group_choice} groups)")
 
-        filtered_entries = entries_with_groups
-        logging.info(f"After group filtering: {len(filtered_entries)} features remaining")
+        feature_entries = entries_with_groups
+        logging.info(f"✅ After group filtering: {len(feature_entries)} features remaining")
+        logging.info("")
 
-    logging.info(f"Final feature count after all filtering: {len(filtered_entries)} features")
+    logging.info(f"📊 Final feature count after all filtering: {len(feature_entries)} features")
 
     # Step 6: Load test durations
     logging.info("=" * 60)
@@ -1829,7 +1970,7 @@ def main():
     logging.info(f"Available nodes for dispatch <{len(available_nodes)}>: {available_nodes}")
 
     # Step 8: Verify we have features and nodes to work with
-    if not filtered_entries:
+    if not feature_entries:
         logging.error("No entries after filtering; aborting.")
         sys.exit(1)
 
@@ -1846,7 +1987,7 @@ def main():
     duration_dict = dict(duration_entries)
     feature_durations = []
 
-    for entry in filtered_entries:
+    for entry in feature_entries:
         feature_name = entry["FEATURE_NAME"]
 
         # Look up duration map from dict (no queue modification issues)
@@ -1867,7 +2008,7 @@ def main():
         feature_durations.append(total_seconds)
 
     # Allocate nodes to features proportionally
-    node_allocations = allocate_counts_to_nodes(feature_durations, len(available_nodes), filtered_entries)
+    node_allocations = allocate_counts_to_nodes(feature_durations, len(available_nodes), feature_entries)
 
     # Step 10: Build dispatch entries
     logging.info("=" * 60)
@@ -1881,7 +2022,7 @@ def main():
     static_features = []
     dynamic_features = []
 
-    for entry, node_count in zip(filtered_entries, node_allocations):
+    for entry, node_count in zip(feature_entries, node_allocations):
         feature_name = entry["FEATURE_NAME"]
         if feature_name in FEATURE_NODE_STATIC_BINDING:
             static_features.append((entry, node_count))
