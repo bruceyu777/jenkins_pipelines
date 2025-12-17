@@ -1421,6 +1421,55 @@ def filter_features_by_patterns(feature_entries: List[Dict[str, Any]], patterns:
     return filtered_entries
 
 
+def filter_test_groups_by_patterns(test_groups: List[str], patterns: str, mode: str = "exclude") -> List[str]:
+    """
+    Filter test groups by matching patterns with fuzzy matching support.
+
+    Args:
+        test_groups: List of test group names
+        patterns: Comma-separated list of patterns (e.g., "smoke,*perf,tmp*")
+        mode: "exclude" (remove matches) or "include" (keep only matches)
+
+    Returns:
+        Filtered list of test groups
+    """
+    if not patterns or not patterns.strip():
+        return test_groups
+
+    pattern_list = [p.strip() for p in patterns.split(",") if p.strip()]
+
+    if not pattern_list:
+        return test_groups
+
+    # Build set of matching groups
+    matching_groups = set()
+    pattern_matches = {pattern: [] for pattern in pattern_list}
+
+    for group in test_groups:
+        # Check if group matches any pattern
+        for pattern in pattern_list:
+            if match_feature_name(group, pattern):  # Reuse existing fuzzy matcher
+                matching_groups.add(group)
+                pattern_matches[pattern].append(group)
+                break
+
+    # Log matching results
+    mode_label = "exclusion" if mode == "exclude" else "inclusion"
+    logging.debug(f"Group {mode_label} patterns: {pattern_list}")
+
+    for pattern, matches in pattern_matches.items():
+        if matches:
+            logging.debug(f"  Pattern '{pattern}' matched {len(matches)} groups: {sorted(matches)}")
+        else:
+            logging.debug(f"  Pattern '{pattern}' matched 0 groups")
+
+    # Filter groups based on mode
+    if mode == "exclude":
+        return [group for group in test_groups if group not in matching_groups]
+    else:  # mode == "include"
+        return [group for group in test_groups if group in matching_groups]
+
+
 # =============================================================================
 # DISPATCH GENERATION
 # =============================================================================
@@ -1823,6 +1872,16 @@ def main():
         choices=["all", "crit", "full", "tmp"],
         help="Filter test groups: 'all' (default), 'crit' (only .crit groups), 'full' (only .full groups). Use -g without value for 'all'",
     )
+    parser.add_argument(
+        "--group-filter",
+        default="",
+        help=(
+            "Comma-separated list of group patterns to exclude from test_groups. "
+            "Supports: exact match ('smoke'), partial match ('perf'), "
+            "wildcard ('smoke*', '*perf', '*smoke*'). "
+            "Applied AFTER --group-choice filtering."
+        ),
+    )
 
     # MongoDB arguments
     mongo_grp = parser.add_argument_group("MongoDB settings")
@@ -1902,32 +1961,51 @@ def main():
         logging.info(f"✅ After feature exclusion filter: {len(feature_entries)} features remaining")
         logging.info("")
 
-    # Step 5: Filter test groups based on group choice
-    if args.group_choice != "all":
-        logging.info("=" * 60)
-        logging.info(f"FILTERING TEST GROUPS: {args.group_choice}")
-        logging.info("=" * 60)
+    # Step 5: Filter test groups based on group choice AND group-filter
+    logging.info("=" * 60)
+    logging.info("FILTERING TEST GROUPS")
+    logging.info("=" * 60)
 
-        entries_with_groups = []
+    entries_with_groups = []
 
-        for entry in feature_entries:
-            original_groups = entry.get("test_groups", [])
+    for entry in feature_entries:
+        feature_name = entry.get("FEATURE_NAME", "")
+        original_groups = entry.get("test_groups", [])
+
+        # Stage 1: Apply suffix-based filtering (--group-choice)
+        if args.group_choice != "all":
             filtered_groups = filter_test_groups_by_choice(original_groups, args.group_choice)
+            logging.debug(f"Feature '{feature_name}': " f"group-choice '{args.group_choice}' -> {len(original_groups)} to {len(filtered_groups)} groups")
+        else:
+            filtered_groups = original_groups
 
-            if filtered_groups:
-                # Create a copy of the entry with filtered groups
-                filtered_entry = dict(entry)
-                filtered_entry["test_groups"] = filtered_groups
-                entries_with_groups.append(filtered_entry)
-                logging.info(f"Feature '{entry['FEATURE_NAME']}': " f"{len(original_groups)} -> {len(filtered_groups)} groups")
-            else:
-                logging.info(f"Feature '{entry['FEATURE_NAME']}': " f"excluded (no {args.group_choice} groups)")
+        # Stage 2: Apply pattern-based exclusion (--group-filter)
+        if args.group_filter and args.group_filter.strip():
+            pre_filter_count = len(filtered_groups)
+            filtered_groups = filter_test_groups_by_patterns(filtered_groups, args.group_filter, mode="exclude")
+            excluded_count = pre_filter_count - len(filtered_groups)
 
-        feature_entries = entries_with_groups
-        logging.info(f"✅ After group filtering: {len(feature_entries)} features remaining")
-        logging.info("")
+            if excluded_count > 0:
+                logging.info(f"Feature '{feature_name}': " f"group-filter excluded {excluded_count} groups -> " f"{len(filtered_groups)} remaining")
 
-    logging.info(f"📊 Final feature count after all filtering: {len(feature_entries)} features")
+        # Only include features that have groups remaining after all filtering
+        if filtered_groups:
+            filtered_entry = dict(entry)
+            filtered_entry["test_groups"] = filtered_groups
+            entries_with_groups.append(filtered_entry)
+
+            logging.info(f"✓ Feature '{feature_name}': " f"{len(original_groups)} -> {len(filtered_groups)} groups after all filters\n" f"filtered groups: <{filtered_groups}>")
+        else:
+            logging.info(f"✗ Feature '{feature_name}': " f"excluded (no groups remaining after filtering)")
+
+    feature_entries = entries_with_groups
+
+    if not feature_entries:
+        logging.error("❌ No features remaining after group filtering")
+        sys.exit(1)
+
+    logging.info(f"✅ After group filtering: {len(feature_entries)} features with test groups")
+    logging.info("")
 
     # Step 6: Load test durations
     logging.info("=" * 60)
