@@ -342,22 +342,31 @@ def call() {
                                     sudo mkdir -p ${crashLogsDir}
                                     sudo mkdir -p /home/fosqa/resources/tools/logs
 
-                                    # Start crash monitor in background
+                                    # Create log file with proper permissions
+                                    sudo touch '${crashMonitorLogFile}'
+                                    sudo chmod 777 '${crashMonitorLogFile}'
+
+                                    # Start crash monitor in background (using bash -c to properly handle sudo and nohup)
                                     echo "🔍 Starting FGT crash log monitor..."
-                                    nohup sudo ./venv/bin/python3 monitor_fgt_crash.py --devices ALL > '${crashMonitorLogFile}' 2>&1 &
+                                    sudo bash -c "cd /home/fosqa/resources/tools && nohup ./venv/bin/python3 monitor_fgt_crash.py --devices ALL > '${crashMonitorLogFile}' 2>&1 & echo \\\$! > '${crashMonitorPidFile}'"
 
-                                    # Save PID
-                                    MONITOR_PID=\$!
-                                    echo \$MONITOR_PID > '${crashMonitorPidFile}'
-                                    echo "✅ Crash monitor started with PID: \$MONITOR_PID"
+                                    # Read the saved PID
+                                    MONITOR_PID=\$(sudo cat '${crashMonitorPidFile}' 2>/dev/null || echo "")
 
-                                    # Verify it's running
-                                    sleep 2
-                                    if ps -p \$MONITOR_PID > /dev/null 2>&1; then
-                                        echo "✅ Crash monitor is running"
+                                    if [ -n "\$MONITOR_PID" ]; then
+                                        echo "✅ Crash monitor started with PID: \$MONITOR_PID"
+
+                                        # Verify it's running
+                                        sleep 2
+                                        if sudo ps -p \$MONITOR_PID > /dev/null 2>&1; then
+                                            echo "✅ Crash monitor is running"
+                                        else
+                                            echo "⚠️  Warning: Crash monitor process not found (may have exited)"
+                                            echo "Last 10 lines of monitor log:"
+                                            sudo tail -n 10 '${crashMonitorLogFile}' 2>/dev/null || echo "Log file not found"
+                                        fi
                                     else
-                                        echo "⚠️  Warning: Crash monitor may have failed to start"
-                                        cat '${crashMonitorLogFile}' || true
+                                        echo "⚠️  Warning: Failed to get monitor PID"
                                     fi
                                 """
                                 echo "✅ Crash log monitoring started successfully"
