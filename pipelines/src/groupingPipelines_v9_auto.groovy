@@ -94,7 +94,7 @@ If both defined, intersection is used.'''
         )
         string(
             name: 'EMAIL_RECIPIENTS',
-            defaultValue: 'yzhengfeng@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,nzhang@fortinet.com,qxu@fortinet.com,scai@fortinet.com,eson@fortinet.com, hchuanjian@fortinet.com, halmossawi@fortinet.com, ldawei@fortinet.com, ljia@fortinet.com, lluo@fortinet.com, mabbasi@fortinet.com, ssun@fortinet.com, vlysak@fortinet.com, wangt@fortinet.com, yjiaran@fortinet.com, yshang@fortinet.com, YUZHU@fortinet.com, yuzhu@fortinet.com, zachwang@fortinet.com',
+            defaultValue: 'yzhengfeng@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,nzhang@fortinet.com,qxu@fortinet.com,scai@fortinet.com,eson@fortinet.com, hchuanjian@fortinet.com, halmossawi@fortinet.com, ldawei@fortinet.com, ljia@fortinet.com, lluo@fortinet.com, mabbasi@fortinet.com, ssun@fortinet.com, vlysak@fortinet.com, wangt@fortinet.com, yjiaran@fortinet.com, yshang@fortinet.com, YUZHU@fortinet.com, yuzhu@fortinet.com, zachwang@fortinet.com, xyan@fortinet.com, jiny@fortinet.com, vthipparthi@fortinet.com',
             description: 'Comma-separated list of email recipients for the test results report'
         )
         booleanParam(
