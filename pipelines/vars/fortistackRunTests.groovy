@@ -324,6 +324,43 @@ def call() {
                             echo "Folder: ${svnResult.folderPath}"
                             echo "Reason: ${svnResult.reason}"
 
+                            // Start crash log monitoring in background
+                            echo "=== Step 3: Start FGT Crash Log Monitor ==="
+                            def crashMonitorPidFile = "/home/fosqa/resources/tools/monitor_fgt_crash.pid"
+                            def crashMonitorLogFile = "/home/fosqa/resources/tools/logs/monitor_fgt_crash.log"
+
+                            try {
+                                sh """
+                                    cd /home/fosqa/resources/tools
+
+                                    # Clean up any previous monitor files
+                                    sudo rm -f '${crashMonitorPidFile}' '${crashMonitorLogFile}'
+                                    sudo rm -rf /home/fosqa/resources/tools/crashlogs
+                                    sudo mkdir -p /home/fosqa/resources/tools/crashlogs
+
+                                    # Start crash monitor in background
+                                    echo "🔍 Starting FGT crash log monitor..."
+                                    nohup sudo ./venv/bin/python3 monitor_fgt_crash.py --devices ALL > '${crashMonitorLogFile}' 2>&1 &
+
+                                    # Save PID
+                                    MONITOR_PID=\$!
+                                    echo \$MONITOR_PID > '${crashMonitorPidFile}'
+                                    echo "✅ Crash monitor started with PID: \$MONITOR_PID"
+
+                                    # Verify it's running
+                                    sleep 2
+                                    if ps -p \$MONITOR_PID > /dev/null 2>&1; then
+                                        echo "✅ Crash monitor is running"
+                                    else
+                                        echo "⚠️  Warning: Crash monitor may have failed to start"
+                                        cat '${crashMonitorLogFile}' || true
+                                    fi
+                                """
+                                echo "✅ Crash log monitoring started successfully"
+                            } catch (err) {
+                                echo "⚠️  Failed to start crash monitor (non-fatal): ${err}"
+                            }
+
                             // Run tests for each computed test group
                             for (group in computedTestGroups) {
                                 echo "get node info by running get_node_info.py"
@@ -599,6 +636,87 @@ def call() {
                                     error "Failing stage after post-processing. Original error: ${testErr}"
                                 }
                             }
+
+                            // Stop crash log monitoring and archive results
+                            echo "=== Final Step: Stop FGT Crash Log Monitor ==="
+                            def crashMonitorPidFile = "/home/fosqa/resources/tools/monitor_fgt_crash.pid"
+                            def crashMonitorLogFile = "/home/fosqa/resources/tools/logs/monitor_fgt_crash.log"
+                            def crashLogsDir = "/home/fosqa/resources/tools/crashlogs"
+
+                            try {
+                                sh """
+                                    cd /home/fosqa/resources/tools
+
+                                    echo "🛑 Stopping crash log monitor..."
+
+                                    # Check if PID file exists
+                                    if [ -f '${crashMonitorPidFile}' ]; then
+                                        MONITOR_PID=\$(cat '${crashMonitorPidFile}' 2>/dev/null)
+
+                                        if [ -n "\$MONITOR_PID" ] && ps -p \$MONITOR_PID > /dev/null 2>&1; then
+                                            echo "Found running crash monitor with PID: \$MONITOR_PID"
+
+                                            # Send SIGTERM for graceful shutdown
+                                            sudo kill -TERM \$MONITOR_PID 2>/dev/null || true
+
+                                            # Wait up to 10 seconds for graceful shutdown
+                                            for i in {1..10}; do
+                                                if ! ps -p \$MONITOR_PID > /dev/null 2>&1; then
+                                                    echo "✅ Crash monitor stopped gracefully"
+                                                    break
+                                                fi
+                                                sleep 1
+                                            done
+
+                                            # Force kill if still running
+                                            if ps -p \$MONITOR_PID > /dev/null 2>&1; then
+                                                echo "⚠️  Forcing crash monitor to stop..."
+                                                sudo kill -9 \$MONITOR_PID 2>/dev/null || true
+                                                sleep 1
+                                            fi
+                                        else
+                                            echo "⚠️  Crash monitor process not running (PID: \$MONITOR_PID)"
+                                        fi
+
+                                        rm -f '${crashMonitorPidFile}'
+                                    else
+                                        echo "⚠️  No crash monitor PID file found"
+                                    fi
+
+                                    # Show monitor log tail
+                                    echo "━━━━━━━━━━━━━━━━━━━━ Crash Monitor Log (last 20 lines) ━━━━━━━━━━━━━━━━━━━━"
+                                    tail -n 20 '${crashMonitorLogFile}' 2>/dev/null || echo "No monitor log found"
+                                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+                                    # Check crash logs directory
+                                    if [ -d '${crashLogsDir}' ]; then
+                                        CRASH_COUNT=\$(find '${crashLogsDir}' -type f 2>/dev/null | wc -l)
+                                        if [ "\$CRASH_COUNT" -gt 0 ]; then
+                                            echo "⚠️  Found \$CRASH_COUNT crash log file(s):"
+                                            ls -lh '${crashLogsDir}'
+                                        else
+                                            echo "✅ No crash logs detected"
+                                        fi
+                                    else
+                                        echo "⚠️  Crash logs directory not found"
+                                    fi
+                                """
+
+                                // Copy crash logs to workspace for archiving
+                                sh """
+                                    if [ -d '${crashLogsDir}' ]; then
+                                        mkdir -p ${WORKSPACE}/crashlogs
+                                        cp -r ${crashLogsDir}/* ${WORKSPACE}/crashlogs/ 2>/dev/null || true
+
+                                        # Also copy the monitor log
+                                        cp '${crashMonitorLogFile}' ${WORKSPACE}/crashlogs/ 2>/dev/null || true
+                                    fi
+                                """
+
+                                echo "✅ Crash log monitoring stopped and archived"
+                            } catch (err) {
+                                echo "⚠️  Error stopping crash monitor (non-fatal): ${err}"
+                            }
                         }
                     }
                 }
@@ -669,6 +787,32 @@ def call() {
                             reportFiles : "summary_${getArchiveGroupName(computedTestGroups[0])}.html",
                             reportName  : "Test Results Summary for ${getArchiveGroupName(computedTestGroups[0])}"
                         ])
+                    }
+
+                    // Archive crash logs if they exist
+                    def crashLogsExist = sh(
+                        returnStatus: true,
+                        script: "test -d ${WORKSPACE}/crashlogs && [ \$(ls -A ${WORKSPACE}/crashlogs 2>/dev/null | wc -l) -gt 0 ]"
+                    ) == 0
+
+                    if (crashLogsExist) {
+                        echo "📦 Archiving crash logs..."
+                        archiveArtifacts artifacts: "crashlogs/**/*", fingerprint: false, allowEmptyArchive: true
+
+                        // Count crash files
+                        def crashCount = sh(
+                            returnStdout: true,
+                            script: "find ${WORKSPACE}/crashlogs -type f -name '*.log' 2>/dev/null | wc -l"
+                        ).trim()
+
+                        if (crashCount.toInteger() > 0) {
+                            echo "⚠️  WARNING: ${crashCount} crash log file(s) detected!"
+                            currentBuild.description = (currentBuild.description ?: "") + " [${crashCount} crashes]"
+                        } else {
+                            echo "✅ No crash logs found"
+                        }
+                    } else {
+                        echo "ℹ️  No crash logs to archive"
                     }
 
                     // Clean up the outputs directory
