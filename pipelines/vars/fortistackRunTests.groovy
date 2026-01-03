@@ -324,10 +324,13 @@ def call() {
                             echo "Folder: ${svnResult.folderPath}"
                             echo "Reason: ${svnResult.reason}"
 
-                            // Start crash log monitoring in background
-                            echo "=== Step 3: Start FGT Crash Log Monitor ==="
+                            // Define crash monitor variables (used for start and stop)
                             def crashMonitorPidFile = "/home/fosqa/resources/tools/monitor_fgt_crash.pid"
                             def crashMonitorLogFile = "/home/fosqa/resources/tools/logs/monitor_fgt_crash.log"
+                            def crashLogsDir = "/home/fosqa/resources/tools/crashlogs"
+
+                            // Start crash log monitoring in background
+                            echo "=== Step 3: Start FGT Crash Log Monitor ==="
 
                             try {
                                 sh """
@@ -335,8 +338,9 @@ def call() {
 
                                     # Clean up any previous monitor files
                                     sudo rm -f '${crashMonitorPidFile}' '${crashMonitorLogFile}'
-                                    sudo rm -rf /home/fosqa/resources/tools/crashlogs
-                                    sudo mkdir -p /home/fosqa/resources/tools/crashlogs
+                                    sudo rm -rf ${crashLogsDir}
+                                    sudo mkdir -p ${crashLogsDir}
+                                    sudo mkdir -p /home/fosqa/resources/tools/logs
 
                                     # Start crash monitor in background
                                     echo "🔍 Starting FGT crash log monitor..."
@@ -639,9 +643,7 @@ def call() {
 
                             // Stop crash log monitoring and archive results
                             echo "=== Final Step: Stop FGT Crash Log Monitor ==="
-                            def crashMonitorPidFile = "/home/fosqa/resources/tools/monitor_fgt_crash.pid"
-                            def crashMonitorLogFile = "/home/fosqa/resources/tools/logs/monitor_fgt_crash.log"
-                            def crashLogsDir = "/home/fosqa/resources/tools/crashlogs"
+                            // Reuse variables declared earlier: crashMonitorPidFile, crashMonitorLogFile, crashLogsDir
 
                             try {
                                 sh """
