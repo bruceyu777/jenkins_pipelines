@@ -169,7 +169,7 @@ def call() {
                     script {
                         currentBuild.displayName = "#${currentBuild.number} " +
                             "${params.NODE_NAME}-${params.RELEASE}-${params.BUILD_NUMBER}-" +
-                            "${FEATURE_NAME}-${computedTestGroups.join(',')}"
+                            "${params.FEATURE_NAME}-${computedTestGroups.join(',')}"
                     }
                 }
             }
