@@ -713,14 +713,28 @@ def call() {
                                     fi
                                 """
 
-                                // Copy crash logs to workspace for archiving
-                                sh """
-                                    if [ -d '${crashLogsDir}' ]; then
-                                        mkdir -p ${WORKSPACE}/crashlogs
-                                        cp -r ${crashLogsDir}/* ${WORKSPACE}/crashlogs/ 2>/dev/null || true
+                                // Create unique crash logs directory for this build to avoid conflicts
+                                def buildCrashLogsDir = "${WORKSPACE}/crashlogs_${env.BUILD_NUMBER}"
 
-                                        # Also copy the monitor log
-                                        cp '${crashMonitorLogFile}' ${WORKSPACE}/crashlogs/ 2>/dev/null || true
+                                sh """
+                                    # Clean up any existing crash log directories from previous runs
+                                    echo "🧹 Cleaning up old crash logs from workspace..."
+                                    rm -rf ${WORKSPACE}/crashlog* 2>/dev/null || true
+
+                                    if [ -d '${crashLogsDir}' ]; then
+                                        mkdir -p ${buildCrashLogsDir}
+
+                                        # Copy crash logs to build-specific directory (preserve originals on agent)
+                                        cp -r ${crashLogsDir}/* ${buildCrashLogsDir}/ 2>/dev/null || true
+
+                                        # Copy the monitor log
+                                        cp '${crashMonitorLogFile}' ${buildCrashLogsDir}/ 2>/dev/null || true
+
+                                        echo "📦 Crash logs copied to build-specific directory: ${buildCrashLogsDir}"
+                                        echo "Original files preserved at: ${crashLogsDir}"
+                                        ls -lh ${buildCrashLogsDir}
+                                    else
+                                        echo "⚠️  Crash logs directory '${crashLogsDir}' not found"
                                     fi
                                 """
 
@@ -803,17 +817,17 @@ def call() {
                     // Archive crash logs if they exist
                     def crashLogsExist = sh(
                         returnStatus: true,
-                        script: "test -d ${WORKSPACE}/crashlogs && [ \$(ls -A ${WORKSPACE}/crashlogs 2>/dev/null | wc -l) -gt 0 ]"
+                        script: "test -d ${WORKSPACE}/crashlogs_${env.BUILD_NUMBER} && [ \$(ls -A ${WORKSPACE}/crashlogs_${env.BUILD_NUMBER} 2>/dev/null | wc -l) -gt 0 ]"
                     ) == 0
 
                     if (crashLogsExist) {
-                        echo "📦 Archiving crash logs..."
-                        archiveArtifacts artifacts: "crashlogs/**/*", fingerprint: false, allowEmptyArchive: true
+                        echo "📦 Archiving crash logs from build ${env.BUILD_NUMBER}..."
+                        archiveArtifacts artifacts: "crashlogs_${env.BUILD_NUMBER}/**/*", fingerprint: false, allowEmptyArchive: true
 
                         // Count crash files
                         def crashCount = sh(
                             returnStdout: true,
-                            script: "find ${WORKSPACE}/crashlogs -type f -name '*.log' 2>/dev/null | wc -l"
+                            script: "find ${WORKSPACE}/crashlogs_${env.BUILD_NUMBER} -type f -name '*_crashlog_*.log' 2>/dev/null | wc -l"
                         ).trim()
 
                         if (crashCount.toInteger() > 0) {
@@ -823,7 +837,7 @@ def call() {
                             echo "✅ No crash logs found"
                         }
                     } else {
-                        echo "ℹ️  No crash logs to archive"
+                        echo "ℹ️  No crash logs to archive for build ${env.BUILD_NUMBER}"
                     }
 
                     // Clean up the outputs directory
