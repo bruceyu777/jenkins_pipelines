@@ -348,7 +348,7 @@ def call() {
 
                                     # Start crash monitor in background (using bash -c to properly handle sudo and nohup)
                                     echo "🔍 Starting FGT crash log monitor..."
-                                    sudo bash -c "cd /home/fosqa/resources/tools && nohup ./venv/bin/python3 monitor_fgt_crash.py --devices ALL > '${crashMonitorLogFile}' 2>&1 & echo \\\$! > '${crashMonitorPidFile}'"
+                                    sudo bash -c "cd /home/fosqa/resources/tools && nohup ./venv/bin/python3 monitor_fgt_crash.py --devices ALL --clean-logs > '${crashMonitorLogFile}' 2>&1 & echo \\\$! > '${crashMonitorPidFile}'"
 
                                     # Read the saved PID
                                     MONITOR_PID=\$(sudo cat '${crashMonitorPidFile}' 2>/dev/null || echo "")
