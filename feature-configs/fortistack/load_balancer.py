@@ -88,7 +88,7 @@ logger = setup_logging("load_balancer.log")
 
 ADMIN_EMAILS: Set[str] = {"yzhengfeng@fortinet.com", "wangd@fortinet.com", "rainxiao@fortinet.com"}
 
-DEFAULT_JENKINS_URL: str = "http://10.96.227.206:8080"
+DEFAULT_JENKINS_URL: str = "http://10.96.234.39:8080"
 DEFAULT_JENKINS_USER: str = "fosqa"
 DEFAULT_JENKINS_TOKEN: str = "110dec5c2d2974a67968074deafccc1414"
 DEFAULT_RESERVED_NODES: str = ",".join(
@@ -123,7 +123,7 @@ DEFAULT_RESERVED_NODES: str = ",".join(
 )
 
 # MongoDB connection settings
-DEFAULT_MONGO_URI: str = "mongodb://10.96.227.206:27017"
+DEFAULT_MONGO_URI: str = "mongodb://10.96.234.39:27017"
 DEFAULT_MONGO_DB: str = "autolib"
 DEFAULT_MONGO_COLLECTION: str = "results"
 
@@ -187,19 +187,19 @@ class MongoDBClient:
         # Generate equivalent shell command for debugging
         if query:
             # MongoDB shell command with query
-            shell_cmd = f"mongo 10.96.227.206:27017/autolib --eval 'db.results.find({json.dumps(query)}).sort({{\"build\": -1}}).limit(10).pretty()'"
+            shell_cmd = f"mongo 10.96.234.39:27017/autolib --eval 'db.results.find({json.dumps(query)}).sort({{\"build\": -1}}).limit(10).pretty()'"
         else:
             # MongoDB shell command without query (all documents)
-            shell_cmd = f"mongo 10.96.227.206:27017/autolib --eval 'db.results.find().sort({{\"build\": -1}}).limit(10).pretty()'"
+            shell_cmd = f"mongo 10.96.234.39:27017/autolib --eval 'db.results.find().sort({{\"build\": -1}}).limit(10).pretty()'"
 
         logging.info(f"Equivalent shell command to test manually:")
         logging.info(f"  {shell_cmd}")
 
         # Alternative mongosh command (newer MongoDB shell)
         if query:
-            mongosh_cmd = f'mongosh "10.96.227.206:27017/autolib" --eval \'db.results.find({json.dumps(query)}).sort({{"build": -1}}).limit(10)\''
+            mongosh_cmd = f'mongosh "10.96.234.39:27017/autolib" --eval \'db.results.find({json.dumps(query)}).sort({{"build": -1}}).limit(10)\''
         else:
-            mongosh_cmd = f'mongosh "10.96.227.206:27017/autolib" --eval \'db.results.find().sort({{"build": -1}}).limit(10)\''
+            mongosh_cmd = f'mongosh "10.96.234.39:27017/autolib" --eval \'db.results.find().sort({{"build": -1}}).limit(10)\''
 
         logging.info(f"Alternative mongosh command:")
         logging.info(f"  {mongosh_cmd}")
@@ -250,7 +250,7 @@ class MongoDBClient:
         logging.info(f"Modified query to include duration_human filter: {duration_query}")
 
         # Generate shell command for the modified query
-        shell_cmd_duration = f"mongo 10.96.227.206:27017/autolib --eval 'db.results.find({json.dumps(duration_query)}).sort({{\"build\": -1}}).limit(10).pretty()'"
+        shell_cmd_duration = f"mongo 10.96.234.39:27017/autolib --eval 'db.results.find({json.dumps(duration_query)}).sort({{\"build\": -1}}).limit(10).pretty()'"
         logging.info(f"Shell command for documents with duration_human:")
         logging.info(f"  {shell_cmd_duration}")
 
@@ -388,7 +388,7 @@ class FeatureParametersGetter:
         4) HTTP Basic (fallback), validated by probing the features endpoint
 
         Args:
-            api_base: Base URL of the API (e.g., "http://10.96.227.206:8000/")
+            api_base: Base URL of the API (e.g., "http://10.96.234.39:8000/")
 
         Returns:
             Authenticated requests.Session
@@ -1894,7 +1894,7 @@ def main():
     # API auth/config args
     parser.add_argument(
         "--api-url",
-        default="http://10.96.227.206:8000/features/?page=1&page_size=1000",
+        default="http://10.96.234.39:8000/features/?page=1&page_size=1000",
         help="DB API endpoint returning a list/paginated list of feature dicts",
     )
     parser.add_argument(
