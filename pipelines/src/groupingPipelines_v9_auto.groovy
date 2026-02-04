@@ -4,12 +4,12 @@ pipeline {
     parameters {
         string(
             name: 'RELEASE',
-            defaultValue: '7.6.5',
+            defaultValue: '7.6.7',
             description: 'Enter the release number, with 3 digits, like 7.6.4, or 8.0.0'
         )
         string(
             name: 'BUILD_NUMBER',
-            defaultValue: '3634',
+            defaultValue: '3670',
             description: 'Enter the build number'
         )
 
@@ -80,6 +80,8 @@ pipeline {
             description: '''Arguments to pass to load-balancer.py:
 -n: Define node pool with optional range notation (e.g., node2,node3,node10-node20)
 -a: Use available Jenkins nodes
+-x: Exclude specific nodes
+-e
 If both defined, intersection is used.'''
         )
         string(
@@ -94,7 +96,7 @@ If both defined, intersection is used.'''
         )
         string(
             name: 'EMAIL_RECIPIENTS',
-            defaultValue: 'yzhengfeng@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,nzhang@fortinet.com,qxu@fortinet.com,scai@fortinet.com,eson@fortinet.com, hchuanjian@fortinet.com, halmossawi@fortinet.com, ldawei@fortinet.com, ljia@fortinet.com, lluo@fortinet.com, mabbasi@fortinet.com, ssun@fortinet.com, vlysak@fortinet.com, wangt@fortinet.com, yjiaran@fortinet.com, yshang@fortinet.com, YUZHU@fortinet.com, yuzhu@fortinet.com, zachwang@fortinet.com, xyan@fortinet.com, jiny@fortinet.com, vthipparthi@fortinet.com',
+            defaultValue: 'yzhengfeng@fortinet.com,rainxiao@fortinet.com,wangd@fortinet.com,nzhang@fortinet.com,qxu@fortinet.com,scai@fortinet.com,eson@fortinet.com,hchuanjian@fortinet.com,halmossawi@fortinet.com,ldawei@fortinet.com,ljia@fortinet.com,lluo@fortinet.com,mabbasi@fortinet.com,ssun@fortinet.com,vlysak@fortinet.com,wangt@fortinet.com,yjiaran@fortinet.com,yshang@fortinet.com,YUZHU@fortinet.com,yuzhu@fortinet.com,zachwang@fortinet.com,xyan@fortinet.com,jiny@fortinet.com,vthipparthi@fortinet.com,vivianwu@fortinet.com',
             description: 'Comma-separated list of email recipients for the test results report'
         )
         booleanParam(
@@ -110,7 +112,7 @@ If both defined, intersection is used.'''
         choice(
             name: 'ORIOLE_SUBMIT_FLAG',
             choices: ['succeeded', 'all', 'none'],
-            description: 'Only passed test case submissions or all/none'
+            description: 'succeeded - Only passed test case submissions, or all - passed and failed submissions, none - no submissions'
         )
     }
 
@@ -707,7 +709,7 @@ If both defined, intersection is used.'''
                         python3 --version
                         python3 -c "import pandas, openpyxl, pymongo, requests, libvirt, matplotlib; print('All required packages available')"
                         echo "=== RUNNING FETCH_AUTOLIB_RESULTS ==="
-                        python3 fetch_autolib_results.py -r ${params.RELEASE} -b ${params.BUILD_NUMBER} -t ${params.EMAIL_RECIPIENTS}
+                        python3 fetch_autolib_results.py -r ${params.RELEASE} -b ${params.BUILD_NUMBER} -t "${params.EMAIL_RECIPIENTS}"
                     """.stripIndent().trim()
 
                     echo "Executing command: ${command}"
